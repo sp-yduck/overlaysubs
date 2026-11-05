@@ -1,0 +1,173 @@
+//! whisper.cpp and llama.cpp adapters for the core `Asr` / `Translator` traits.
+use floatsubs_core::pfml::{self, TranslateRequest};
+use floatsubs_core::session::{Asr, Transcript, Translator};
+use llama_cpp_2::context::params::LlamaContextParams;
+use llama_cpp_2::llama_backend::LlamaBackend;
+use llama_cpp_2::llama_batch::LlamaBatch;
+use llama_cpp_2::model::params::LlamaModelParams;
+use llama_cpp_2::model::LlamaModel;
+use llama_cpp_2::sampling::LlamaSampler;
+use std::num::NonZeroU32;
+use std::path::Path;
+use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperVadParams};
+
+pub struct Whisper {
+    ctx: WhisperContext,
+    vad_path: String,
+    threads: i32,
+}
+
+impl Whisper {
+    pub fn load(model: &Path, vad: &Path, use_gpu: bool, threads: usize) -> Result<Self, String> {
+        let mut p = WhisperContextParameters::default();
+        p.use_gpu(use_gpu);
+        let ctx = WhisperContext::new_with_params(model, p).map_err(|e| e.to_string())?;
+        Ok(Self { ctx, vad_path: vad.to_string_lossy().into_owned(), threads: threads.min(8) as i32 })
+    }
+}
+
+impl Whisper {
+    /// Full decode without VAD, so synthetic audio still costs real work.
+    pub fn bench(&mut self, pcm: &[f32]) -> Result<(), String> {
+        let mut st = self.ctx.create_state().map_err(|e| e.to_string())?;
+        let mut p = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+        p.set_n_threads(self.threads);
+        p.set_language(Some("en"));
+        p.set_print_progress(false);
+        st.full(p, pcm).map_err(|e| e.to_string())
+    }
+}
+
+impl Asr for Whisper {
+    fn transcribe(&mut self, pcm: &[f32], lang: Option<&str>) -> Result<Transcript, String> {
+        let mut st = self.ctx.create_state().map_err(|e| e.to_string())?;
+        let mut p = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+        p.set_n_threads(self.threads);
+        p.set_language(Some(lang.unwrap_or("auto")));
+        p.set_no_context(true);
+        p.set_single_segment(true);
+        p.set_suppress_blank(true);
+        p.set_suppress_nst(true);
+        p.set_print_progress(false);
+        p.set_print_realtime(false);
+        p.set_print_special(false);
+        p.set_print_timestamps(false);
+        p.set_vad_model_path(Some(&self.vad_path));
+        p.set_vad_params(WhisperVadParams::new());
+        p.enable_vad(true);
+        st.full(p, pcm).map_err(|e| e.to_string())?;
+        let text: String = (0..st.full_n_segments()).filter_map(|i| st.get_segment(i)).map(|s| s.to_string()).collect();
+        let lang = whisper_rs::get_lang_str(st.full_lang_id_from_state()).unwrap_or("en").to_string();
+        Ok(Transcript { text: text.trim().to_string(), lang })
+    }
+}
+
+pub struct Plamo {
+    backend: LlamaBackend,
+    model: LlamaModel,
+    threads: i32,
+}
+
+const N_CTX: u32 = 4096;
+const MAX_NEW: usize = 256;
+
+impl Plamo {
+    pub fn load(model: &Path, gpu_layers: u32, threads: usize) -> Result<Self, String> {
+        let mut backend = LlamaBackend::init().map_err(|e| e.to_string())?;
+        backend.void_logs();
+        let params = LlamaModelParams::default().with_n_gpu_layers(gpu_layers);
+        let model = LlamaModel::load_from_file(&backend, model, &params).map_err(|e| e.to_string())?;
+        Ok(Self { backend, model, threads: threads as i32 })
+    }
+}
+
+impl Translator for Plamo {
+    fn translate(&mut self, req: &TranslateRequest, on_piece: &mut dyn FnMut(&str)) -> Result<String, String> {
+        let vocab = self.model.vocab();
+        // Fresh context per call: cheap at this size and avoids KV-cache bookkeeping.
+        let cp = LlamaContextParams::default().with_n_ctx(NonZeroU32::new(N_CTX)).with_n_batch(N_CTX).with_n_threads(self.threads).with_n_threads_batch(self.threads);
+        let mut ctx = self.model.new_context(&self.backend, cp).map_err(|e| e.to_string())?;
+        let tokens = vocab.tokenize(pfml::build(req).as_bytes(), true, true);
+        if tokens.len() + MAX_NEW > N_CTX as usize {
+            return Err("utterance too long for context".into());
+        }
+        let mut batch = LlamaBatch::new(N_CTX as usize, 1);
+        batch.add_sequence(&tokens, 0, false).map_err(|e| e.to_string())?;
+        ctx.decode(&mut batch).map_err(|e| e.to_string())?;
+        let mut sampler = LlamaSampler::greedy();
+        let mut out = Vec::<u8>::new();
+        let mut emitted = 0;
+        let mut pos = tokens.len() as i32;
+        for _ in 0..MAX_NEW {
+            let tok = sampler.sample(&ctx, batch.n_tokens() - 1);
+            if vocab.is_eog(tok) {
+                break;
+            }
+            out.extend(vocab.token_to_piece(tok, true, None));
+            if let Some(stop) = pfml::STOP.iter().find_map(|s| find(&out, s.as_bytes())) {
+                out.truncate(stop);
+                break;
+            }
+            // Emit only whole UTF-8 characters.
+            let valid = match std::str::from_utf8(&out[emitted..]) {
+                Ok(s) => s.len(),
+                Err(e) => e.valid_up_to(),
+            };
+            if valid > 0 {
+                on_piece(std::str::from_utf8(&out[emitted..emitted + valid]).unwrap());
+                emitted += valid;
+            }
+            batch.clear();
+            batch.add(tok, pos, &[0], true).map_err(|e| e.to_string())?;
+            pos += 1;
+            ctx.decode(&mut batch).map_err(|e| e.to_string())?;
+        }
+        Ok(String::from_utf8_lossy(&out).trim().to_string())
+    }
+}
+
+fn find(hay: &[u8], needle: &[u8]) -> Option<usize> {
+    hay.windows(needle.len()).position(|w| w == needle)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use floatsubs_core::endpoint::{EndpointConfig, Endpointer, Event};
+    use floatsubs_core::registry::Registry;
+    use floatsubs_core::session::{Session, SessionConfig, Stage};
+
+    /// Downloads ~0.7 GB. Run: FLOATSUBS_WAV=path/to/16k-mono.wav cargo test -p floatsubs -- --ignored
+    #[test]
+    #[ignore]
+    fn real_models_transcribe_and_translate() {
+        let reg = Registry::parse(include_str!("../../models.json")).unwrap();
+        let dir = std::env::temp_dir().join("floatsubs-models");
+        let ids = ["whisper-base", "plamo-3-translate-0.8b-q4_k_m", "silero-vad-v6.2.0"];
+        for id in ids {
+            crate::download::fetch(reg.get(id).unwrap(), &dir, &mut |_, _| {}).unwrap();
+        }
+        let p = |i: usize| dir.join(&reg.get(ids[i]).unwrap().file);
+        let mut asr = Whisper::load(&p(0), &p(2), false, 8).unwrap();
+        let mut mt = Plamo::load(&p(1), 0, 8).unwrap();
+
+        let wav = std::fs::read(std::env::var("FLOATSUBS_WAV").unwrap()).unwrap();
+        let pcm: Vec<f32> = wav[44..].chunks(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect();
+        let mut ep = Endpointer::new(EndpointConfig::default());
+        let mut evs = vec![];
+        ep.push(&pcm, &mut evs);
+        ep.push(&vec![0.0; 16_000], &mut evs);
+        let mut s = Session::new(SessionConfig::default());
+        let mut finals = vec![];
+        for ev in evs.into_iter().filter(|e| matches!(e, Event::Final(_))) {
+            let t0 = std::time::Instant::now();
+            s.handle(ev, &mut asr, &mut mt, &mut |c| if c.stage == Stage::Final { finals.push(c) }).unwrap();
+            eprintln!("utterance took {:?}", t0.elapsed());
+        }
+        for c in &finals {
+            eprintln!("[{}] {}\n  → {}", c.lang, c.source, c.translation);
+        }
+        assert!(!finals.is_empty(), "speech produced captions");
+        assert!(finals.iter().all(|c| c.lang == "en" && c.translation.chars().any(|ch| ('\u{3040}'..='\u{30ff}').contains(&ch) || ('\u{4e00}'..='\u{9fff}').contains(&ch))), "English speech translated into Japanese");
+    }
+}

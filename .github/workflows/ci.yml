@@ -1,0 +1,34 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test -p floatsubs-core
+  bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            features: vulkan
+          - os: macos-14
+            features: metal
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - if: matrix.features == 'vulkan'
+        uses: humbletim/install-vulkan-sdk@v1.2
+      - run: cargo install tauri-cli --version "^2" --locked
+      - run: cargo tauri build --features ${{ matrix.features }}
+        working-directory: src-tauri
+      - uses: actions/upload-artifact@v4
+        with:
+          name: floatsubs-${{ matrix.os }}
+          path: |
+            target/release/bundle/msi/*.msi
+            target/release/bundle/nsis/*.exe
+            target/release/bundle/dmg/*.dmg

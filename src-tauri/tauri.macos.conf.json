@@ -1,0 +1,1 @@
+{ "bundle": { "macOS": { "frameworks": ["../target/release/libllama.dylib", "../target/release/libllama-common.dylib", "../target/release/libggml.dylib", "../target/release/libggml-base.dylib", "../target/release/libggml-cpu.dylib", "../target/release/libggml-metal.dylib", "../target/release/libggml-blas.dylib"] } } }
