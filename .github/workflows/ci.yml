@@ -17,7 +17,11 @@ jobs:
           - os: macos-14
             features: metal
     runs-on: ${{ matrix.os }}
+    env:
+      # libgit2 hits MAX_PATH on llama.cpp's submodule; the git CLI honours core.longpaths.
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     steps:
+      - run: git config --global core.longpaths true
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - if: matrix.features == 'vulkan'
