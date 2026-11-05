@@ -21,3 +21,4 @@ progress { width: 100%; }
 .error { color: #d64545; }
 .hist div { padding: 4px 0; border-bottom: 1px solid var(--border); }
 .hist .src { color: var(--muted); font-size: 12px; }
+h1 select { font-size: 13px; font-weight: normal; }

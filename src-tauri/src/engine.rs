@@ -77,7 +77,7 @@ impl Plamo {
         backend.void_logs();
         let params = LlamaModelParams::default().with_n_gpu_layers(gpu_layers);
         let model = LlamaModel::load_from_file(&backend, model, &params).map_err(|e| e.to_string())?;
-        Ok(Self { backend, model, threads: threads as i32 })
+        Ok(Self { backend, model, threads: threads.min(8) as i32 })
     }
 }
 
@@ -148,8 +148,10 @@ mod tests {
             crate::download::fetch(reg.get(id).unwrap(), &dir, &mut |_, _| {}).unwrap();
         }
         let p = |i: usize| dir.join(&reg.get(ids[i]).unwrap().file);
-        let mut asr = Whisper::load(&p(0), &p(2), false, 8).unwrap();
-        let mut mt = Plamo::load(&p(1), 0, 8).unwrap();
+        // Threads above the core count make ggml's spin barriers thrash (measured 30x slower).
+        let threads = std::thread::available_parallelism().unwrap().get();
+        let mut asr = Whisper::load(&p(0), &p(2), false, threads).unwrap();
+        let mut mt = Plamo::load(&p(1), 0, threads).unwrap();
 
         let wav = std::fs::read(std::env::var("FLOATSUBS_WAV").unwrap()).unwrap();
         let pcm: Vec<f32> = wav[44..].chunks(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect();
