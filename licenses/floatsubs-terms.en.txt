@@ -1,0 +1,32 @@
+floatsubs Terms of Use (version 1)
+
+1. These Terms
+You must accept these Terms to use floatsubs (the "App"). These Terms include the attached PLaMo Community License Agreement. If you do not accept, you may not use the App.
+
+2. License of the App
+The App's source code is provided under the MIT License. The App is provided "as is", without warranty of any kind, express or implied.
+
+3. Translation model (PLaMo)
+3.1 The App downloads and uses PLaMo 3 Translate, a translation model by Preferred Networks, Inc. ("PFN").
+3.2 By accepting these Terms you also accept the attached PLaMo Community License Agreement and are bound by it with PFN.
+3.3 Key points (the attached agreement prevails):
+  (a) Personal and non-commercial use is free.
+  (b) Commercial use requires prior registration on PFN's page (https://forms.gle/mTL8tBLrMYXKNZD56).
+  (c) If you or your affiliates have annual revenue over JPY 1 billion, business use needs a separate agreement with PFN.
+  (d) If you publish or distribute output such as subtitles, state that it was produced by PLaMo (e.g. "Built with PLaMo").
+
+4. Other models
+Whisper (OpenAI, MIT License) for speech recognition and Silero VAD (MIT License) for voice activity detection are subject to their own licenses.
+
+5. Subtitles and translations
+5.1 Subtitles are machine transcription and translation and may contain errors. Check them yourself where accuracy matters.
+5.2 If you publish or distribute subtitles, respect the copyright of the source content and the platform's terms.
+
+6. Privacy
+Audio, transcripts and translations are processed only on your device and are never sent out. The only network traffic is model downloads (Hugging Face). There is no telemetry.
+
+7. Disclaimer
+The developers are not liable for any damage arising from use of the App.
+
+8. Changes
+If these Terms change, the App will ask you to accept them again on the next launch.

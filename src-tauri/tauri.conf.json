@@ -8,7 +8,7 @@
     "withGlobalTauri": true,
     "macOSPrivateApi": true,
     "windows": [
-      { "label": "main", "title": "floatsubs", "url": "index.html", "width": 820, "height": 760 },
+      { "label": "main", "title": "floatsubs", "url": "index.html", "width": 980, "height": 680, "minWidth": 760, "minHeight": 520 },
       {
         "label": "overlay", "title": "floatsubs overlay", "url": "overlay.html",
         "width": 1100, "height": 220, "y": 760, "center": true,

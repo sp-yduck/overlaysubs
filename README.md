@@ -15,11 +15,11 @@ WASAPI loopback / マイク ─▶ 16kHz mono ─▶ エネルギー区切り �
 - `src-tauri` は Tauri アプリ本体です。音声キャプチャ、whisper.cpp / llama.cpp アダプタ、ダウンロード、トレイ、ホットキーを担当します。
 - `ui` は設定画面とオーバーレイです。ビルド不要の素の HTML/JS です。
 - 翻訳エンジンと音声認識は `session::Translator` / `session::Asr` トレイトの裏にあり、差し替えられます。
-- `models.json` がモデル定義（URL、サイズ、SHA-256、ティア）です。設定フォルダに `models.json` を置くと、アプリを更新せずに上書きできます。
+- `models.json` がモデル定義（URL、サイズ、SHA-256、ティア）です。URL は Hugging Face のコミットに固定しています（`main` だと上流の再アップロードでハッシュが合わなくなるため）。設定フォルダに `models.json` を置くと、アプリを更新せずに上書きできます。
 
 ## 機能
 
-- 初回起動でライセンス同意。その後ハードウェアを検出し、ティア（High / Mid / Low / CPU）からモデルを自動選択します。
+- 初回起動で floatsubs 利用規約（PLaMo コミュニティライセンスを別紙として含む）に同意します。同意は設定フォルダの `terms-accepted` に保存し、規約の版が変わるまで再表示しません。その後ハードウェアを検出し、ティア（High / Mid / Low / CPU）からモデルを自動選択します。
 - モデルは Hugging Face から自動ダウンロードします。中断しても再開でき、SHA-256 で検証します。アカウントやトークンは不要です。
 - ベンチマークを実行し、リアルタイムに間に合わなければ1段下げます。
 - 入力言語の自動判定または固定。訳文言語と「入力が訳文と同じ言語のとき」の言語を選べるので、英⇔日・韓⇔日を同時に扱えます。
@@ -60,7 +60,7 @@ NVIDIA 向けには `--features cuda` を使います。whisper.cpp と llama.cp
 ## ライセンス
 
 - **アプリのコードは MIT ライセンスです**（[LICENSE](LICENSE)）。
-- **PLaMo モデルは [PLaMo コミュニティライセンス](https://plamo.preferredai.jp/info/plamo-community-license) に従います。** 全文を [`licenses/`](licenses/) に同梱し、アプリ内からも参照できます。
+- アプリの利用条件は [floatsubs 利用規約](licenses/floatsubs-terms.ja.txt)（[English](licenses/floatsubs-terms.en.txt)）です。規約は [PLaMo コミュニティライセンス](https://plamo.preferredai.jp/info/plamo-community-license) を別紙として含み、初回起動時にまとめて同意を求めます。全文を [`licenses/`](licenses/) に同梱し、アプリの「情報」からも参照できます。
   - 個人・非商用の利用は無償です。
   - 商用利用には事前登録が必要です。また、本人または関連会社の年間売上が10億円を超える組織が業務で使う場合は、Preferred Networks との別途契約が必要です。
   - 字幕などの出力を公開・配布する場合は、PLaMo による出力である旨を明示してください。テキスト出力には `Built with PLaMo` の表記が入ります。
