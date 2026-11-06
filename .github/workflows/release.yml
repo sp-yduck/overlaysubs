@@ -629,12 +629,14 @@ jobs:
               -e "s|@@SIZE_DMG@@|${size_dmg}|g" \
               dist/release-body.md.tmpl > dist/release-body.md
 
-          # CHANGELOG.md is being added in parallel; include its 0.1.0 section when present,
-          # but never fail the release because of it.
+          # Release notes: append the CHANGELOG section for this tag's version
+          # ("## [x.y.z] - ..."), but never fail the release because of it.
+          version="${TAG#v}"
+          version_re=$(printf '%s' "$version" | sed 's/\./\\./g')
           if [ -f CHANGELOG.md ]; then
-            awk '
-              /^##[[:space:]]*\[?0\.1\.0\]?([[:space:]]|$)/ { in_section = 1 }
-              in_section && /^##[[:space:]]/ && $0 !~ /0\.1\.0/ { exit }
+            awk -v ver="$version_re" '
+              $0 ~ "^##[[:space:]]*\\[?" ver "\\]?([[:space:]]|$)" { in_section = 1 }
+              in_section && /^##[[:space:]]/ && $0 !~ "^##[[:space:]]*\\[?" ver "\\]?([[:space:]]|$)" { exit }
               in_section && /^\[[^]]+\]:[[:space:]]/ { exit }
               in_section { print }
             ' CHANGELOG.md > dist/changelog-section.md || true
@@ -644,9 +646,9 @@ jobs:
                 cat dist/changelog-section.md
                 printf '\n'
               } >> dist/release-body.md
-              echo "Appended the CHANGELOG.md [0.1.0] section."
+              echo "Appended the CHANGELOG.md [$version] section."
             else
-              echo "CHANGELOG.md exists but has no 0.1.0 section; skipping it."
+              echo "CHANGELOG.md exists but has no [$version] section; skipping it."
             fi
           else
             echo "No CHANGELOG.md in this commit; release notes omit the changelog."
