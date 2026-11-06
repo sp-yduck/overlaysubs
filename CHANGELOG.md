@@ -1,0 +1,40 @@
+# Changelog
+
+floatsubs の主な変更点を記録します。
+
+このファイルは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に従い、バージョンは [Semantic Versioning](https://semver.org/lang/ja/) に従います。
+
+## [Unreleased]
+
+次のリリースに向けた変更点をここに追記します。
+
+## [0.1.0] - 2026-11-06
+
+最初の公開リリースです。GitHub Releases での配布を開始しました。
+
+### Added
+
+- ローカル・リアルタイム音声翻訳オーバーレイの初期実装。PC の音声を文字起こしし、翻訳した字幕を最前面の透過ウィンドウに表示します。
+- Windows の WASAPI loopback（システム音声）とマイク入力を 16kHz モノラルに変換して取り込む音声キャプチャ。
+- Silero VAD とエネルギー区切りによる発話区間の検出。発話ごとに区切って認識・翻訳します。
+- whisper.cpp による文字起こしと、llama.cpp 経由の PLaMo 3 Translate による翻訳（PFML3 プロンプト）。
+- ハードウェア検出とティア自動選択（High / Mid / Low / CPU）。ベンチマークを実行し、リアルタイムに間に合わない場合は1段下げます。
+- Hugging Face からのモデル自動ダウンロード。中断しても続きから再開でき、SHA-256 で検証します（アカウント・トークン不要）。
+- Tauri UI の刷新: サイドバー型の設定画面、「モデルの準備」の3ステップ、トースト通知、進行状況の表示。
+- 利用規約の同意フロー: floatsubs 利用規約（PLaMo コミュニティライセンスを別紙として含む）を初回起動時に表示し、同意を版付きで保存します。
+- 字幕オーバーレイ: 最前面・透過・クリック透過、原文併記、文字サイズ・フォント・背景の不透明度・行数・表示時間の設定、「Built with PLaMo」表記の表示切り替え。
+- 履歴のテキスト／SRT 書き出し。
+- トレイ常駐とグローバルホットキー（既定 `CmdOrCtrl+Shift+T`）。UI は日本語・英語。
+- GitHub Releases での配布を開始: Windows x64（NSIS インストーラ / MSI）と macOS Apple Silicon（dmg）、および SHA256SUMS.txt。
+- CI を追加: `cargo test -p floatsubs-core` を push と Pull Request で実行。
+- リリースワークフローを追加: `v*` タグで Windows / macOS のバンドルをビルドし、GitHub Releases に固定名のアセット（`floatsubs-windows-x64-setup.exe` / `floatsubs-windows-x64.msi` / `floatsubs-macos-arm64.dmg`）と `SHA256SUMS.txt` を公開します。
+
+### Changed
+
+- 設定ウィンドウを閉じたらアプリを終了するようにしました（オーバーレイが残らないようにするため）。
+- オーバーレイは透過ウィンドウのまま、背景に淡い色を付けて表示領域がわかるようにしました。
+- 「Built with PLaMo」の表記をサイドバーから削除し、「情報」ページと README に残しました。オーバーレイの表記は既定で表示し、「字幕の表示」からオフにできます。
+- モデルのダウンロード URL を Hugging Face のコミットに固定しました（上流の再アップロードで SHA-256 が変わるのを防ぐため）。
+
+[Unreleased]: https://github.com/sp-yduck/floatsubs/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sp-yduck/floatsubs/releases/tag/v0.1.0

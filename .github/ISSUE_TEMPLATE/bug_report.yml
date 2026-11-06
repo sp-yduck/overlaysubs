@@ -1,0 +1,109 @@
+name: バグ報告
+description: 不具合を報告する
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        バグ報告ありがとうございます。記入前に [README の FAQ](https://github.com/sp-yduck/floatsubs#トラブルシューティングfaq) と既存の Issue を確認してください。
+
+        **セキュリティ上の問題は公開 Issue に書かず、[SECURITY.md](https://github.com/sp-yduck/floatsubs/blob/main/SECURITY.md) の手順で非公開で報告してください。**
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: 報告前の確認
+      options:
+        - label: 既存の Issue を検索して、同じ問題が報告されていないことを確認しました
+          required: true
+        - label: 初回起動時の利用規約（floatsubs 利用規約・PLaMo コミュニティライセンス）に同意しています
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: floatsubs のバージョン
+      description: アプリの「情報」ページ、またはダウンロードしたファイル名から確認できます。
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - Windows 11 (x64)
+        - Windows 10 (x64)
+        - macOS 15 (Apple Silicon)
+        - macOS 14 (Apple Silicon)
+        - macOS 13 (Apple Silicon)
+        - その他
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: CPU / GPU / VRAM / メモリ
+      description: 設定画面の「PC の性能を調べる」で表示される内容を貼ってください。わかる範囲で構いません。
+      value: |
+        - CPU:
+        - GPU:
+        - VRAM:
+        - メモリ:
+        - 入力元: システム音声 / マイク
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: ティア（設定画面に表示されるもの）
+      options:
+        - High
+        - Mid
+        - Low
+        - CPU
+        - わからない
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      description: 問題が起きるまでの手順を書いてください。
+      placeholder: |
+        1. floatsubs を起動
+        2. 「...」を選ぶ
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待した動作
+    validations:
+      required: false
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作
+      description: 表示されたメッセージやトーストの文言があれば、そのまま貼ってください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: ログ・エラーメッセージ・補足
+      description: |
+        現行バージョンはログファイルを書き出しません。画面に表示されたエラーメッセージをそのまま貼ってください。
+        モデルの保存先は設定画面の「モデルの準備」→「保存先」で確認できます。
+        スクリーンショットや動画はこの欄にドラッグして添付できます。
+    validations:
+      required: false
