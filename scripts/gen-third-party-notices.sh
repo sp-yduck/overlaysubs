@@ -298,7 +298,7 @@ fallback_url() {
 text_source_note=""
 
 resolve_license_text() {
-  local term=$1 source="" crate_name="" crate_version="" file="" dir=""
+  local term=$1 source="" crate_name="" crate_version="" file=""
   local cname cver cdir scan_dir
   : > "$tmp/candidates.tsv"
   awk -F'\t' -v t="$term" '$1 == t {print $2 "\t" $3}' "$tmp/terms.tsv" | sort -u > "$tmp/candidates.tsv"

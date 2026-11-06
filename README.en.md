@@ -137,7 +137,7 @@ WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ energy endpointer ─▶ 
 
 ## Features
 
-- First run asks you to accept the floatsubs Terms of Use (with the PLaMo Community License as an appendix). Acceptance is stored in `terms-accepted` and not asked again until the terms version changes. The app then detects your hardware and picks a tier (High / Mid / Low / CPU).
+- First run asks you to accept the floatsubs Terms of Use (with the PLaMo Community License as an appendix). Acceptance is stored in `terms-accepted` and not asked again until the terms version changes. Clicking "Check PC performance" in the setup screen detects your hardware and picks a tier (High / Mid / Low / CPU).
 - Models download from Hugging Face automatically, resume after interruption, and are verified with SHA-256. No account or token required.
 - You can run the optional speed check (benchmark) in the settings window; if it cannot keep up in real time, it switches to one tier lower.
 - Source language auto-detect or fixed. You can pick the target language and the "if already in that language" language, so English↔Japanese and Korean↔Japanese work together.

@@ -245,7 +245,10 @@ jobs:
             echo "No APPLE_SIGNING_IDENTITY configured; using ad-hoc signing (signingIdentity \"-\")."
             # Single-quoted JSON string: bash passes it through as one argv element, double quotes
             # stay part of the JSON, and no shell expansion happens on the braces.
-            args+=(--config '{"bundle":{"macOS":{"signingIdentity":"-"}}}')
+            # hardenedRuntime must be OFF for ad-hoc builds: with it on, the hardened runtime's
+            # library validation rejects the bundled llama/ggml dylibs and the app crashes on launch
+            # ("different Team IDs", Tauri issue #9318). Developer ID builds keep the default (on).
+            args+=(--config '{"bundle":{"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}')
             # GitHub exports a missing secret as DEFINED BUT EMPTY. tauri-cli does
             # `env::var_os("APPLE_SIGNING_IDENTITY")` -> Some("") and treats that as an explicit
             # identity, which overrides the --config above and makes it run `codesign -s ""`
@@ -259,20 +262,38 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Bundle output lives in the Cargo workspace target dir at the repo root
-          # (src-tauri is a workspace member), so search instead of hard-coding one layout.
-          app=$(find . -type d -name 'floatsubs.app' -path '*/release/bundle/macos/*' -print -quit)
+          # `tauri build` removes the intermediate .app after it creates the DMG, so verify what
+          # users actually download: mount the DMG and inspect (and launch-test what we can of) the
+          # app inside it.
           dmg=$(find . -type f -name '*.dmg' -path '*/release/bundle/dmg/*' -print -quit)
-          if [ -z "$app" ] || [ ! -d "$app" ]; then
-            echo "::error::no floatsubs.app under */release/bundle/macos/ - the macOS bundle was not produced."
-            exit 1
-          fi
           if [ -z "$dmg" ] || [ ! -s "$dmg" ]; then
             echo "::error::no non-empty .dmg under */release/bundle/dmg/ - the macOS bundle was not produced."
             exit 1
           fi
-          echo "app: $app"
+          echo "dmg: $dmg"
           ls -lh "$dmg"
+
+          mountpoint=$(mktemp -d)
+          cleanup() { hdiutil detach "$mountpoint" -quiet -force >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mountpoint" >/dev/null || {
+            echo "::error::could not mount $dmg"
+            exit 1
+          }
+          app=$(find "$mountpoint" -maxdepth 2 -type d -name 'floatsubs.app' -print -quit)
+          if [ -z "$app" ] || [ ! -d "$app" ]; then
+            echo "::error::floatsubs.app not found inside $dmg"
+            ls -la "$mountpoint"
+            exit 1
+          fi
+          echo "app: $app"
+
+          # The MIT notices for the bundled native libraries must ship inside the app.
+          if [ ! -f "$app/Contents/Resources/THIRD_PARTY_NOTICES.md" ]; then
+            echo "::error::THIRD_PARTY_NOTICES.md is missing from the app's Contents/Resources"
+            exit 1
+          fi
+          echo "THIRD_PARTY_NOTICES.md is bundled at Contents/Resources"
 
           # Fail hard if the .app carries no signature at all (that is the "damaged" case for users).
           if ! codesign -dv --verbose=2 "$app" > /tmp/codesign.txt 2>&1; then
@@ -281,13 +302,43 @@ jobs:
             exit 1
           fi
           cat /tmp/codesign.txt
-          if grep -qE '^Signature=adhoc$|^Authority=' /tmp/codesign.txt; then
-            echo "Signature found (ad-hoc or Developer ID)."
-          else
+          if ! grep -qE '^Signature=adhoc$|^Authority=' /tmp/codesign.txt; then
             echo "::error::$app has no ad-hoc/Developer ID signature"
             exit 1
           fi
+
+          # Ad-hoc + hardened runtime is fatal at launch: library validation rejects the bundled
+          # llama/ggml dylibs (Tauri issue #9318). The build step turns the runtime off for ad-hoc.
+          if grep -q '^Signature=adhoc$' /tmp/codesign.txt; then
+            if grep -qE 'flags=.*\(.*runtime' /tmp/codesign.txt; then
+              echo "::error::ad-hoc signature has hardened runtime enabled - the bundled Frameworks dylibs would fail library validation and the app would crash on launch."
+              exit 1
+            fi
+            echo "ad-hoc signature without hardened runtime: bundled dylibs can load."
+          fi
+
           codesign --verify --strict "$app"
+
+          # Every @rpath dependency of the main binary must be bundled inside the .app, otherwise
+          # the installed app cannot start even though signing succeeded.
+          frameworks="$app/Contents/Frameworks"
+          if [ ! -d "$frameworks" ]; then
+            echo "::error::no Contents/Frameworks directory in the app bundle"
+            exit 1
+          fi
+          missing=0
+          for lib in $(otool -L "$app/Contents/MacOS/floatsubs" | awk '/@rpath\// {print $1}' | sort -u); do
+            name=${lib#@rpath/}
+            if [ ! -e "$frameworks/$name" ]; then
+              echo "::error::$lib is referenced by the binary but missing from Contents/Frameworks"
+              missing=1
+            elif ! codesign --verify --strict "$frameworks/$name" > /dev/null 2>&1; then
+              echo "::warning::$frameworks/$name has no valid code signature (ad-hoc linker signature expected)"
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+          echo "all @rpath dependencies are present in Contents/Frameworks"
+
           # Nested Frameworks: arm64 linker output is already ad-hoc signed, so this normally
           # passes; keep it non-fatal so a bundler-level detail cannot block a release.
           if ! codesign --verify --deep --strict "$app" > /dev/null 2>&1; then

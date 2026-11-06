@@ -62,9 +62,10 @@ gh run watch "$(gh run list --workflow=release.yml --limit=1 --json databaseId -
 
 # 生成物のファイル名とサイズを確認（固定名になっているか）
 RUN_ID=$(gh run list --workflow=release.yml --limit=1 --json databaseId --jq '.[0].databaseId')
+# gh run download は artifact 名のディレクトリに展開されます
 gh run download "$RUN_ID" -n floatsubs-windows-dist
 gh run download "$RUN_ID" -n floatsubs-macos-dist
-ls -lh floatsubs-windows-x64-setup.exe floatsubs-windows-x64.msi floatsubs-macos-arm64.dmg
+ls -lh floatsubs-windows-dist floatsubs-macos-dist
 ```
 
 `verify` と `publish` が skipped、`build` の 2 ジョブが success で、上の 3 ファイルが
@@ -205,8 +206,8 @@ Actions のログを確認します。よくある原因:
 
 - Windows: Vulkan SDK のダウンロード失敗 → ワークフローを再実行
 - Windows: `llama.dll` のステージング失敗 → `src-tauri/libs/` と `C:\t\release\build\llama-cpp-sys-2-*\out\bin\`
-- macOS: `codesign` 検証失敗 → ad-hoc 署名の設定（`--config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'`）が消えていないか
-- ビルド時間切れ（180 分）→ キャッシュが効いていれば通常は数十分
+- macOS: `codesign` 検証失敗 → ad-hoc 署名の設定（`--config '{"bundle":{"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}'`）が消えていないか。ad-hoc 署名では hardened runtime を無効にしないと、同梱した llama/ggml の dylib が library validation で拒否されて起動時にクラッシュします
+- ビルド時間切れ（240 分）→ キャッシュが効いていれば通常は数十分
 
 失敗したジョブだけを再実行できます。
 
