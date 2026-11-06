@@ -86,7 +86,7 @@ WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ Silero VAD endpointer ─
 - Source language auto-detect or fixed. You can pick the target language and the "if already in that language" language, so English↔Japanese and Korean↔Japanese work together.
 - Previous utterances are passed as context and translation happens per sentence. Glossary, a free-text topic hint, and Japanese plain/polite style are configurable.
 - Partial results are dimmed; final translations stream in and replace them.
-- Always-on-top, semi-transparent overlay (click-through can be enabled in settings). Original text, font size, font, background opacity, line count, display time, and the "Built with PLaMo" credit are configurable. The overlay appears while translating and hides when translation stops; you can also toggle it from "Show subtitles" in the tray menu or from Settings.
+- Always-on-top, semi-transparent overlay (click-through can be enabled in settings). Original text, font size, font, background opacity, line count, display time, and the "Built with PLaMo" credit are configurable. The overlay appears while translating and hides when translation stops; you can also toggle it from "Show subtitles" in the tray menu or with the switch above the Start button.
 - Export history as text or SRT.
 - Tray/menu-bar resident, global hotkey (default `CmdOrCtrl+Shift+T`; `Ctrl+Shift+T` on Windows, `Cmd+Shift+T` on macOS) to start/stop. UI in Japanese and English.
 - Audio, transcripts, and translations are never sent anywhere. The only network traffic is the model download. No telemetry. The app works offline once the models are downloaded.
