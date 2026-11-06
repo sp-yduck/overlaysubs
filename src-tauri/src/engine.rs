@@ -237,7 +237,7 @@ mod tests {
         ep.push(&vec![0.0; 16_000], &mut vad, &mut evs).unwrap();
         let lang = env("OVERLAYSUBS_LANG", "en");
         // Glossary terms reach Whisper as its prompt.
-        let glossary = env("OVERLAYSUBS_GLOSSARY", "Blink=ブリンク;Tracer=トレーサー").split(';').filter_map(|e| e.split_once('=')).map(|(a, b)| (a.into(), b.into())).collect();
+        let glossary = env("OVERLAYSUBS_GLOSSARY", "dots=点;calligraphy=カリグラフィー").split(';').filter_map(|e| e.split_once('=')).map(|(a, b)| (a.into(), b.into())).collect();
         let source_lang = std::env::var("OVERLAYSUBS_SOURCE_LANG").ok();
         let mut s = Session::new(SessionConfig { glossary, topic: env("OVERLAYSUBS_TOPIC", ""), source_lang, ..Default::default() });
         let mut finals = vec![];

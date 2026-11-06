@@ -28,7 +28,7 @@ pub struct SessionConfig {
     pub form: Option<Form>,
     pub use_context: bool,
     pub glossary: Vec<(String, String)>,
-    /// Free-text hint for the translator, e.g. "Overwatch coaching stream".
+    /// Free-text hint for the translator, e.g. "Stanford commencement speech".
     pub topic: String,
 }
 
@@ -280,12 +280,12 @@ mod tests {
     #[test]
     fn japanese_fragments_join_without_space_and_flush_finalizes() {
         let mut s = Session::new(SessionConfig::default());
-        let (mut a, mut mt, mut caps) = (asr(vec!["ブリンクを使うのが", "早すぎます"]), FakeMt(vec![]), vec![]);
+        let (mut a, mut mt, mut caps) = (asr(vec!["この設定を変えるのが", "早すぎます"]), FakeMt(vec![]), vec![]);
         fin(&mut s, &mut a, &mut mt, &mut caps);
         fin(&mut s, &mut a, &mut mt, &mut caps);
         assert!(s.entries.is_empty());
         s.flush(&mut mt, &mut |c| caps.push(c)).unwrap();
-        assert_eq!(s.entries[0].source, "ブリンクを使うのが早すぎます");
+        assert_eq!(s.entries[0].source, "この設定を変えるのが早すぎます");
         s.flush(&mut mt, &mut |c| caps.push(c)).unwrap();
         assert_eq!(s.entries.len(), 1, "second flush is a no-op");
     }
@@ -302,16 +302,16 @@ mod tests {
     #[test]
     fn glossary_and_previous_sentence_go_to_asr_topic_and_matching_terms_to_mt() {
         let cfg = SessionConfig {
-            glossary: vec![("Tracer".into(), "トレーサー".into()), ("Blink".into(), "ブリンク".into())],
-            topic: "Overwatch coaching".into(),
+            glossary: vec![("dots".into(), "点".into()), ("calligraphy".into(), "カリグラフィー".into())],
+            topic: "Stanford commencement speech".into(),
             ..Default::default()
         };
         let mut s = Session::new(cfg);
-        let (mut a, mut mt, mut caps) = (asr(vec!["Tracer is fast.", "Use it later."]), FakeMt(vec![]), vec![]);
+        let (mut a, mut mt, mut caps) = (asr(vec!["The dots connect later.", "Trust the process."]), FakeMt(vec![]), vec![]);
         fin(&mut s, &mut a, &mut mt, &mut caps);
         fin(&mut s, &mut a, &mut mt, &mut caps);
-        assert_eq!(a.1, ["Tracer, Blink.", "Tracer, Blink. Tracer is fast."]);
-        assert_eq!(mt.0[0], r#"en>ja h0 Tracer is fast. ["Tracer"] "Overwatch coaching""#);
+        assert_eq!(a.1, ["dots, calligraphy.", "dots, calligraphy. The dots connect later."]);
+        assert_eq!(mt.0[0], r#"en>ja h0 The dots connect later. ["dots"] "Stanford commencement speech""#);
         assert!(mt.0[1].contains("[]"), "no matching terms: {}", mt.0[1]);
     }
 
