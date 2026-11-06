@@ -17,7 +17,7 @@ body:
       options:
         - label: 既存の Issue を検索して、同じ問題が報告されていないことを確認しました
           required: true
-        - label: 初回起動時の利用規約（OverlaySubs 利用規約・PLaMo コミュニティライセンス）に同意しています
+        - label: 初回起動時の利用規約に同意しています
           required: true
 
   - type: input

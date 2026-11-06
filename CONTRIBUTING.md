@@ -91,7 +91,7 @@ npx --yes @tauri-apps/cli@^2 build --features metal    # macOS
 | `src-tauri/capabilities/` | Tauri の権限設定。新しい API を使うときはここも更新します。 |
 | `ui/` | 設定画面とオーバーレイ。ビルド不要の素の HTML/JS/CSS。`ui/i18n.js` に日本語と英語の文言があります。 |
 | `models.json` | モデル定義（URL・サイズ・SHA-256・ティア）。 |
-| `licenses/` | OverlaySubs 利用規約と PLaMo コミュニティライセンス（日英）。 |
+| `licenses/` | OverlaySubs 利用規約（日英）。PLaMo 3 のライセンスは本文を同梱せず、公式ページへのリンクのみを掲載します。 |
 | `scripts/` | バンドル用の補助スクリプト。 |
 | `docs/` | 利用者向けドキュメント（GitHub Pages のソース。日本語 `docs/index.html`、英語 `docs/en/index.html`、共通 CSS `docs/style.css`）。インストール・使い方・FAQ・ライセンスをここに集約します。外部 CDN やフォントは使わず、単体で完結させてください。 |
 
@@ -108,7 +108,7 @@ npx --yes @tauri-apps/cli@^2 build --features metal    # macOS
 
 - `ui/i18n.js` に日本語（`ja`）と英語（`en`）があります。UI の文言を追加・変更したら**両方**を更新してください。
 - 新しい設定項目を追加したら、`ui/app.js` の該当ページと、必要なら `src-tauri/src/main.rs` の `Settings` も更新します。
-- オーバーレイの表記（`Built with PLaMo`）と利用規約まわりは、ライセンス上の意味があるので勝手に削らないでください。
+- オーバーレイの表記（`Built with PLaMo`）、利用規約、PLaMo 3 のライセンスへのリンクは、ライセンス上の意味があるので勝手に削らないでください。
 
 ## コミットメッセージ
 
@@ -137,7 +137,7 @@ PR を出す前に、次を確認してください。
 - 秘密情報（API キー、トークン、個人情報、ローカルのパス）を含めていない。
 - UI の文言を変更した場合、`ui/i18n.js` の日本語と英語の両方を更新した。
 - 動作やインストール手順が変わる場合、docs/index.html / docs/en/index.html（利用者向け）と README.md（英語）/ README.ja.md（日本語）（開発者向け）を更新した。
-- ライセンスや利用規約（`licenses/`）に関わる変更は、その理由を PR に書いた。
+- ライセンスや利用規約（`licenses/`、PLaMo 3 のライセンスへのリンク）に関わる変更は、その理由を PR に書いた。
 
 ### フォーマット
 

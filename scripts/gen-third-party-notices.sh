@@ -382,11 +382,12 @@ apply to the distributed builds.
 - **Downloaded at runtime (not part of the installers).** On first run the app
   downloads model files from Hugging Face: OpenAI Whisper GGML models (MIT),
   Silero VAD (MIT) and PLaMo 3 Translate models. PLaMo is **not** open source;
-  it is governed by the PLaMo Community License. The full PLaMo terms and the
-  OverlaySubs terms of use are bundled in this repository and shipped with the
-  app:
-  - [`licenses/PLaMo-Community-License.ja.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/PLaMo-Community-License.ja.txt)
-  - [`licenses/PLaMo-Community-License.en.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/PLaMo-Community-License.en.txt)
+  it is governed by the PLaMo Community License (PLaMo 3 license), provided by
+  Preferred Networks, Inc.:
+  <https://plamo.preferredai.jp/info/plamo-community-license-en>
+
+  The OverlaySubs terms of use are bundled in this repository and shipped with
+  the app:
   - [`licenses/overlaysubs-terms.ja.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt)
   - [`licenses/overlaysubs-terms.en.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt)
 
@@ -443,8 +444,8 @@ These files are **not** included in the installers. OverlaySubs downloads them
 from Hugging Face on first run and verifies each file against the size and
 SHA-256 values declared in [`models.json`](https://github.com/sp-yduck/overlaysubs/blob/main/models.json). The MIT license text
 that covers the Whisper and Silero VAD assets is reproduced in [§4
-("MIT")](#4-license-texts); the PLaMo assets are covered exclusively by the
-PLaMo Community License files linked in the header of this document.
+("MIT")](#4-license-texts); the PLaMo assets are governed by the PLaMo
+Community License linked in the header of this document.
 
 | Model file | Hugging Face repository | Pinned revision | License |
 |---|---|---|---|
@@ -456,7 +457,7 @@ SECTION2
     case "$repo" in
       ggerganov/whisper.cpp) license='MIT (OpenAI Whisper weights, GGML conversion)' ;;
       ggml-org/whisper-vad) license='MIT (Silero VAD)' ;;
-      pfnet/plamo-3-translate-*) license='PLaMo Community License (not open source; see `licenses/`)' ;;
+      pfnet/plamo-3-translate-*) license='PLaMo Community License (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>)' ;;
       *) license='see model card' ;;
     esac
     printf '| %s | `%s` | `%s` | %s |\n' "$file" "$repo" "$rev" "$license"
@@ -468,7 +469,8 @@ SECTION2
   printf -- '- Silero VAD: Copyright (c) 2020-present Silero Team (MIT). Upstream\n'
   printf '  repository: <https://github.com/snakers4/silero-vad>.\n'
   printf -- '- PLaMo 3 Translate model weights: PLaMo Community License, provided by\n'
-  printf '  Preferred Networks, Inc. See the license files linked above.\n\n'
+  printf '  Preferred Networks, Inc. See\n'
+  printf '  <https://plamo.preferredai.jp/info/plamo-community-license-en>.\n\n'
 
   # --- §3 Rust dependency inventory ----------------------------------------
   printf '## 3. Rust dependency inventory\n\n'

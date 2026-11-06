@@ -19,11 +19,12 @@ apply to the distributed builds.
 - **Downloaded at runtime (not part of the installers).** On first run the app
   downloads model files from Hugging Face: OpenAI Whisper GGML models (MIT),
   Silero VAD (MIT) and PLaMo 3 Translate models. PLaMo is **not** open source;
-  it is governed by the PLaMo Community License. The full PLaMo terms and the
-  OverlaySubs terms of use are bundled in this repository and shipped with the
-  app:
-  - [`licenses/PLaMo-Community-License.ja.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/PLaMo-Community-License.ja.txt)
-  - [`licenses/PLaMo-Community-License.en.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/PLaMo-Community-License.en.txt)
+  it is governed by the PLaMo Community License (PLaMo 3 license), provided by
+  Preferred Networks, Inc.:
+  <https://plamo.preferredai.jp/info/plamo-community-license-en>
+
+  The OverlaySubs terms of use are bundled in this repository and shipped with
+  the app:
   - [`licenses/overlaysubs-terms.ja.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt)
   - [`licenses/overlaysubs-terms.en.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt)
 
@@ -123,8 +124,8 @@ These files are **not** included in the installers. OverlaySubs downloads them
 from Hugging Face on first run and verifies each file against the size and
 SHA-256 values declared in [`models.json`](https://github.com/sp-yduck/overlaysubs/blob/main/models.json). The MIT license text
 that covers the Whisper and Silero VAD assets is reproduced in [§4
-("MIT")](#4-license-texts); the PLaMo assets are covered exclusively by the
-PLaMo Community License files linked in the header of this document.
+("MIT")](#4-license-texts); the PLaMo assets are governed by the PLaMo
+Community License linked in the header of this document.
 
 | Model file | Hugging Face repository | Pinned revision | License |
 |---|---|---|---|
@@ -133,11 +134,11 @@ PLaMo Community License files linked in the header of this document.
 | ggml-medium-q5_0.bin | `ggerganov/whisper.cpp` | `5359861c739e955e79d9a303bcbc70fb988958b1` | MIT (OpenAI Whisper weights, GGML conversion) |
 | ggml-small.bin | `ggerganov/whisper.cpp` | `5359861c739e955e79d9a303bcbc70fb988958b1` | MIT (OpenAI Whisper weights, GGML conversion) |
 | ggml-base.bin | `ggerganov/whisper.cpp` | `5359861c739e955e79d9a303bcbc70fb988958b1` | MIT (OpenAI Whisper weights, GGML conversion) |
-| plamo-3-translate-31b-Q4_K_M.gguf | `pfnet/plamo-3-translate-31b-GGUF` | `7970aee3005211df5d90740a3e009a9b26be4df9` | PLaMo Community License (not open source; see `licenses/`) |
-| plamo-3-translate-8b-Q4_K_M.gguf | `pfnet/plamo-3-translate-8b-GGUF` | `2234f168757f570714b333049c9d018161ec5277` | PLaMo Community License (not open source; see `licenses/`) |
-| plamo-3-translate-8b-Q3_K_M.gguf | `pfnet/plamo-3-translate-8b-GGUF` | `2234f168757f570714b333049c9d018161ec5277` | PLaMo Community License (not open source; see `licenses/`) |
-| plamo-3-translate-2b-Q4_K_M.gguf | `pfnet/plamo-3-translate-2b-GGUF` | `232fbd7916519edecddfdae0beae7e76fe70453f` | PLaMo Community License (not open source; see `licenses/`) |
-| plamo-3-translate-0.8b-Q4_K_M.gguf | `pfnet/plamo-3-translate-0.8b-GGUF` | `dbeb0856cb0b004b484f190bb71dd65876297013` | PLaMo Community License (not open source; see `licenses/`) |
+| plamo-3-translate-31b-Q4_K_M.gguf | `pfnet/plamo-3-translate-31b-GGUF` | `7970aee3005211df5d90740a3e009a9b26be4df9` | PLaMo Community License (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>) |
+| plamo-3-translate-8b-Q4_K_M.gguf | `pfnet/plamo-3-translate-8b-GGUF` | `2234f168757f570714b333049c9d018161ec5277` | PLaMo Community License (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>) |
+| plamo-3-translate-8b-Q3_K_M.gguf | `pfnet/plamo-3-translate-8b-GGUF` | `2234f168757f570714b333049c9d018161ec5277` | PLaMo Community License (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>) |
+| plamo-3-translate-2b-Q4_K_M.gguf | `pfnet/plamo-3-translate-2b-GGUF` | `232fbd7916519edecddfdae0beae7e76fe70453f` | PLaMo Community License (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>) |
+| plamo-3-translate-0.8b-Q4_K_M.gguf | `pfnet/plamo-3-translate-0.8b-GGUF` | `dbeb0856cb0b004b484f190bb71dd65876297013` | PLaMo Community License (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>) |
 | ggml-silero-v6.2.0.bin | `ggml-org/whisper-vad` | `9ffd54a1e1ee413ddf265af9913beaf518d1639b` | MIT (Silero VAD) |
 
 Attribution for the MIT-licensed model weights and the VAD model:
@@ -147,7 +148,8 @@ Attribution for the MIT-licensed model weights and the VAD model:
 - Silero VAD: Copyright (c) 2020-present Silero Team (MIT). Upstream
   repository: <https://github.com/snakers4/silero-vad>.
 - PLaMo 3 Translate model weights: PLaMo Community License, provided by
-  Preferred Networks, Inc. See the license files linked above.
+  Preferred Networks, Inc. See
+  <https://plamo.preferredai.jp/info/plamo-community-license-en>.
 
 ## 3. Rust dependency inventory
 

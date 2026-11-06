@@ -1,19 +1,16 @@
-OverlaySubs Terms of Use (version 1)
+OverlaySubs Terms of Use (version 2)
 
 1. These Terms
-You must accept these Terms to use OverlaySubs (the "App"). These Terms include the attached PLaMo Community License Agreement. If you do not accept, you may not use the App.
+You must accept these Terms to use OverlaySubs (the "App"). If you do not accept, you may not use the App.
 
 2. License of the App
 The App's source code is provided under the MIT License. The App is provided "as is", without warranty of any kind, express or implied.
 
 3. Translation model (PLaMo)
 3.1 The App downloads and uses PLaMo 3 Translate, a translation model by Preferred Networks, Inc. ("PFN").
-3.2 By accepting these Terms you also accept the attached PLaMo Community License Agreement and are bound by it with PFN.
-3.3 Key points (the attached agreement prevails):
-  (a) Personal and non-commercial use is free.
-  (b) Commercial use requires prior registration on PFN's page (https://forms.gle/mTL8tBLrMYXKNZD56).
-  (c) If you or your affiliates have annual revenue over JPY 1 billion, business use needs a separate agreement with PFN.
-  (d) If you publish or distribute output such as subtitles, state that it was produced by PLaMo (e.g. "Built with PLaMo").
+3.2 Use of PLaMo 3 Translate is governed by the PLaMo 3 license set by PFN. The license is available at:
+    https://plamo.preferredai.jp/info/plamo-community-license-en
+3.3 If you use PLaMo 3 Translate with the App, you must review and comply with that license.
 
 4. Other models
 Whisper (OpenAI, MIT License) for speech recognition and Silero VAD (MIT License) for voice activity detection are subject to their own licenses.
