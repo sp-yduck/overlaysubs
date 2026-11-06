@@ -210,12 +210,16 @@ mod tests {
     }
 
     /// Downloads ~0.7 GB. Run: FLOATSUBS_WAV=path/to/16k-mono.wav cargo test -p floatsubs -- --ignored
+    /// Optional: FLOATSUBS_LANG (spoken language, default en), FLOATSUBS_ASR (model id, default whisper-base),
+    /// FLOATSUBS_GLOSSARY ("src=dst;src=dst", empty for none), FLOATSUBS_TOPIC.
     #[test]
     #[ignore]
     fn real_models_transcribe_and_translate() {
+        let env = |k: &str, d: &str| std::env::var(k).unwrap_or_else(|_| d.into());
         let reg = Registry::parse(include_str!("../../models.json")).unwrap();
         let dir = std::env::temp_dir().join("floatsubs-models");
-        let ids = ["whisper-base", "plamo-3-translate-0.8b-q4_k_m", "silero-vad-v6.2.0"];
+        let asr_id = env("FLOATSUBS_ASR", "whisper-base");
+        let ids = [asr_id.as_str(), "plamo-3-translate-0.8b-q4_k_m", "silero-vad-v6.2.0"];
         for id in ids {
             crate::download::fetch(reg.get(id).unwrap(), &dir, &mut |_, _| {}).unwrap();
         }
@@ -231,8 +235,10 @@ mod tests {
         let mut vad = Silero::load(&asr.vad_path).unwrap();
         ep.push(&pcm, &mut vad, &mut evs).unwrap();
         ep.push(&vec![0.0; 16_000], &mut vad, &mut evs).unwrap();
+        let lang = env("FLOATSUBS_LANG", "en");
         // Glossary terms reach Whisper as its prompt.
-        let mut s = Session::new(SessionConfig { glossary: vec![("Blink".into(), "ブリンク".into()), ("Tracer".into(), "トレーサー".into())], ..Default::default() });
+        let glossary = env("FLOATSUBS_GLOSSARY", "Blink=ブリンク;Tracer=トレーサー").split(';').filter_map(|e| e.split_once('=')).map(|(a, b)| (a.into(), b.into())).collect();
+        let mut s = Session::new(SessionConfig { glossary, topic: env("FLOATSUBS_TOPIC", ""), ..Default::default() });
         let mut finals = vec![];
         for ev in evs.into_iter().filter(|e| matches!(e, Event::Final(_))) {
             let t0 = std::time::Instant::now();
@@ -244,6 +250,6 @@ mod tests {
             eprintln!("[{}] {}\n  → {}", c.lang, c.source, c.translation);
         }
         assert!(!finals.is_empty(), "speech produced captions");
-        assert!(finals.iter().all(|c| c.lang == "en" && c.translation.chars().any(|ch| ('\u{3040}'..='\u{30ff}').contains(&ch) || ('\u{4e00}'..='\u{9fff}').contains(&ch))), "English speech translated into Japanese");
+        assert!(finals.iter().all(|c| c.lang == lang && c.translation.chars().any(|ch| ('\u{3040}'..='\u{30ff}').contains(&ch) || ('\u{4e00}'..='\u{9fff}').contains(&ch))), "{lang} speech translated into Japanese");
     }
 }
