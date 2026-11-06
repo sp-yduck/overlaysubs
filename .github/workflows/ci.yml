@@ -41,8 +41,11 @@ jobs:
         run: |
           "CARGO_TARGET_DIR=C:\t" >> $env:GITHUB_ENV
           $env:CARGO_TARGET_DIR = "C:\t"
-          cargo build --release -p floatsubs --features ${{ matrix.features }}
           New-Item -ItemType Directory -Force src-tauri/libs | Out-Null
+          # tauri-build checks the glob during this build too; a placeholder satisfies it until the real DLLs exist.
+          New-Item -ItemType File -Force src-tauri/libs/placeholder.dll | Out-Null
+          cargo build --release -p floatsubs --features ${{ matrix.features }}
+          Remove-Item src-tauri/libs/placeholder.dll
           Copy-Item C:\t\release\*.dll src-tauri/libs/
           Get-ChildItem src-tauri/libs
       - run: cargo tauri build --features ${{ matrix.features }}
