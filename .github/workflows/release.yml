@@ -660,9 +660,22 @@ jobs:
             echo "$json" | jq -e --arg name "$asset" 'any(.assets[]; .name == $name and .size > 0)' > /dev/null \
               || { echo "::error::asset $asset is missing or empty in release $TAG"; exit 1; }
           done
-          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tagName)
+          # `releases/latest` can lag for a moment right after a release is published (the API is
+          # eventually consistent), which is exactly when this step runs. Poll it for up to a
+          # minute and tolerate 404s instead of failing on the first empty response.
+          latest=""
+          for attempt in $(seq 1 12); do
+            if raw=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" 2>/dev/null); then
+              latest=$(printf '%s' "$raw" | jq -r '.tag_name // empty')
+            fi
+            if [ "$latest" = "$TAG" ]; then
+              break
+            fi
+            echo "latest release is '${latest:-<none>}' (attempt ${attempt}/12); /releases/latest can lag after publishing, retrying in 5s"
+            sleep 5
+          done
           if [ "$latest" != "$TAG" ]; then
-            echo "::error::the latest release is '$latest', expected '$TAG'"
+            echo "::error::the latest release is '${latest:-<none>}', expected '$TAG'"
             exit 1
           fi
           echo "Release $TAG is published as latest with all four assets."
