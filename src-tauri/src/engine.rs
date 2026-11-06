@@ -231,7 +231,8 @@ mod tests {
         let mut vad = Silero::load(&asr.vad_path).unwrap();
         ep.push(&pcm, &mut vad, &mut evs).unwrap();
         ep.push(&vec![0.0; 16_000], &mut vad, &mut evs).unwrap();
-        let mut s = Session::new(SessionConfig::default());
+        // Glossary terms reach Whisper as its prompt.
+        let mut s = Session::new(SessionConfig { glossary: vec![("Blink".into(), "ブリンク".into()), ("Tracer".into(), "トレーサー".into())], ..Default::default() });
         let mut finals = vec![];
         for ev in evs.into_iter().filter(|e| matches!(e, Event::Final(_))) {
             let t0 = std::time::Instant::now();

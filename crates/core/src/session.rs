@@ -125,9 +125,10 @@ impl Session {
             (None, Some((src, _))) => src,
             (None, None) => "",
         };
+        // Whisper mimics the prompt's style, so the term list ends with a period to keep punctuation on.
         let p = match (terms.is_empty(), prev.is_empty()) {
             (true, _) => prev.to_string(),
-            (false, true) => terms.join(", "),
+            (false, true) => format!("{}.", terms.join(", ")),
             (false, false) => format!("{}. {prev}", terms.join(", ")),
         };
         let n = p.chars().count();
@@ -309,7 +310,7 @@ mod tests {
         let (mut a, mut mt, mut caps) = (asr(vec!["Tracer is fast.", "Use it later."]), FakeMt(vec![]), vec![]);
         fin(&mut s, &mut a, &mut mt, &mut caps);
         fin(&mut s, &mut a, &mut mt, &mut caps);
-        assert_eq!(a.1, ["Tracer, Blink", "Tracer, Blink. Tracer is fast."]);
+        assert_eq!(a.1, ["Tracer, Blink.", "Tracer, Blink. Tracer is fast."]);
         assert_eq!(mt.0[0], r#"en>ja h0 Tracer is fast. ["Tracer"] "Overwatch coaching""#);
         assert!(mt.0[1].contains("[]"), "no matching terms: {}", mt.0[1]);
     }
