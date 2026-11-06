@@ -1,0 +1,588 @@
+name: release
+
+# Tag push (v*) -> verify versions -> build Windows/macOS bundles -> publish GitHub Release.
+# GitHub Releases is the ONLY supported distribution channel. Nothing is uploaded anywhere
+# else, and installers are published under stable version-less asset names so that
+# .../releases/latest/download/<asset> keeps working across versions.
+#
+# workflow_dispatch is a build-only dry run: verify and publish are skipped, both build jobs
+# run, and each uploads an artifact whose contents are the exact final release filenames.
+on:
+  push:
+    tags: ["v*"]
+  # Bare dispatch (no inputs) is intentional: `gh workflow run release.yml --ref main`.
+  workflow_dispatch:
+
+# One run per ref, so a duplicate tag push cannot race an in-flight release build.
+# cancel-in-progress stays false on purpose: a run that is already uploading assets must
+# never be killed by a duplicate event (the publish job is create-or-update, i.e. idempotent).
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Least privilege at the top level; only the publish job opts into contents: write.
+permissions:
+  contents: read
+
+jobs:
+  # Tag pushes only. A dry run has no tag to compare, so this job is skipped entirely.
+  verify:
+    name: verify tag matches app version
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release_exists: ${{ steps.existing.outputs.release_exists }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tag, tauri.conf.json and crate versions agree
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "Tag under test: $TAG"
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Tag '$TAG' must look like vX.Y.Z (for example v0.1.0)."
+            exit 1
+          fi
+          version="${TAG#v}"
+
+          # First `version =` in the [package] section of each manifest.
+          pkg_version() {
+            awk -F'"' '
+              /^\[package\]/ { inpkg = 1; next }
+              /^\[/          { inpkg = 0 }
+              inpkg && /^[[:space:]]*version[[:space:]]*=/ { print $2; exit }
+            ' "$1"
+          }
+
+          conf_version=$(jq -r '.version' src-tauri/tauri.conf.json)
+          tauri_version=$(pkg_version src-tauri/Cargo.toml)
+          core_version=$(pkg_version crates/core/Cargo.toml)
+
+          failed=0
+          check_version() {
+            file="$1"; got="$2"
+            if [ "$got" != "$version" ]; then
+              echo "::error file=$file::version is '$got' but tag '$TAG' implies '$version'."
+              failed=1
+            else
+              echo "OK $file: $got"
+            fi
+          }
+          check_version src-tauri/tauri.conf.json "$conf_version"
+          check_version src-tauri/Cargo.toml "$tauri_version"
+          check_version crates/core/Cargo.toml "$core_version"
+          [ "$failed" -eq 0 ] || exit 1
+
+          # The stable asset names are hard-coded, so the product name is part of the contract.
+          product=$(jq -r '.productName' src-tauri/tauri.conf.json)
+          if [ "$product" != "floatsubs" ]; then
+            echo "::error file=src-tauri/tauri.conf.json::productName is '$product'; release asset names assume 'floatsubs'."
+            exit 1
+          fi
+
+      - name: Check whether an identical release is already published
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          release_exists=false
+          expected="SHA256SUMS.txt,floatsubs-macos-arm64.dmg,floatsubs-windows-x64-setup.exe,floatsubs-windows-x64.msi"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "No release exists for $TAG yet; the build will run."
+          elif json=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --json isDraft,isPrerelease,assets 2>/dev/null); then
+            draft=$(printf '%s' "$json" | jq -r '.isDraft // false' 2>/dev/null || echo "unknown")
+            prerelease=$(printf '%s' "$json" | jq -r '.isPrerelease // false' 2>/dev/null || echo "unknown")
+            actual=$(printf '%s' "$json" | jq -r '[.assets[].name] | sort | join(",")' 2>/dev/null || echo "unknown")
+            # Only a PUBLISHED release (draft=false, prerelease=false) with all four assets is
+            # a completed release. A draft/prerelease must still be rebuilt and published.
+            if [ "$draft" = "false" ] && [ "$prerelease" = "false" ] && [ "$actual" = "$expected" ]; then
+              release_exists=true
+              echo "::warning::Release $TAG is already published with all four assets; skipping the rebuild. Delete that release first if you intended to rebuild it from this commit."
+            else
+              echo "Release $TAG exists (draft=$draft, prerelease=$prerelease, assets=[$actual]); rebuilding and publishing."
+            fi
+          else
+            echo "Could not inspect the existing release for $TAG; rebuilding."
+          fi
+          # Written exactly once: duplicate keys in $GITHUB_OUTPUT are not a documented contract.
+          echo "release_exists=$release_exists" >> "$GITHUB_OUTPUT"
+
+  # Runs on tag pushes and on workflow_dispatch. `always()` is required because verify is
+  # skipped for a dry run: without it, a skipped `needs` job would skip the builds too.
+  # verify failure still blocks the build (and therefore the publish) on tag pushes.
+  build:
+    name: build (${{ matrix.os }}, ${{ matrix.features }})
+    needs: verify
+    if: >-
+      always()
+      && needs.verify.result != 'failure'
+      && needs.verify.result != 'cancelled'
+      && needs.verify.outputs.release_exists != 'true'
+      && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v'))
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            features: vulkan
+            target: C:\t
+          - os: macos-15
+            features: metal
+            target: target
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    env:
+      # libgit2 hits MAX_PATH on llama.cpp's submodule; the git CLI honours core.longpaths.
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+    steps:
+      - run: git config --global core.longpaths true
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # Keeps the whisper.cpp / llama.cpp builds between runs.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> ${{ matrix.target }}"
+          key: ${{ matrix.features }}
+
+      # --- Windows: Vulkan SDK (same pin as the previous ci.yml bundle job) ---
+      - name: Install Vulkan SDK
+        if: matrix.features == 'vulkan'
+        shell: pwsh
+        run: |
+          $v = "1.4.313.2"
+          curl.exe -fL -o vk.exe "https://sdk.lunarg.com/sdk/download/$v/windows/vulkansdk-windows-X64-$v.exe"
+          ./vk.exe --accept-licenses --default-answer --confirm-command install | Out-Null
+          if (!(Test-Path "C:\VulkanSDK\$v\Include\vulkan\vulkan.h")) { throw "Vulkan SDK install failed" }
+          "VULKAN_SDK=C:\VulkanSDK\$v" >> $env:GITHUB_ENV
+          "C:\VulkanSDK\$v\Bin" >> $env:GITHUB_PATH
+
+      # --- Windows: short target dir + placeholder DLLs, exactly as in the previous ci.yml bundle job ---
+      - name: Build Windows binary with staged DLLs
+        if: runner.os == 'Windows'
+        shell: pwsh
+        # MSBuild caps paths at 260 chars; whisper.cpp's Vulkan shader build nests deep, so use a short target dir.
+        # The DLLs must exist before tauri-build resolves bundle.resources.
+        run: |
+          "CARGO_TARGET_DIR=C:\t" >> $env:GITHUB_ENV
+          $env:CARGO_TARGET_DIR = "C:\t"
+          New-Item -ItemType Directory -Force src-tauri/libs | Out-Null
+          # tauri-build checks the glob during this build too; a placeholder satisfies it until the real DLLs exist.
+          New-Item -ItemType File -Force src-tauri/libs/placeholder.dll | Out-Null
+          cargo build --release -p floatsubs --features ${{ matrix.features }}
+          Remove-Item src-tauri/libs/placeholder.dll
+          Copy-Item C:\t\release\build\llama-cpp-sys-2-*\out\bin\*.dll src-tauri/libs/
+          if (!(Test-Path src-tauri/libs/llama.dll)) { throw "llama.dll was not staged" }
+          Get-ChildItem src-tauri/libs
+
+      # The npm package ships a prebuilt CLI; `cargo install tauri-cli` took up to 19 minutes.
+      - name: Build Windows bundles
+        if: runner.os == 'Windows'
+        run: npx --yes @tauri-apps/cli@2.12.4 build --features ${{ matrix.features }}
+        working-directory: src-tauri
+
+      # Stage the exact final release filenames in the build job, so a workflow_dispatch dry
+      # run proves the names and sizes that will be published later.
+      - name: Stage Windows installers under the stable asset names
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $nsis = Get-ChildItem "C:\t\release\bundle\nsis\*.exe" -File | Select-Object -First 1
+          $msi = Get-ChildItem "C:\t\release\bundle\msi\*.msi" -File | Select-Object -First 1
+          if (-not $nsis) { throw "NSIS installer not found under C:\t\release\bundle\nsis" }
+          if (-not $msi) { throw "MSI installer not found under C:\t\release\bundle\msi" }
+          if ($nsis.Name -notlike "*-setup.exe") { throw "Unexpected NSIS installer name: $($nsis.Name)" }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item $nsis.FullName "dist\floatsubs-windows-x64-setup.exe" -Force
+          Copy-Item $msi.FullName "dist\floatsubs-windows-x64.msi" -Force
+          $expected = @("floatsubs-windows-x64-setup.exe", "floatsubs-windows-x64.msi")
+          $actual = @(Get-ChildItem dist -File | ForEach-Object { $_.Name })
+          if (Compare-Object $expected $actual) { throw "dist does not contain exactly the expected files: $($actual -join ', ')" }
+          foreach ($name in $expected) {
+            $size = (Get-Item (Join-Path dist $name)).Length
+            if ($size -lt 5MB) { throw "$name is implausibly small ($size bytes, expected at least 5 MB)" }
+            "{0}: {1} bytes" -f $name, $size
+          }
+          Get-ChildItem dist
+          # Make the dry-run artifact names/sizes visible on the run summary page.
+          $summary = @("## Windows distribution artifacts", "", "| file | bytes |", "|---|---|")
+          foreach ($name in $expected) { $summary += "| $name | $((Get-Item (Join-Path dist $name)).Length) |" }
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Upload Windows dist artifacts
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: floatsubs-windows-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+      # --- macOS ---
+      # Tauri does not ad-hoc sign by default. On Apple Silicon an unsigned .app downloaded
+      # from the internet is rejected as "damaged", so unless a real Developer ID is configured
+      # (APPLE_SIGNING_IDENTITY secret -> picked up by the Tauri CLI), pass signingIdentity "-"
+      # as a one-off CLI override. It is deliberately NOT written into tauri.conf.json, so that
+      # adding a real certificate later needs no config change.
+      - name: Build macOS bundles (ad-hoc signed unless a Developer ID is configured)
+        if: runner.os == 'macOS'
+        working-directory: src-tauri
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          args=(build --features metal)
+          if [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
+            echo "APPLE_SIGNING_IDENTITY is configured; letting Tauri sign with the Developer ID."
+          else
+            echo "No APPLE_SIGNING_IDENTITY configured; using ad-hoc signing (signingIdentity \"-\")."
+            # Single-quoted JSON string: bash passes it through as one argv element, double quotes
+            # stay part of the JSON, and no shell expansion happens on the braces.
+            args+=(--config '{"bundle":{"macOS":{"signingIdentity":"-"}}}')
+            # GitHub exports a missing secret as DEFINED BUT EMPTY. tauri-cli does
+            # `env::var_os("APPLE_SIGNING_IDENTITY")` -> Some("") and treats that as an explicit
+            # identity, which overrides the --config above and makes it run `codesign -s ""`
+            # (failure). Remove the variable from the environment for the ad-hoc branch only.
+            unset APPLE_SIGNING_IDENTITY
+          fi
+          npx --yes @tauri-apps/cli@2.12.4 "${args[@]}"
+
+      - name: Verify macOS bundle is signed
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Bundle output lives in the Cargo workspace target dir at the repo root
+          # (src-tauri is a workspace member), so search instead of hard-coding one layout.
+          app=$(find . -type d -name 'floatsubs.app' -path '*/release/bundle/macos/*' -print -quit)
+          dmg=$(find . -type f -name '*.dmg' -path '*/release/bundle/dmg/*' -print -quit)
+          if [ -z "$app" ] || [ ! -d "$app" ]; then
+            echo "::error::no floatsubs.app under */release/bundle/macos/ - the macOS bundle was not produced."
+            exit 1
+          fi
+          if [ -z "$dmg" ] || [ ! -s "$dmg" ]; then
+            echo "::error::no non-empty .dmg under */release/bundle/dmg/ - the macOS bundle was not produced."
+            exit 1
+          fi
+          echo "app: $app"
+          ls -lh "$dmg"
+
+          # Fail hard if the .app carries no signature at all (that is the "damaged" case for users).
+          if ! codesign -dv --verbose=2 "$app" > /tmp/codesign.txt 2>&1; then
+            echo "::error::codesign found no signature on $app"
+            cat /tmp/codesign.txt || true
+            exit 1
+          fi
+          cat /tmp/codesign.txt
+          if grep -qE '^Signature=adhoc$|^Authority=' /tmp/codesign.txt; then
+            echo "Signature found (ad-hoc or Developer ID)."
+          else
+            echo "::error::$app has no ad-hoc/Developer ID signature"
+            exit 1
+          fi
+          codesign --verify --strict "$app"
+          # Nested Frameworks: arm64 linker output is already ad-hoc signed, so this normally
+          # passes; keep it non-fatal so a bundler-level detail cannot block a release.
+          if ! codesign --verify --deep --strict "$app" > /dev/null 2>&1; then
+            echo "::warning::codesign --verify --deep --strict failed; the app bundle signature itself verifies."
+          fi
+
+      - name: Stage macOS dmg under the stable asset name
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg=$(find . -type f -name '*.dmg' -path '*/release/bundle/dmg/*' -print -quit)
+          if [ -z "$dmg" ]; then
+            echo "::error::no .dmg under */release/bundle/dmg/"
+            exit 1
+          fi
+          mkdir -p dist
+          cp "$dmg" dist/floatsubs-macos-arm64.dmg
+          bytes=$(stat -f%z dist/floatsubs-macos-arm64.dmg)
+          if [ "$bytes" -lt $((10 * 1024 * 1024)) ]; then
+            echo "::error::floatsubs-macos-arm64.dmg is implausibly small ($bytes bytes, expected at least 10 MB)"
+            exit 1
+          fi
+          count=$(find dist -type f | wc -l | tr -d ' ')
+          if [ "$count" -ne 1 ] || [ ! -f dist/floatsubs-macos-arm64.dmg ]; then
+            echo "::error::dist does not contain exactly the expected file: $(find dist -type f)"
+            exit 1
+          fi
+          echo "floatsubs-macos-arm64.dmg: $bytes bytes"
+          ls -l dist
+          # Make the dry-run artifact name/size visible on the run summary page.
+          {
+            echo "## macOS distribution artifact"
+            echo ""
+            echo "| file | bytes |"
+            echo "|---|---|"
+            echo "| floatsubs-macos-arm64.dmg | $bytes |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload macOS dist artifact
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: floatsubs-macos-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Tag pushes only: a workflow_dispatch dry run stops after the builds.
+  publish:
+    name: publish GitHub release
+    needs: [verify, build]
+    if: >-
+      github.event_name == 'push'
+      && startsWith(github.ref, 'refs/tags/v')
+      && needs.verify.outputs.release_exists != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: floatsubs-windows-dist
+          path: dist/windows
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: floatsubs-macos-dist
+          path: dist/macos
+
+      - name: Collect the stable-named assets
+        run: |
+          set -euo pipefail
+          mkdir -p dist/release
+          for name in \
+            floatsubs-windows-x64-setup.exe \
+            floatsubs-windows-x64.msi \
+            floatsubs-macos-arm64.dmg; do
+            src=$(find dist/windows dist/macos -type f -name "$name" -print -quit)
+            if [ -z "$src" ]; then
+              echo "::error::$name is missing from the downloaded build artifacts"
+              exit 1
+            fi
+            cp "$src" "dist/release/$name"
+          done
+          ls -l dist/release
+
+      - name: Verify asset sizes and write SHA256SUMS.txt
+        run: |
+          set -euo pipefail
+          cd dist/release
+          check_size() {
+            file="$1"
+            minimum="$2"
+            if [ ! -s "$file" ]; then
+              echo "::error::$file is missing or empty"
+              exit 1
+            fi
+            bytes=$(stat -c %s "$file")
+            if [ "$bytes" -lt "$minimum" ]; then
+              echo "::error::$file is implausibly small ($bytes bytes, expected at least $minimum); refusing to publish a broken artifact."
+              exit 1
+            fi
+            echo "$file: $bytes bytes"
+          }
+          check_size floatsubs-windows-x64-setup.exe $((5 * 1024 * 1024))
+          check_size floatsubs-windows-x64.msi $((5 * 1024 * 1024))
+          check_size floatsubs-macos-arm64.dmg $((10 * 1024 * 1024))
+          sha256sum \
+            floatsubs-windows-x64-setup.exe \
+            floatsubs-windows-x64.msi \
+            floatsubs-macos-arm64.dmg > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Generate release notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          human_size() {
+            awk -v b="$1" 'BEGIN {
+              if (b >= 1000000000) printf "%.2f GB", b / 1000000000;
+              else if (b >= 1000000) printf "%.0f MB", b / 1000000;
+              else printf "%.1f KB", b / 1000;
+            }'
+          }
+          size_exe=$(human_size "$(stat -c %s dist/release/floatsubs-windows-x64-setup.exe)")
+          size_msi=$(human_size "$(stat -c %s dist/release/floatsubs-windows-x64.msi)")
+          size_dmg=$(human_size "$(stat -c %s dist/release/floatsubs-macos-arm64.dmg)")
+
+          # Quoted heredoc: no shell expansion, so backticks, $ and quotes stay literal.
+          # @@MARKERS@@ are substituted afterwards with sed.
+          cat > dist/release-body.md.tmpl <<'BODY'
+          このリリースのバージョン: **@@TAG@@**
+
+          PC の音声をリアルタイムで文字起こし・翻訳し、字幕として重ねて表示するアプリです。
+          インストーラをダウンロードして実行するだけで使えます。API キーは不要で、音声が外部に送信されることはありません。
+
+          ## ダウンロード
+
+          | ファイル | 対象 | 種類 | サイズ |
+          |---|---|---|---|
+          | [floatsubs-windows-x64-setup.exe](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-windows-x64-setup.exe) | Windows 10/11 (64bit) | インストーラ（推奨） | @@SIZE_EXE@@ |
+          | [floatsubs-windows-x64.msi](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-windows-x64.msi) | Windows 10/11 (64bit) | MSI（管理者配布向け） | @@SIZE_MSI@@ |
+          | [floatsubs-macos-arm64.dmg](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-macos-arm64.dmg) | macOS 13 以降（Apple Silicon） | ディスクイメージ | @@SIZE_DMG@@ |
+          | [SHA256SUMS.txt](https://github.com/sp-yduck/floatsubs/releases/latest/download/SHA256SUMS.txt) | すべて | SHA-256 チェックサム | - |
+
+          - Windows は 64bit (x64) のみです。Windows 10 / 11 に対応しています。
+          - macOS は Apple Silicon（M1 以降）のみです。macOS 13 以降が必要です。Intel Mac 用のビルドはありません。
+          - GitHub アカウントは不要です。上のリンクから直接ダウンロードできます。
+
+          ## インストール
+
+          ### Windows
+
+          1. `floatsubs-windows-x64-setup.exe` をダウンロードして実行します（MSI 版が必要な場合は `floatsubs-windows-x64.msi`）。
+          2. 「Windows によって PC が保護されました」と表示されたら、**[詳細情報]** をクリックし、**[実行]** を選びます。このアプリはコード署名を行っていないため、初回のみこの警告が表示されます。
+          3. 画面の指示に従ってインストールします。初回起動時に利用規約への同意を求められます。
+
+          ### macOS
+
+          1. `floatsubs-macos-arm64.dmg` をダウンロードして開き、`floatsubs` を「Applications」フォルダにドラッグします。
+          2. 初回起動時に「開発元を検証できません」と表示されたら、アプリを **右クリック →［開く］** を選び、確認ダイアログで **［開く］** を押します。
+             うまくいかない場合は、**[システム設定] → [プライバシーとセキュリティ]** を開き、「セキュリティ」の項目にある **[このまま開く]** を押してください。
+          3. 2 回目以降は通常どおり起動できます。
+
+          > [!IMPORTANT]
+          > 本アプリは ad-hoc 署名のみ（公証なし）です。そのため macOS では、初回のみ上記の「右クリック→開く」または「システム設定→プライバシーとセキュリティ→このまま開く」の操作が必要です。
+          > Gatekeeper を無効化する必要はありません（セキュリティ上、無効化は推奨しません）。
+
+          ## 初回起動時のモデルダウンロード
+
+          初回起動時、音声認識モデルと翻訳モデル（合計で数 GB）を Hugging Face から自動ダウンロードします。回線によっては数分〜十数分かかります。ダウンロードは中断しても再開でき、SHA-256 で検証されます。アカウントやトークンは不要です。2 回目以降はモデルを再利用するため短時間で起動します。
+          モデル用に数 GB 以上の空き容量を確保してください。
+
+          ## チェックサムの確認（任意）
+
+          ダウンロードしたファイルが壊れていないか、`SHA256SUMS.txt` と照合できます。
+
+          **Windows（PowerShell）**
+
+          ```powershell
+          Get-FileHash .\floatsubs-windows-x64-setup.exe -Algorithm SHA256
+          Get-FileHash .\floatsubs-windows-x64.msi -Algorithm SHA256
+          ```
+
+          **macOS（ターミナル）**
+
+          ```bash
+          cd ~/Downloads
+          shasum -a 256 floatsubs-macos-arm64.dmg
+          ```
+
+          表示された値が `SHA256SUMS.txt` の該当行と一致すれば正常です。
+
+          ## リンク
+
+          - [README（使い方・仕組み・ビルド方法）](https://github.com/sp-yduck/floatsubs#readme)
+          - [floatsubs 利用規約（日本語）](https://github.com/sp-yduck/floatsubs/blob/main/licenses/floatsubs-terms.ja.txt) / [English](https://github.com/sp-yduck/floatsubs/blob/main/licenses/floatsubs-terms.en.txt)
+          - [PLaMo コミュニティライセンス](https://plamo.preferredai.jp/info/plamo-community-license)
+          - [リリース一覧](https://github.com/sp-yduck/floatsubs/releases)
+
+          アプリのコードは MIT ライセンスです。翻訳には Preferred Networks の PLaMo 3 Translate を使用しています（**Built with PLaMo**）。
+          BODY
+
+          sed -e "s|@@TAG@@|${TAG}|g" \
+              -e "s|@@SIZE_EXE@@|${size_exe}|g" \
+              -e "s|@@SIZE_MSI@@|${size_msi}|g" \
+              -e "s|@@SIZE_DMG@@|${size_dmg}|g" \
+              dist/release-body.md.tmpl > dist/release-body.md
+
+          # CHANGELOG.md is being added in parallel; include its 0.1.0 section when present,
+          # but never fail the release because of it.
+          if [ -f CHANGELOG.md ]; then
+            awk '
+              /^##[[:space:]]*\[?0\.1\.0\]?([[:space:]]|$)/ { in_section = 1 }
+              in_section && /^##[[:space:]]/ && $0 !~ /0\.1\.0/ { exit }
+              in_section && /^\[[^]]+\]:[[:space:]]/ { exit }
+              in_section { print }
+            ' CHANGELOG.md > dist/changelog-section.md || true
+            if [ -s dist/changelog-section.md ]; then
+              {
+                printf '\n---\n\n## 変更履歴\n\n'
+                cat dist/changelog-section.md
+                printf '\n'
+              } >> dist/release-body.md
+              echo "Appended the CHANGELOG.md [0.1.0] section."
+            else
+              echo "CHANGELOG.md exists but has no 0.1.0 section; skipping it."
+            fi
+          else
+            echo "No CHANGELOG.md in this commit; release notes omit the changelog."
+          fi
+          echo "----- release body -----"
+          cat dist/release-body.md
+
+      - name: Create or update the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          title="floatsubs $TAG"
+          assets=(
+            dist/release/floatsubs-windows-x64-setup.exe
+            dist/release/floatsubs-windows-x64.msi
+            dist/release/floatsubs-macos-arm64.dmg
+            dist/release/SHA256SUMS.txt
+          )
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Idempotent re-run (for example a re-run of a partially failed publish):
+            # overwrite assets and re-assert title/notes state instead of failing.
+            echo "Release $TAG already exists; uploading assets with --clobber and updating metadata."
+            gh release upload "$TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+            # No --latest here: re-running an old tag must not move /releases/latest
+            # backwards. Only `gh release create` marks the new release as latest.
+            gh release edit "$TAG" \
+              --title "$title" \
+              --notes-file dist/release-body.md \
+              --draft=false \
+              --prerelease=false \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            echo "Creating release $TAG."
+            gh release create "$TAG" "${assets[@]}" \
+              --title "$title" \
+              --notes-file dist/release-body.md \
+              --latest \
+              --verify-tag \
+              --repo "$GITHUB_REPOSITORY"
+          fi
+
+      - name: Verify the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          json=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,isPrerelease,url,assets)
+          echo "$json" | jq .
+          echo "$json" | jq -e '.isDraft == false and .isPrerelease == false' > /dev/null
+          for asset in \
+            floatsubs-windows-x64-setup.exe \
+            floatsubs-windows-x64.msi \
+            floatsubs-macos-arm64.dmg \
+            SHA256SUMS.txt; do
+            echo "$json" | jq -e --arg name "$asset" 'any(.assets[]; .name == $name and .size > 0)' > /dev/null \
+              || { echo "::error::asset $asset is missing or empty in release $TAG"; exit 1; }
+          done
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tagName)
+          if [ "$latest" != "$TAG" ]; then
+            echo "::error::the latest release is '$latest', expected '$TAG'"
+            exit 1
+          fi
+          echo "Release $TAG is published as latest with all four assets."

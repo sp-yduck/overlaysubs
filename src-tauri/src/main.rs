@@ -28,7 +28,7 @@ struct Settings {
     selection: Option<Selection>,
     source: Source,
     session: SessionConfig,
-    /// NF-PF-04: cap GPU use when gaming. 0 = translator on CPU.
+    /// Cap GPU use when gaming. 0 = translator on CPU.
     gpu_layers: u32,
     whisper_gpu: bool,
     hotkey: String,
@@ -214,7 +214,7 @@ struct Bench {
     downgraded_to: Option<Detected>,
 }
 
-/// F-MDL-03: time ASR + translation on a fixed clip; suggest one tier lower if too slow.
+/// Time ASR + translation on a fixed clip; suggest one tier lower if too slow.
 #[tauri::command]
 async fn benchmark(app: AppHandle) -> Result<Bench, String> {
     tauri::async_runtime::spawn_blocking(move || {

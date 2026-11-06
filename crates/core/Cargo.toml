@@ -3,6 +3,12 @@ name = "floatsubs-core"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+description = "Engine-agnostic core for floatsubs: tiers, model registry, prompts, segmentation and SRT export"
+repository = "https://github.com/sp-yduck/floatsubs"
+homepage = "https://sp-yduck.github.io/floatsubs/"
+readme = "../../README.md"
+keywords = ["translation", "speech-recognition", "subtitles", "srt", "whisper"]
+categories = ["multimedia::audio", "text-processing"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

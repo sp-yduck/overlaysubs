@@ -1,4 +1,4 @@
-//! Resumable, hash-verified downloads. No account or token is sent (F-MDL-07).
+//! Resumable, hash-verified downloads. No account or token is ever sent.
 use floatsubs_core::registry::ModelDef;
 use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};

@@ -1,1 +1,1 @@
-{ "bundle": { "resources": { "libs/*.dll": "./" } } }
+{ "bundle": { "resources": { "libs/*.dll": "./", "../THIRD_PARTY_NOTICES.md": "./" } } }

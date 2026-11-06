@@ -1,0 +1,21 @@
+# Normalize line endings to LF in the working tree and in the repository.
+* text=auto eol=lf
+
+# Shell scripts must stay LF even on Windows.
+*.sh text eol=lf
+
+# Binary assets: never convert line endings.
+*.png binary
+*.ico binary
+*.icns binary
+*.dmg binary
+*.exe binary
+*.msi binary
+*.bin binary
+*.gguf binary
+*.dll binary
+*.dylib binary
+*.wav binary
+
+# The lockfile is generated; keep it diffable but out of language statistics.
+Cargo.lock linguist-generated=true
