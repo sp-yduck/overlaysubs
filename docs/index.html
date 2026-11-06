@@ -7,945 +7,451 @@
 <meta name="description" content="OverlaySubs は、PC で再生される音声をリアルタイムで文字起こし・翻訳し、字幕としてオーバーレイ表示する無料のデスクトップアプリです。API キー不要、データは端末内で処理。Windows 10/11 (x64) と macOS 13+ (Apple Silicon) に対応。ダウンロード・インストール・使い方・FAQ・アンインストール方法を掲載。GitHub アカウントは不要です。">
 <meta name="color-scheme" content="light">
 <link rel="canonical" href="https://sp-yduck.github.io/overlaysubs/">
-<style>
-  :root {
-    --ink: #0f172a;
-    --muted: #475569;
-    --line: #e2e8f0;
-    --bg: #f8fafc;
-    --card: #ffffff;
-    --brand: #4338ca;
-    --brand-strong: #3730a3;
-    --brand-soft: #eef2ff;
-    --warn-bg: #fff7ed;
-    --warn-line: #fdba74;
-    --warn-ink: #7c2d12;
-    --radius: 14px;
-    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
-  }
-
-  *, *::before, *::after { box-sizing: border-box; }
-
-  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
-
-  body {
-    margin: 0;
-    font-family: var(--font);
-    color: var(--ink);
-    background: var(--bg);
-    line-height: 1.8;
-    font-size: 16px;
-  }
-
-  a { color: var(--brand); text-underline-offset: 3px; }
-  a:hover { color: var(--brand-strong); }
-
-  :focus-visible {
-    outline: 3px solid #f59e0b;
-    outline-offset: 3px;
-    border-radius: 4px;
-  }
-
-  .skip {
-    position: absolute;
-    left: -9999px;
-    top: 0;
-    background: #fff;
-    color: var(--ink);
-    padding: 10px 16px;
-    z-index: 10;
-  }
-  .skip:focus { left: 12px; top: 12px; }
-
-  .wrap {
-    width: min(1060px, calc(100% - 40px));
-    margin: 0 auto;
-  }
-
-  /* ---------- hero ---------- */
-
-  .hero {
-    background:
-      radial-gradient(1100px 420px at 78% -8%, rgba(14, 165, 233, 0.45), transparent 60%),
-      linear-gradient(135deg, #0b1220 0%, #1e1b4b 52%, #312e81 100%);
-    color: #f8fafc;
-    padding: 26px 0 64px;
-  }
-
-  .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    padding-bottom: 34px;
-  }
-
-  .brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 700;
-    font-size: 1.15rem;
-    letter-spacing: 0.01em;
-    color: #fff;
-    text-decoration: none;
-  }
-  .brand:hover { color: #fff; }
-  .brand svg { width: 34px; height: 34px; flex: none; }
-
-  .topnav {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-    font-size: 0.92rem;
-  }
-  .topnav a { color: #c7d2fe; text-decoration: none; }
-  .topnav a:hover { color: #fff; text-decoration: underline; }
-
-  .hero h1 {
-    margin: 0 0 14px;
-    font-size: clamp(1.9rem, 4.4vw, 3rem);
-    line-height: 1.3;
-    letter-spacing: 0.01em;
-  }
-  .hero h1 span {
-    background: linear-gradient(90deg, #93c5fd, #a5b4fc);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-
-  .lead {
-    margin: 0 0 22px;
-    max-width: 62ch;
-    color: #dbeafe;
-    font-size: 1.02rem;
-  }
-
-  .pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 0 0 28px;
-    padding: 0;
-    list-style: none;
-  }
-  .pills li {
-    font-size: 0.82rem;
-    line-height: 1.4;
-    padding: 5px 12px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    color: #e0e7ff;
-  }
-
-  .hero-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
-    margin-bottom: 16px;
-  }
-
-  .btn {
-    display: inline-flex;
-    flex-direction: column;
-    gap: 2px;
-    text-decoration: none;
-    border-radius: var(--radius);
-    padding: 15px 26px;
-    font-weight: 700;
-    font-size: 1.05rem;
-    line-height: 1.35;
-    border: 2px solid transparent;
-    transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
-  }
-  .btn small {
-    font-weight: 500;
-    font-size: 0.78rem;
-    opacity: 0.8;
-  }
-  .btn-primary {
-    background: #fff;
-    color: #1e1b4b;
-    box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.6);
-  }
-  .btn-primary:hover {
-    background: #eef2ff;
-    color: #1e1b4b;
-    transform: translateY(-1px);
-  }
-  .btn-ghost {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.55);
-    color: #fff;
-  }
-  .btn-ghost:hover {
-    background: rgba(255, 255, 255, 0.16);
-    color: #fff;
-    transform: translateY(-1px);
-  }
-
-  .hero .fineprint {
-    margin: 0;
-    font-size: 0.88rem;
-    color: #c7d2fe;
-  }
-  .hero .fineprint a { color: #fff; }
-
-  /* ---------- sections ---------- */
-
-  main { padding: 0 0 40px; }
-
-  section { padding: 52px 0 8px; }
-
-  h2 {
-    margin: 0 0 8px;
-    font-size: clamp(1.35rem, 2.6vw, 1.7rem);
-    line-height: 1.4;
-  }
-  h3 { margin: 28px 0 10px; font-size: 1.08rem; }
-
-  .section-lead {
-    margin: 0 0 24px;
-    color: var(--muted);
-  }
-
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
-    gap: 18px;
-  }
-
-  .card {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  }
-  .card.primary { border-color: #c7d2fe; box-shadow: 0 14px 34px -24px rgba(67, 56, 202, 0.55); }
-  .card h3 { margin: 0; font-size: 1.12rem; }
-  .card p { margin: 0; color: var(--muted); font-size: 0.92rem; }
-  .card .os { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; color: var(--brand); text-transform: uppercase; }
-  .card .btn { margin-top: auto; }
-  .btn-solid {
-    background: var(--brand);
-    color: #fff;
-    text-align: center;
-    align-items: center;
-    font-size: 1rem;
-    padding: 13px 20px;
-  }
-  .btn-solid:hover { background: var(--brand-strong); color: #fff; }
-  .btn-outline {
-    background: #fff;
-    border-color: var(--brand);
-    color: var(--brand);
-    text-align: center;
-    align-items: center;
-    font-size: 0.95rem;
-    padding: 12px 20px;
-  }
-  .btn-outline:hover { background: var(--brand-soft); color: var(--brand-strong); }
-  .filename {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 0.8rem;
-    color: var(--muted);
-    word-break: break-all;
-  }
-
-  .steps {
-    counter-reset: step;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 16px;
-  }
-  .steps li {
-    counter-increment: step;
-    position: relative;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 22px 22px 22px 64px;
-  }
-  .steps li::before {
-    content: counter(step);
-    position: absolute;
-    left: 20px;
-    top: 20px;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background: var(--brand-soft);
-    color: var(--brand-strong);
-    font-weight: 700;
-    display: grid;
-    place-items: center;
-    font-size: 0.95rem;
-  }
-  .steps strong { display: block; margin-bottom: 2px; }
-  .steps p { margin: 0; color: var(--muted); font-size: 0.9rem; }
-
-  .notice {
-    background: var(--warn-bg);
-    border: 1px solid var(--warn-line);
-    border-radius: var(--radius);
-    padding: 20px 22px;
-    color: var(--warn-ink);
-  }
-  .notice strong { color: #7c2d12; }
-  .notice p { margin: 0 0 10px; }
-  .notice p:last-child { margin-bottom: 0; }
-  .notice code {
-    background: rgba(124, 45, 18, 0.08);
-    padding: 1px 5px;
-    border-radius: 4px;
-  }
-
-  .steps-inline {
-    margin: 8px 0 0;
-    padding-left: 1.3em;
-  }
-  .steps-inline li { margin: 4px 0; }
-
-  details {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 0 18px;
-    margin: 0 0 10px;
-  }
-  details[open] { padding-bottom: 8px; }
-  summary {
-    cursor: pointer;
-    padding: 15px 0;
-    font-weight: 600;
-    list-style-position: outside;
-  }
-  summary:hover { color: var(--brand); }
-  details p, details ul { margin-top: 0; color: var(--muted); font-size: 0.94rem; }
-  details p:last-child, details ul:last-child { margin-bottom: 10px; }
-
-  .table-scroll { overflow-x: auto; margin: 0 0 18px; }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    overflow: hidden;
-    font-size: 0.93rem;
-  }
-  caption {
-    caption-side: top;
-    text-align: left;
-    font-size: 0.85rem;
-    color: var(--muted);
-    padding-bottom: 8px;
-  }
-  th, td {
-    text-align: left;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--line);
-    vertical-align: top;
-  }
-  thead th { background: #f1f5f9; font-size: 0.85rem; }
-  tbody tr:last-child td { border-bottom: 0; }
-  td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-  .dl-links { margin-top: 22px; margin-bottom: 0; }
-
-  .en {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 24px;
-  }
-  .en h2 { font-size: 1.25rem; }
-  .en p { margin: 0 0 10px; color: var(--muted); }
-  .en p:last-child { margin-bottom: 0; }
-
-  footer {
-    border-top: 1px solid var(--line);
-    background: #fff;
-    padding: 34px 0 40px;
-    margin-top: 48px;
-    font-size: 0.9rem;
-    color: var(--muted);
-  }
-  .foot-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 22px;
-    padding: 0 0 16px;
-    margin: 0;
-    list-style: none;
-  }
-  footer p { margin: 6px 0; }
-  footer .credit { color: var(--ink); font-weight: 600; }
-
-  @media (max-width: 620px) {
-    .hero { padding-bottom: 48px; }
-    .btn { width: 100%; align-items: center; text-align: center; }
-    .hero-actions { flex-direction: column; }
-    section { padding-top: 42px; }
-  }
-
-  pre {
-    background: #0f172a;
-    color: #e2e8f0;
-    border-radius: 10px;
-    padding: 14px 16px;
-    overflow-x: auto;
-    font-size: 0.88rem;
-    line-height: 1.6;
-    margin: 0 0 14px;
-  }
-  pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
-
-  code {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 0.9em;
-    background: var(--brand-soft);
-    color: var(--brand-strong);
-    padding: 1px 5px;
-    border-radius: 4px;
-  }
-
-  .list { margin: 0 0 18px; padding-left: 1.2em; color: var(--muted); font-size: 0.94rem; }
-  .list li { margin: 0 0 8px; }
-  .list li:last-child { margin-bottom: 0; }
-  .list strong { color: var(--ink); }
-  .list.two { columns: 2; column-gap: 44px; }
-  .list.two li { break-inside: avoid; }
-  .card .list { margin: 0; font-size: 0.9rem; }
-  .card h3 + p { margin-top: 0; }
-
-  @media (max-width: 720px) {
-    .list.two { columns: 1; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-    .btn { transition: none; }
-  }
-
-  @media print {
-    .hero { background: #fff; color: #000; }
-    .hero h1 span { background: none; color: #000; -webkit-text-fill-color: #000; }
-    .topnav, .skip { display: none; }
-    .card, details, .en, table { box-shadow: none; }
-    a { color: #000; }
-  }
-</style>
+<link rel="alternate" hreflang="ja" href="https://sp-yduck.github.io/overlaysubs/">
+<link rel="alternate" hreflang="en" href="https://sp-yduck.github.io/overlaysubs/en/">
+<link rel="alternate" hreflang="x-default" href="https://sp-yduck.github.io/overlaysubs/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <a class="skip" href="#download">ダウンロードへスキップ</a>
 
-<header class="hero">
+<header class="dark">
   <div class="wrap">
-    <div class="topbar">
-      <a class="brand" href="index.html" aria-label="OverlaySubs トップ">
-        <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-          <rect x="3" y="7" width="42" height="30" rx="8" fill="#6366f1"/>
-          <rect x="9" y="14" width="24" height="4" rx="2" fill="#eef2ff"/>
-          <rect x="9" y="22" width="30" height="4" rx="2" fill="#c7d2fe"/>
-          <path d="M16 37 L16 44 L24 37 Z" fill="#6366f1"/>
-        </svg>
-        OverlaySubs
-      </a>
-      <nav class="topnav" aria-label="ページ内メニュー">
-        <a href="#download">ダウンロード</a>
-        <a href="#install">インストール</a>
-        <a href="#usage">使い方</a>
-        <a href="#warning">警告が出たとき</a>
-        <a href="#requirements">動作環境</a>
-        <a href="#limits">現状の制限</a>
-        <a href="#license">ライセンス</a>
-        <a href="#faq">FAQ</a>
+    <div class="top">
+      <a class="brand" href="index.html" aria-label="OverlaySubs トップ">OverlaySubs</a>
+      <nav aria-label="ページ内メニュー">
+        <ul class="nav">
+          <li><a href="#download">ダウンロード</a></li>
+          <li><a href="#install">インストール</a></li>
+          <li><a href="#warning">警告が出たとき</a></li>
+          <li><a href="#usage">使い方</a></li>
+          <li><a href="#uninstall">アンインストール</a></li>
+          <li><a href="#requirements">動作環境</a></li>
+          <li><a href="#limits">現状の制限</a></li>
+          <li><a href="#license">ライセンス</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li class="lang"><a href="en/" hreflang="en" lang="en">English</a></li>
+        </ul>
       </nav>
     </div>
 
-    <h1>PC の音声を、<br><span>その場で字幕に。</span></h1>
-    <p class="lead">
-      OverlaySubs（オーバーレイサブス）は、PC で再生されるあらゆる音声をリアルタイムで文字起こし・翻訳し、
-      最前面のオーバーレイに字幕として表示するデスクトップアプリです。API キーは不要、データは端末の外に出ません。
-    </p>
-    <ul class="pills">
-      <li>API キー不要・無料</li>
-      <li>データは端末内で処理</li>
-      <li>テレメトリなし</li>
-      <li>Windows 10/11 (x64)</li>
-      <li>macOS 13+ (Apple Silicon)</li>
-    </ul>
-
-    <div class="hero-actions">
-      <a class="btn btn-primary" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe">
-        Windows 版をダウンロード
-        <small>overlaysubs-windows-x64-setup.exe</small>
-      </a>
-      <a class="btn btn-ghost" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg">
-        macOS 版をダウンロード
-        <small>overlaysubs-macos-arm64.dmg</small>
-      </a>
+    <div class="screen">
+      <div class="win w1" aria-hidden="true"></div>
+      <div class="win w2" aria-hidden="true"></div>
+      <div class="win w3" aria-hidden="true"></div>
+      <div class="win w4" aria-hidden="true"></div>
+      <h1><span class="src" lang="en">Everything playing on your PC, subtitled as it plays.</span><span class="seg">PC の音声を、</span><span class="seg">その場で字幕に。</span></h1>
+      <span class="plamo">Built with PLaMo</span>
     </div>
-    <p class="fineprint">
-      GitHub アカウントは不要です。ダウンロードして実行するだけ。
-      ほかの形式は<a href="#download">下の一覧</a>から。すべてのリリースは
-      <a href="https://github.com/sp-yduck/overlaysubs/releases/latest">GitHub Releases</a> にあります。
-    </p>
+
+    <div class="hero-foot">
+      <div>
+        <p class="lead">
+          OverlaySubs（オーバーレイサブス）は、PC で再生されるあらゆる音声をリアルタイムで文字起こし・翻訳し、
+          最前面のオーバーレイに字幕として表示する無料のデスクトップアプリです。API キーは不要で、音声もテキストも端末の外に出ません。
+        </p>
+        <ul class="facts">
+          <li>API キー不要・無料</li>
+          <li>データは端末内で処理</li>
+          <li>テレメトリなし</li>
+          <li>Windows 10/11 (x64)</li>
+          <li>macOS 13+ (Apple Silicon)</li>
+        </ul>
+      </div>
+      <div class="dl">
+        <a class="btn" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe">
+          Windows 版をダウンロード
+          <small>overlaysubs-windows-x64-setup.exe</small>
+        </a>
+        <a class="btn alt" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg">
+          macOS 版をダウンロード
+          <small>overlaysubs-macos-arm64.dmg</small>
+        </a>
+        <p class="fine">
+          GitHub アカウントは不要です。ダウンロードして実行するだけ。ほかの形式は<a href="#download">下の一覧</a>から。
+          すべてのリリースは <a href="https://github.com/sp-yduck/overlaysubs/releases/latest">GitHub Releases</a> にあります。
+        </p>
+      </div>
+    </div>
   </div>
 </header>
 
 <main>
   <section id="download" aria-labelledby="download-h">
-    <div class="wrap">
+    <div class="wrap sec">
       <h2 id="download-h">ダウンロード</h2>
-      <p class="section-lead">
-        お使いの PC に合ったファイルを選んでください。<strong>GitHub のアカウントは不要です。</strong>
-        ファイル名のリンクをクリックすると、最新版のダウンロードがすぐに始まります。
-      </p>
+      <div class="sec-body">
+        <p class="intro">
+          お使いの PC に合ったファイルを選んでください。<strong>GitHub のアカウントは不要です。</strong>
+          ボタンを押すと最新版のダウンロードがすぐに始まります。
+        </p>
+        <ul class="releases">
+          <li>
+            <div class="os">Windows 版（推奨）<span>Windows 10 / 11（64bit）</span></div>
+            <div>
+              <p>ダウンロードした <code>.exe</code> を実行するだけのインストーラです。通常はこちらを選んでください。</p>
+              <p class="file">overlaysubs-windows-x64-setup.exe</p>
+            </div>
+            <a class="btn solid" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe">ダウンロード（.exe）</a>
+          </li>
+          <li>
+            <div class="os">macOS 版<span>macOS 13 Ventura 以降</span></div>
+            <div>
+              <p>Apple Silicon（M1 / M2 / M3 / M4）用です。<code>.dmg</code> を開いてアプリケーションへドラッグします。Intel Mac 版はありません。</p>
+              <p class="file">overlaysubs-macos-arm64.dmg</p>
+            </div>
+            <a class="btn solid" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg">ダウンロード（.dmg）</a>
+          </li>
+          <li>
+            <div class="os">Windows 版（MSI）<span>Windows 10 / 11（64bit）</span></div>
+            <div>
+              <p>MSI は管理者権限（全ユーザー向け）でインストールされます。社内配布などで MSI が必要な場合の代替形式です。通常は上の .exe を使ってください。</p>
+              <p class="file">overlaysubs-windows-x64.msi</p>
+            </div>
+            <a class="btn quiet" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64.msi">ダウンロード（.msi）</a>
+          </li>
+        </ul>
 
-      <div class="cards">
-        <div class="card primary">
-          <span class="os">Windows 10 / 11（64bit）</span>
-          <h3>Windows 版（推奨）</h3>
-          <p>ダウンロードした <code>.exe</code> を実行するだけのインストーラです。通常はこちらを選んでください。</p>
-          <p class="filename">overlaysubs-windows-x64-setup.exe</p>
-          <a class="btn btn-solid" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe">ダウンロード（.exe）</a>
-        </div>
+        <p class="muted">
+          チェックサム（SHA-256）: <a href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a>。
+          過去のバージョンを含むリリース一覧: <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a>
+        </p>
 
-        <div class="card">
-          <span class="os">Windows 10 / 11（64bit）</span>
-          <h3>Windows 版（MSI）</h3>
-          <p>MSI は管理者権限（全ユーザー向け）でインストールされます。MSI が必要な場合（社内配布など）の代替形式です。通常は上の .exe を使ってください。</p>
-          <p class="filename">overlaysubs-windows-x64.msi</p>
-          <a class="btn btn-outline" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64.msi">ダウンロード（.msi）</a>
-        </div>
-
-        <div class="card primary">
-          <span class="os">macOS 13 Ventura 以降</span>
-          <h3>macOS 版</h3>
-          <p>Apple Silicon（M1 / M2 / M3 / M4）用です。<code>.dmg</code> を開いてアプリケーションへドラッグします。Intel Mac 版はありません。</p>
-          <p class="filename">overlaysubs-macos-arm64.dmg</p>
-          <a class="btn btn-solid" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg">ダウンロード（.dmg）</a>
-        </div>
+        <details class="sha">
+          <summary>SHA-256 を確認する（任意）</summary>
+          <p>ダウンロードしたファイルが壊れていないか確認できます。表示された値を
+            <a href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a> の値と比べてください。</p>
+          <p><strong>Windows（PowerShell）</strong></p>
+          <pre><code>Get-FileHash .\overlaysubs-windows-x64-setup.exe -Algorithm SHA256</code></pre>
+          <p><strong>macOS（ターミナル）</strong></p>
+          <pre><code>shasum -a 256 overlaysubs-macos-arm64.dmg</code></pre>
+        </details>
       </div>
-
-      <p class="section-lead dl-links">
-        チェックサム（SHA-256）: <a href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a>／
-        リリース一覧（過去のバージョンを含む）: <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a>
-      </p>
-
-      <details>
-        <summary>SHA-256 を確認する（任意）</summary>
-        <p>ダウンロードしたファイルが壊れていないか確認できます。表示された値を
-          <a href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a> の値と比べてください。</p>
-        <p><strong>Windows（PowerShell）</strong></p>
-        <pre><code>Get-FileHash .\overlaysubs-windows-x64-setup.exe -Algorithm SHA256</code></pre>
-        <p><strong>macOS（ターミナル）</strong></p>
-        <pre><code>shasum -a 256 overlaysubs-macos-arm64.dmg</code></pre>
-      </details>
     </div>
   </section>
 
   <section id="install" aria-labelledby="install-h">
-    <div class="wrap">
+    <div class="wrap sec">
       <h2 id="install-h">インストールは 3 ステップ</h2>
-      <p class="section-lead">初回だけモデルのダウンロードに数分〜十数分かかります。2 回目以降はすぐに翻訳を始められます。</p>
-      <ol class="steps">
-        <li>
-          <strong>ダウンロード</strong>
-          <p>上の一覧から、お使いの PC に合ったファイルをクリックします。</p>
-        </li>
-        <li>
-          <strong>実行</strong>
-          <p>Windows は <code>.exe</code> を実行、macOS は <code>.dmg</code> を開いて「OverlaySubs」を「アプリケーション」にドラッグします。</p>
-        </li>
-        <li>
-          <strong>初回セットアップ</strong>
-          <p>起動して利用規約に同意 →「PC の性能を調べる」→「モデルをダウンロード」。終われば準備完了です。</p>
-        </li>
-      </ol>
+      <div class="sec-body">
+        <p class="intro">初回だけモデルのダウンロードに数分〜十数分かかります。2 回目以降はすぐに翻訳を始められます。</p>
+        <ol class="cues">
+          <li>
+            <span class="tc" aria-hidden="true">00:00:00,000 --&gt; 00:01:00,000</span>
+            <strong>ダウンロード</strong>
+            <p>上の一覧から、お使いの PC に合ったファイルをクリックします。</p>
+          </li>
+          <li>
+            <span class="tc" aria-hidden="true">00:01:00,000 --&gt; 00:02:00,000</span>
+            <strong>実行</strong>
+            <p>Windows は <code>.exe</code> を実行、macOS は <code>.dmg</code> を開いて「OverlaySubs」を「アプリケーション」にドラッグします。</p>
+          </li>
+          <li>
+            <span class="tc" aria-hidden="true">00:02:00,000 --&gt; 00:15:00,000</span>
+            <strong>初回セットアップ</strong>
+            <p>起動して利用規約に同意 →「PC の性能を調べる」→「モデルをダウンロード」。終われば準備完了です。</p>
+          </li>
+        </ol>
+      </div>
     </div>
   </section>
 
   <section id="warning" aria-labelledby="warning-h">
-    <div class="wrap">
+    <div class="wrap sec">
       <h2 id="warning-h">警告が表示されたとき</h2>
-      <p class="section-lead">
-        配布しているビルドは<strong>未署名・未公証</strong>です（Windows はコード署名なし、macOS は Developer ID 署名なし・公証なしで <strong>ad-hoc 署名のみ</strong>）。
-        そのため初回起動時に OS が警告（Windows の <strong>SmartScreen / スマートスクリーン</strong>、macOS の <strong>Gatekeeper / ゲートキーパー</strong>）を出しますが、アプリ自体に問題があるという意味ではありません。
-        次の手順で起動できます。
-      </p>
-
-      <div class="notice">
-        <p><strong>重要:</strong> Gatekeeper（ゲートキーパー）や SmartScreen（スマートスクリーン）を<strong>システム全体で無効にしないでください</strong>。このアプリだけを個別に許可する、下記の手順を使ってください。</p>
-        <p>macOS 15 以降では右クリック →「開く」の回避操作が廃止されているため、システム設定からの操作が必要です。環境によっては「開発元を確認できません」と表示されます。</p>
+      <div class="sec-body">
+        <p class="intro">
+          配布しているビルドは<strong>未署名・未公証</strong>です（Windows はコード署名なし、macOS は Developer ID 署名なし・公証なしで <strong>ad-hoc 署名のみ</strong>）。
+          そのため初回起動時に OS が警告（Windows の <strong>SmartScreen / スマートスクリーン</strong>、macOS の <strong>Gatekeeper / ゲートキーパー</strong>）を出しますが、アプリ自体に問題があるという意味ではありません。
+          次の手順で起動できます。
+        </p>
+        <div class="notice">
+          <p><strong>重要:</strong> Gatekeeper（ゲートキーパー）や SmartScreen（スマートスクリーン）を<strong>システム全体で無効にしないでください</strong>。このアプリだけを個別に許可する、下記の手順を使ってください。</p>
+          <p>macOS 15 以降では右クリック →「開く」の回避操作が廃止されているため、システム設定からの操作が必要です。環境によっては「開発元を確認できません」と表示されます。</p>
+        </div>
+        <div class="two">
+          <div>
+            <h3>Windows: 「Windows によって PC が保護されました」</h3>
+            <ol class="plain">
+              <li>青い画面の <strong>「詳細情報」</strong> をクリックします。</li>
+              <li>表示された <strong>「実行」</strong> ボタンをクリックします。</li>
+            </ol>
+          </div>
+          <div>
+            <h3>macOS: 「開発元を検証できません」/「…は開いていません」</h3>
+            <ol class="plain">
+              <li>Finder で OverlaySubs を<strong>右クリック（または Control キーを押しながらクリック）</strong> → <strong>「開く」</strong> → 確認ダイアログで <strong>「開く」</strong>。</li>
+              <li>それでも開かない場合は、<strong>システム設定</strong> → <strong>プライバシーとセキュリティ</strong> を開き、下部に出る「OverlaySubs は…ブロックされました」の横の <strong>「このまま開く」</strong> をクリックします。</li>
+            </ol>
+          </div>
+        </div>
       </div>
-
-      <h3>Windows: 「Windows によって PC が保護されました」</h3>
-      <ol class="steps-inline">
-        <li>青い画面の <strong>「詳細情報」</strong> をクリックします。</li>
-        <li>表示された <strong>「実行」</strong> ボタンをクリックします。</li>
-      </ol>
-
-      <h3>macOS: 「開発元を検証できません」/「…は開いていません」</h3>
-      <ol class="steps-inline">
-        <li>Finder で OverlaySubs を<strong>右クリック（または Control キーを押しながらクリック）</strong> → <strong>「開く」</strong> → 確認ダイアログで <strong>「開く」</strong>。</li>
-        <li>それでも開かない場合は、<strong>システム設定</strong> → <strong>プライバシーとセキュリティ</strong> を開き、下部に出る「OverlaySubs は…ブロックされました」の横の <strong>「このまま開く」</strong> をクリックします。</li>
-      </ol>
     </div>
   </section>
 
   <section id="usage" aria-labelledby="usage-h">
-    <div class="wrap">
+    <div class="wrap sec">
       <h2 id="usage-h">使い方</h2>
-      <p class="section-lead">初回セットアップが終われば、あとはホットキーで開始・停止するだけです。</p>
+      <div class="sec-body">
+        <p class="intro">初回セットアップが終われば、あとはホットキーで開始・停止するだけです。</p>
 
-      <div class="cards">
-        <div class="card">
+        <div class="block">
           <h3>初回セットアップ</h3>
           <p>起動して利用規約（PLaMo コミュニティライセンスを含む）に同意し、「モデルの準備」で「PC の性能を調べる」→「モデルをダウンロード」の順に進めます（数 GB・数分〜十数分）。任意で「速度を測る」を実行できます。</p>
+          <figure>
+            <img src="images/ui-model-setup.png" width="1960" height="1840" loading="lazy" alt="「モデルの準備」画面。「PC の性能を調べる」「モデルをダウンロード」「速度を確認（任意）」の 3 段階が並び、Whisper・PLaMo・VAD の各モデルが取得済みと表示されている。">
+            <figcaption>モデルの準備。ハードウェアを判定し、ティアに合ったモデルを自動で選びます。</figcaption>
+          </figure>
         </div>
-        <div class="card">
+
+        <div class="block">
           <h3>開始と停止</h3>
           <p><strong>Ctrl+Shift+T</strong>（macOS は <strong>Cmd+Shift+T</strong>）で翻訳を開始・停止します。ホットキーは設定画面で変更できます。</p>
           <p>音声入力は Windows なら「システム音声」で PC の再生音をそのまま取り込めます。macOS はループバック（仮想オーディオ）デバイスを「マイク」として選んでください（<a href="#limits">現状の制限</a>）。</p>
+          <figure>
+            <img src="images/overlay.jpg" width="1920" height="630" loading="lazy" alt="字幕オーバーレイ。他のアプリの上に、英語の原文（小）と日本語の訳文（大）が 2 行で表示されている。右下に Built with PLaMo の表記。">
+            <figcaption>字幕オーバーレイ。他のアプリの上に重ねて表示されます（背景はイメージ）。</figcaption>
+          </figure>
         </div>
-        <div class="card">
+
+        <div class="block">
           <h3>トレイ常駐と終了</h3>
           <p>アプリの実行中は、タスクトレイ / メニューバーのアイコンから「Start / Stop」「Settings」「Quit」を選べます。設定画面を閉じるとアプリは終了します。</p>
         </div>
+
+        <div class="block">
+          <h3>設定できること</h3>
+          <ul class="settings">
+            <li><strong>音声入力</strong>: システム音声 / マイクと、使用するデバイス</li>
+            <li><strong>言語</strong>: 話されている言語（自動判定または固定）、訳す言語、「すでにその言語のとき」の言語</li>
+            <li><strong>翻訳の調整</strong>: 日本語の文体（敬体 / 常体）、用語集（1行に「原語=訳語」）、話題（翻訳のヒント）、直前の発話を文脈として使う</li>
+            <li><strong>字幕の表示</strong>: 原文も表示、文字サイズ、フォント、背景の不透明度、表示行数、表示時間、「Built with PLaMo」表記の有無</li>
+            <li><strong>クリック透過</strong>: 既定はオフ。オンにするとマウス操作が下の画面に通ります（オンの間はオーバーレイ自体は操作できません）</li>
+            <li><strong>履歴</strong>: 最近の字幕をテキスト / SRT で保存</li>
+            <li><strong>表示言語</strong>: 日本語 / English</li>
+            <li><strong>詳細設定</strong>: 翻訳モデルの GPU レイヤー数（0 で CPU）、音声認識に GPU を使うか、モデルの保存先</li>
+          </ul>
+          <figure>
+            <img src="images/ui-settings.png" width="1960" height="1508" loading="lazy" alt="設定画面の「翻訳」タブ。音声入力、言語、翻訳の調整の各設定と、最近の字幕（原文と訳文）の一覧が表示されている。">
+            <figcaption>設定画面（翻訳）。言語・翻訳の調整・最近の字幕。</figcaption>
+          </figure>
+        </div>
+
+        <div class="block">
+          <p>
+            音声・文字起こし・翻訳データは外部に送信されません。通信はモデルのダウンロードだけで、テレメトリはありません。
+            モデルをダウンロードした後はオフラインでも動作します。
+          </p>
+        </div>
       </div>
-
-      <h3>設定できること</h3>
-      <ul class="list two">
-        <li><strong>音声入力</strong>: システム音声 / マイクと、使用するデバイス</li>
-        <li><strong>言語</strong>: 話されている言語（自動判定または固定）、訳す言語、「すでにその言語のとき」の言語</li>
-        <li><strong>翻訳の調整</strong>: 日本語の文体（敬体 / 常体）、用語集（1行に「原語=訳語」）、話題（翻訳のヒント）、直前の発話を文脈として使う</li>
-        <li><strong>字幕の表示</strong>: 原文も表示、文字サイズ、フォント、背景の不透明度、表示行数、表示時間、「Built with PLaMo」表記の有無</li>
-        <li><strong>クリック透過</strong>: 既定はオフ。オンにするとマウス操作が下の画面に通ります（オンの間はオーバーレイ自体は操作できません）</li>
-        <li><strong>履歴</strong>: 最近の字幕をテキスト / SRT で保存</li>
-        <li><strong>表示言語</strong>: 日本語 / English</li>
-        <li><strong>詳細設定</strong>: 翻訳モデルの GPU レイヤー数（0 で CPU）、音声認識に GPU を使うか、モデルの保存先</li>
-      </ul>
-
-      <p class="section-lead">
-        音声・文字起こし・翻訳データは外部に送信されません。通信はモデルのダウンロードだけで、テレメトリはありません。
-        モデルをダウンロードした後はオフラインでも動作します。
-      </p>
     </div>
   </section>
 
   <section id="uninstall" aria-labelledby="uninstall-h">
-    <div class="wrap">
+    <div class="wrap sec">
       <h2 id="uninstall-h">アンインストール</h2>
-      <p class="section-lead">アプリ本体を削除しても、ダウンロード済みのモデルと設定はフォルダに残ります。</p>
-
-      <div class="cards">
-        <div class="card">
-          <span class="os">Windows</span>
-          <h3>Windows</h3>
-          <p>設定 → アプリ → インストールされているアプリ →「OverlaySubs」→ アンインストール。</p>
+      <div class="sec-body">
+        <p class="intro">アプリ本体を削除しても、ダウンロード済みのモデルと設定はフォルダに残ります。</p>
+        <div class="two">
+          <div>
+            <h3>Windows</h3>
+            <p>設定 → アプリ → インストールされているアプリ →「OverlaySubs」→ アンインストール。</p>
+          </div>
+          <div>
+            <h3>macOS</h3>
+            <p>「アプリケーション」フォルダの「OverlaySubs」をゴミ箱に入れます。</p>
+          </div>
         </div>
-        <div class="card">
-          <span class="os">macOS</span>
-          <h3>macOS</h3>
-          <p>「アプリケーション」フォルダの「OverlaySubs」をゴミ箱に入れます。</p>
+
+        <div class="block" style="margin-top: 24px;">
+          <h3>残るデータと完全削除</h3>
+          <div class="table-scroll">
+            <table>
+              <caption>アンインストール後に残るフォルダ（アプリの識別子は io.github.overlaysubs）</caption>
+              <thead>
+                <tr><th scope="col">OS</th><th scope="col">場所</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">Windows</th><td><code>%APPDATA%\io.github.overlaysubs</code></td></tr>
+                <tr><th scope="row">macOS</th><td><code>~/Library/Application Support/io.github.overlaysubs</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            このフォルダには、モデル（<code>models</code>）、設定（<code>settings.json</code>）、利用規約への同意（<code>terms-accepted</code>）が保存されます。
+            再インストール時にモデルを再ダウンロードしたくない場合は残しておき、完全に削除する場合はフォルダごと削除してください。
+          </p>
         </div>
       </div>
-
-      <h3>残るデータと完全削除</h3>
-      <div class="table-scroll">
-        <table>
-          <caption>アンインストール後に残るフォルダ（アプリの識別子は io.github.overlaysubs）</caption>
-          <thead>
-            <tr>
-              <th scope="col">OS</th>
-              <th scope="col">場所</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">Windows</th>
-              <td><code>%APPDATA%\io.github.overlaysubs</code></td>
-            </tr>
-            <tr>
-              <th scope="row">macOS</th>
-              <td><code>~/Library/Application Support/io.github.overlaysubs</code></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="section-lead">
-        このフォルダには、モデル（<code>models</code>）、設定（<code>settings.json</code>）、利用規約への同意（<code>terms-accepted</code>）が保存されます。
-        再インストール時にモデルを再ダウンロードしたくない場合は残しておき、完全に削除する場合はフォルダごと削除してください。
-      </p>
     </div>
   </section>
 
   <section id="requirements" aria-labelledby="requirements-h">
-    <div class="wrap">
+    <div class="wrap sec">
       <h2 id="requirements-h">動作環境</h2>
-      <p class="section-lead">Windows x64 と macOS Apple Silicon のみに対応しています。32bit Windows、Windows on ARM、Intel Mac 版はありません。</p>
+      <div class="sec-body">
+        <p class="intro">Windows x64 と macOS Apple Silicon のみに対応しています。32bit Windows、Windows on ARM、Intel Mac 版はありません。</p>
+        <div class="table-scroll">
+          <table>
+            <caption>対応 OS とハードウェア</caption>
+            <thead>
+              <tr><th scope="col">項目</th><th scope="col">Windows</th><th scope="col">macOS</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">OS</th><td>Windows 10 / 11（64bit）</td><td>macOS 13 Ventura 以降</td></tr>
+              <tr><th scope="row">CPU</th><td>x64（Intel / AMD）</td><td>Apple Silicon（M1 以降）</td></tr>
+              <tr><th scope="row">GPU</th><td>Vulkan 対応 GPU + 最新の GPU ドライバ</td><td>内蔵 GPU（Metal）</td></tr>
+              <tr><th scope="row">メモリ</th><td>8GB 以上</td><td>8GB 以上</td></tr>
+              <tr><th scope="row">空き容量</th><td>初回のモデルダウンロード分（下表）</td><td>同左</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Windows 版は <strong>Vulkan 対応の GPU と最新ドライバ</strong>が必要です。ドライバが古いと GPU が使われず、実用的な速度が出ません。
+          配布は <strong>GitHub Releases のみ</strong>で、自動アップデート機能はありません。
+        </p>
 
-      <div class="table-scroll">
-        <table>
-          <caption>対応 OS とハードウェア</caption>
-          <thead>
-            <tr>
-              <th scope="col">項目</th>
-              <th scope="col">Windows</th>
-              <th scope="col">macOS</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">OS</th>
-              <td>Windows 10 / 11（64bit）</td>
-              <td>macOS 13 Ventura 以降</td>
-            </tr>
-            <tr>
-              <th scope="row">CPU</th>
-              <td>x64（Intel / AMD）</td>
-              <td>Apple Silicon（M1 以降）</td>
-            </tr>
-            <tr>
-              <th scope="row">GPU</th>
-              <td>Vulkan 対応 GPU + 最新の GPU ドライバ</td>
-              <td>内蔵 GPU（Metal）</td>
-            </tr>
-            <tr>
-              <th scope="row">メモリ</th>
-              <td>8GB 以上</td>
-              <td>8GB 以上</td>
-            </tr>
-            <tr>
-              <th scope="row">空き容量</th>
-              <td>初回のモデルダウンロード分（下表）</td>
-              <td>同左</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="block">
+          <h3 id="models-h">初回起動時のモデルダウンロード（数 GB）</h3>
+          <p>
+            初回セットアップで、PC の性能に合わせたモデルを Hugging Face から自動でダウンロードします。
+            <strong>Hugging Face のアカウントもトークンも不要です。</strong> 中断しても続きから再開でき、SHA-256 で検証されます。
+            モデルをダウンロードした後はオフラインでも動作します。
+          </p>
+          <div class="table-scroll">
+            <table>
+              <caption>ティアごとのダウンロード量と空き容量の目安</caption>
+              <thead>
+                <tr><th scope="col">ティア</th><th scope="col">自動で選ばれる構成</th><th scope="col">ダウンロード量</th><th scope="col">空き容量の目安</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">High</th><td>Whisper large-v3-turbo + PLaMo 3 Translate 8B</td><td class="num">約 6.9GB</td><td class="num">10GB 以上</td></tr>
+                <tr><th scope="row">Mid</th><td>Whisper large-v3-turbo (Q5_0) + PLaMo 3 Translate 2B</td><td class="num">約 2.4GB</td><td class="num">5GB 以上</td></tr>
+                <tr><th scope="row">Low</th><td>Whisper small + PLaMo 3 Translate 2B</td><td class="num">約 2.3GB</td><td class="num">5GB 以上</td></tr>
+                <tr><th scope="row">CPU</th><td>Whisper base + PLaMo 3 Translate 0.8B</td><td class="num">約 0.7GB</td><td class="num">2GB 以上</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="muted">
+            数値は <code>models.json</code> の宣言サイズの合計（Silero VAD の約 0.9MB を含む）です。初回セットアップで「PC の性能を調べる」を実行すると、ハードウェアからティアが決まりモデルが自動選択されます。設定画面では使用するモデル（Whisper / PLaMo）を個別に変更できます。
+          </p>
+          <p class="muted">
+            ティアの目安: High は VRAM 12GB 以上、Mid は VRAM 8GB、Low は VRAM 4〜6GB、CPU は GPU がない場合または VRAM 4GB 未満です（Apple Silicon はメモリ量で判定）。
+          </p>
+        </div>
       </div>
-
-      <p class="section-lead">
-        Windows 版は <strong>Vulkan 対応の GPU と最新ドライバ</strong>が必要です。ドライバが古いと GPU が使われず、実用的な速度が出ません。
-        配布は <strong>GitHub Releases のみ</strong>で、自動アップデート機能はありません。
-      </p>
-
-      <h3 id="models-h">初回起動時のモデルダウンロード（数 GB）</h3>
-      <p class="section-lead">
-        初回セットアップで、PC の性能に合わせたモデルを Hugging Face から自動でダウンロードします。
-        <strong>Hugging Face のアカウントもトークンも不要です。</strong> 中断しても続きから再開でき、SHA-256 で検証されます。
-        モデルをダウンロードした後はオフラインでも動作します。
-      </p>
-
-      <div class="table-scroll">
-        <table>
-          <caption>ティアごとのダウンロード量と空き容量の目安</caption>
-          <thead>
-            <tr>
-              <th scope="col">ティア</th>
-              <th scope="col">自動で選ばれる構成</th>
-              <th scope="col">ダウンロード量</th>
-              <th scope="col">空き容量の目安</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">High</th>
-              <td>Whisper large-v3-turbo + PLaMo 3 Translate 8B</td>
-              <td class="num">約 6.9GB</td>
-              <td class="num">10GB 以上</td>
-            </tr>
-            <tr>
-              <th scope="row">Mid</th>
-              <td>Whisper large-v3-turbo (Q5_0) + PLaMo 3 Translate 2B</td>
-              <td class="num">約 2.4GB</td>
-              <td class="num">5GB 以上</td>
-            </tr>
-            <tr>
-              <th scope="row">Low</th>
-              <td>Whisper small + PLaMo 3 Translate 2B</td>
-              <td class="num">約 2.3GB</td>
-              <td class="num">5GB 以上</td>
-            </tr>
-            <tr>
-              <th scope="row">CPU</th>
-              <td>Whisper base + PLaMo 3 Translate 0.8B</td>
-              <td class="num">約 0.7GB</td>
-              <td class="num">2GB 以上</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="section-lead">
-        数値は <code>models.json</code> の宣言サイズの合計（Silero VAD の約 0.9MB を含む）です。初回セットアップで「PC の性能を調べる」を実行すると、ハードウェアからティアが決まりモデルが自動選択されます。設定画面では使用するモデル（Whisper / PLaMo）を個別に変更できます。
-      </p>
-      <p class="section-lead">
-        ティアの目安: High は VRAM 12GB 以上、Mid は VRAM 8GB、Low は VRAM 4〜6GB、CPU は GPU がない場合または VRAM 4GB 未満です（Apple Silicon はメモリ量で判定）。
-      </p>
     </div>
   </section>
 
   <section id="limits" aria-labelledby="limits-h">
-    <div class="wrap">
+    <div class="wrap sec">
       <h2 id="limits-h">現状の制限</h2>
-      <p class="section-lead">現在のバージョンで分かっている制約です。今後のリリースで改善する可能性があります。</p>
-      <ul class="list">
-        <li>配布ビルドは<strong>未署名・未公証</strong>です（Windows はコード署名なし、macOS は Developer ID 署名なし・公証なしで <strong>ad-hoc 署名のみ</strong>）。SmartScreen / Gatekeeper の警告が出ます（<a href="#warning">警告が表示されたとき</a>）。</li>
-        <li><strong>Intel Mac 版はありません。</strong>macOS は Apple Silicon（M1 以降）かつ macOS 13 以降のみです。</li>
-        <li>Windows は <strong>Vulkan 対応 GPU と最新ドライバが必須</strong>です。対応していない環境では実用的な速度が出ません。</li>
-        <li>macOS のシステム音声キャプチャ（ScreenCaptureKit）は未実装です。ループバック（仮想オーディオ）デバイスを「マイク」として選ぶ必要があります。</li>
-        <li>特定のアプリだけをキャプチャする機能、システム音声とマイクを同時に処理する機能は未実装です。</li>
-        <li><strong>自動アップデートはありません。</strong>新しいバージョンは <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> から手動でダウンロードしてください（配布は GitHub Releases のみです）。</li>
-      </ul>
+      <div class="sec-body">
+        <p class="intro">現在のバージョンで分かっている制約です。今後のリリースで改善する可能性があります。</p>
+        <ul class="plain">
+          <li>配布ビルドは<strong>未署名・未公証</strong>です（Windows はコード署名なし、macOS は Developer ID 署名なし・公証なしで <strong>ad-hoc 署名のみ</strong>）。SmartScreen / Gatekeeper の警告が出ます（<a href="#warning">警告が表示されたとき</a>）。</li>
+          <li><strong>Intel Mac 版はありません。</strong>macOS は Apple Silicon（M1 以降）かつ macOS 13 以降のみです。</li>
+          <li>Windows は <strong>Vulkan 対応 GPU と最新ドライバが必須</strong>です。対応していない環境では実用的な速度が出ません。</li>
+          <li>macOS のシステム音声キャプチャ（ScreenCaptureKit）は未実装です。ループバック（仮想オーディオ）デバイスを「マイク」として選ぶ必要があります。</li>
+          <li>特定のアプリだけをキャプチャする機能、システム音声とマイクを同時に処理する機能は未実装です。</li>
+          <li><strong>自動アップデートはありません。</strong>新しいバージョンは <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> から手動でダウンロードしてください（配布は GitHub Releases のみです）。</li>
+        </ul>
+      </div>
     </div>
   </section>
 
   <section id="license" aria-labelledby="license-h">
-    <div class="wrap">
+    <div class="wrap sec">
       <h2 id="license-h">ライセンスと利用規約</h2>
-      <p class="section-lead">アプリのコードは MIT ライセンスです。翻訳モデル PLaMo には専用の利用条件があります。</p>
-
-      <div class="cards">
-        <div class="card">
-          <h3>アプリのコード</h3>
-          <p><strong>MIT ライセンス</strong>です。全文は <a href="https://github.com/sp-yduck/overlaysubs/blob/main/LICENSE">LICENSE</a> にあります。</p>
-          <p>同梱している whisper.cpp / llama.cpp / ggml などのサードパーティライセンスは
-            <a href="https://github.com/sp-yduck/overlaysubs/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にまとめています。
-            Whisper モデル（MIT）と Silero VAD（MIT）は、それぞれのライセンスに従います。</p>
-        </div>
-        <div class="card">
-          <h3>利用規約（PLaMo コミュニティライセンスを含む）</h3>
-          <p>初回起動時に同意が必要です。全文は
-            <a href="https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt">OverlaySubs 利用規約</a>
-            （<a href="https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt">English</a>）にあり、アプリの「情報」からも参照できます。</p>
-          <ul class="list">
-            <li>個人・非商用の利用は無償です。</li>
-            <li>商用利用には PFN への事前登録が必要です。年間売上が 10 億円を超える組織（関連会社を含む）の業務利用には、Preferred Networks との別途契約が必要です（<a href="https://plamo.preferredai.jp/info/plamo-community-license">PLaMo コミュニティライセンス</a>）。</li>
-            <li>字幕などの出力を公開・配布する場合は「Built with PLaMo」と明記してください。保存したテキスト / SRT には表記が入らないため、公開時にご自身で明記が必要です。元コンテンツの著作権にも注意してください。</li>
-            <li>字幕オーバーレイには既定で「Built with PLaMo」を表示します（設定でオフにできます）。</li>
-          </ul>
+      <div class="sec-body">
+        <p class="intro">アプリのコードは MIT ライセンスです。翻訳モデル PLaMo には専用の利用条件があります。</p>
+        <div class="two">
+          <div>
+            <h3>アプリのコード</h3>
+            <p><strong>MIT ライセンス</strong>です。全文は <a href="https://github.com/sp-yduck/overlaysubs/blob/main/LICENSE">LICENSE</a> にあります。</p>
+            <p>同梱している whisper.cpp / llama.cpp / ggml などのサードパーティライセンスは
+              <a href="https://github.com/sp-yduck/overlaysubs/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にまとめています。
+              Whisper モデル（MIT）と Silero VAD（MIT）は、それぞれのライセンスに従います。</p>
+          </div>
+          <div>
+            <h3>利用規約（PLaMo コミュニティライセンスを含む）</h3>
+            <p>初回起動時に同意が必要です。全文は
+              <a href="https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt">OverlaySubs 利用規約</a>
+              （<a href="https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt">English</a>）にあり、アプリの「情報」からも参照できます。</p>
+            <ul class="plain">
+              <li>個人・非商用の利用は無償です。</li>
+              <li>商用利用には PFN への事前登録が必要です。年間売上が 10 億円を超える組織（関連会社を含む）の業務利用には、Preferred Networks との別途契約が必要です（<a href="https://plamo.preferredai.jp/info/plamo-community-license">PLaMo コミュニティライセンス</a>）。</li>
+              <li>字幕などの出力を公開・配布する場合は「Built with PLaMo」と明記してください。保存したテキスト / SRT には表記が入らないため、公開時にご自身で明記が必要です。元コンテンツの著作権にも注意してください。</li>
+              <li>字幕オーバーレイには既定で「Built with PLaMo」を表示します（設定でオフにできます）。</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
   <section id="faq" aria-labelledby="faq-h">
-    <div class="wrap">
+    <div class="wrap sec">
       <h2 id="faq-h">よくある質問</h2>
-
-      <details>
-        <summary>GitHub を使ったことがありません。それでも入れられますか？</summary>
-        <p>入れられます。このページのダウンロードボタンからファイルを保存して実行するだけで、アカウント登録も git も Rust も必要ありません。</p>
-      </details>
-
-      <details>
-        <summary>Windows で「Windows によって PC が保護されました」と出て実行できません。</summary>
-        <p>未署名のビルドのため表示されます。「詳細情報」→「実行」で起動できます（<a href="#warning">警告が表示されたとき</a>）。</p>
-      </details>
-
-      <details>
-        <summary>macOS で「開発元を検証できません」と出て開けません。</summary>
-        <p>右クリック →「開く」を試してください。開けない場合は システム設定 → プライバシーとセキュリティ →「このまま開く」を使います（<a href="#warning">警告が表示されたとき</a>）。</p>
-      </details>
-
-      <details>
-        <summary>起動したのに翻訳を開始できません。</summary>
-        <p>初回セットアップが完了していません。「モデルの準備」で「PC の性能を調べる」→「モデルをダウンロード」まで進めてください。ダウンロードが終わるまで開始ボタンは使えません。手順は<a href="#usage">使い方</a>を参照してください。</p>
-      </details>
-
-      <details>
-        <summary>ホットキーが効きません。</summary>
-        <p>ほかのアプリが同じキーを使っている可能性があります。設定画面で既定の <code>Ctrl+Shift+T</code>（macOS は <code>Cmd+Shift+T</code>）を別の組み合わせに変更してください（<a href="#usage">使い方</a>）。</p>
-      </details>
-
-      <details>
-        <summary>GPU が使われていない / 動作が遅いです。</summary>
-        <p>Windows では Vulkan 対応の最新 GPU ドライバが必要です（<a href="#requirements">動作環境</a>）。それでも遅い場合は、設定画面で使用するモデル（Whisper / PLaMo）を軽いものに変更するか、「速度を測る」を実行して 1 段下げたモデルに切り替えてください。CPU 向けのモデルでも動作しますが遅くなります。</p>
-      </details>
-
-      <details>
-        <summary>macOS でシステム音声を取り込めません。</summary>
-        <p>macOS のシステム音声キャプチャ（ScreenCaptureKit）は未実装です。BlackHole などのループバック（仮想オーディオ）デバイスを用意し、入力元を「マイク」にしてそのデバイスを選んでください（<a href="#limits">現状の制限</a>）。</p>
-      </details>
-
-      <details>
-        <summary>オフラインでも使えますか？</summary>
-        <p>使えます。モデルのダウンロードが終わった後は、ネットワークがなくても文字起こし・翻訳が動作します。音声・文字起こし・翻訳データは外部に送信されません。</p>
-      </details>
-
-      <details>
-        <summary>商用利用できますか？</summary>
-        <p>アプリのコードは MIT ライセンスです。翻訳モデル PLaMo は PLaMo コミュニティライセンスに従い、個人・非商用は無償、商用利用には PFN への事前登録が必要です。年間売上が 10 億円を超える組織の業務利用は別途契約が必要です。詳細は<a href="#license">ライセンスと利用規約</a>を参照してください。</p>
-      </details>
-
-      <details>
-        <summary>アンインストール方法を教えてください。</summary>
-        <p>Windows は 設定 → アプリ → インストールされているアプリ →「OverlaySubs」→ アンインストール。macOS は「アプリケーション」フォルダの OverlaySubs をゴミ箱に入れます。モデルと設定はフォルダに残るため、完全に削除する場合は手動で削除してください。詳しくは<a href="#uninstall">アンインストール</a>を参照してください。</p>
-      </details>
-
-      <details>
-        <summary>クリック透過をオンにしたらオーバーレイを操作できなくなりました。</summary>
-        <p>クリック透過がオンの間は、マウス操作が下の画面に通るためオーバーレイ自体は操作できません。設定画面の「字幕の表示」でクリック透過をオフに戻してください（<a href="#usage">使い方</a>）。</p>
-      </details>
-
-      <details>
-        <summary>新しいバージョンに更新するには？</summary>
-        <p>自動アップデートはありません。このページのダウンロードリンク、または <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> から最新版をダウンロードしてインストールしてください。設定とモデルはそのまま引き継がれます（<a href="#limits">現状の制限</a>）。</p>
-      </details>
-    </div>
-  </section>
-
-  <section id="english" lang="en" aria-labelledby="english-h">
-    <div class="wrap">
-      <div class="en">
-        <h2 id="english-h">English</h2>
-        <p>
-          OverlaySubs is a free desktop app that transcribes and translates any audio playing on your PC in real time and
-          overlays the result as subtitles. No API key is required, and audio, transcripts, and translations never leave
-          your device. The only network access is the first-run model download from Hugging Face (no account needed); the
-          app then works offline.
-        </p>
-        <p>
-          Download the Windows installer (<code>overlaysubs-windows-x64-setup.exe</code>, Windows 10/11 x64 with a
-          Vulkan-capable GPU) or the macOS disk image (<code>overlaysubs-macos-arm64.dmg</code>, macOS 13+ on Apple
-          Silicon; there is no Intel Mac build). The builds are not signed with an Apple Developer ID or Windows code-signing certificate and are not notarized (the macOS app is ad-hoc signed only), so SmartScreen or Gatekeeper
-          will warn you: choose "More info" → "Run anyway" on Windows, or right-click → "Open" / System Settings →
-          Privacy &amp; Security → "Open Anyway" on macOS. Never disable Gatekeeper or SmartScreen globally.
-        </p>
-        <p>
-          First launch downloads 0.7–6.9 GB of models depending on your tier, so keep 10 GB free on high-end machines
-          and 2–5 GB otherwise. All downloads are SHA-256 verified and resumable. The app is MIT licensed; the PLaMo
-          translation model follows the PLaMo Community License.
-        </p>
-        <p>
-          Jump to: <a href="#download">Download</a> / <a href="#install">Install</a> / <a href="#warning">If Gatekeeper or SmartScreen warns you</a> /
-          <a href="#usage">Usage</a> / <a href="#uninstall">Uninstall</a> / <a href="#limits">Known limitations</a> /
-          <a href="#license">License</a> / <a href="#faq">FAQ</a>.
-        </p>
-        <p>
-          Build instructions, tests, and code layout are in the developer-facing
-          <a href="https://github.com/sp-yduck/overlaysubs/blob/main/README.md">README</a>
-          (<a href="https://github.com/sp-yduck/overlaysubs/blob/main/README.ja.md">日本語</a>).
-        </p>
+      <div class="sec-body faq">
+        <details>
+          <summary>GitHub を使ったことがありません。それでも入れられますか？</summary>
+          <p>入れられます。このページのダウンロードボタンからファイルを保存して実行するだけで、アカウント登録も git も Rust も必要ありません。</p>
+        </details>
+        <details>
+          <summary>Windows で「Windows によって PC が保護されました」と出て実行できません。</summary>
+          <p>未署名のビルドのため表示されます。「詳細情報」→「実行」で起動できます（<a href="#warning">警告が表示されたとき</a>）。</p>
+        </details>
+        <details>
+          <summary>macOS で「開発元を検証できません」と出て開けません。</summary>
+          <p>右クリック →「開く」を試してください。開けない場合は システム設定 → プライバシーとセキュリティ →「このまま開く」を使います（<a href="#warning">警告が表示されたとき</a>）。</p>
+        </details>
+        <details>
+          <summary>起動したのに翻訳を開始できません。</summary>
+          <p>初回セットアップが完了していません。「モデルの準備」で「PC の性能を調べる」→「モデルをダウンロード」まで進めてください。ダウンロードが終わるまで開始ボタンは使えません。手順は<a href="#usage">使い方</a>を参照してください。</p>
+        </details>
+        <details>
+          <summary>ホットキーが効きません。</summary>
+          <p>ほかのアプリが同じキーを使っている可能性があります。設定画面で既定の <code>Ctrl+Shift+T</code>（macOS は <code>Cmd+Shift+T</code>）を別の組み合わせに変更してください（<a href="#usage">使い方</a>）。</p>
+        </details>
+        <details>
+          <summary>GPU が使われていない / 動作が遅いです。</summary>
+          <p>Windows では Vulkan 対応の最新 GPU ドライバが必要です（<a href="#requirements">動作環境</a>）。それでも遅い場合は、設定画面で使用するモデル（Whisper / PLaMo）を軽いものに変更するか、「速度を測る」を実行して 1 段下げたモデルに切り替えてください。CPU 向けのモデルでも動作しますが遅くなります。</p>
+        </details>
+        <details>
+          <summary>macOS でシステム音声を取り込めません。</summary>
+          <p>macOS のシステム音声キャプチャ（ScreenCaptureKit）は未実装です。BlackHole などのループバック（仮想オーディオ）デバイスを用意し、入力元を「マイク」にしてそのデバイスを選んでください（<a href="#limits">現状の制限</a>）。</p>
+        </details>
+        <details>
+          <summary>オフラインでも使えますか？</summary>
+          <p>使えます。モデルのダウンロードが終わった後は、ネットワークがなくても文字起こし・翻訳が動作します。音声・文字起こし・翻訳データは外部に送信されません。</p>
+        </details>
+        <details>
+          <summary>商用利用できますか？</summary>
+          <p>アプリのコードは MIT ライセンスです。翻訳モデル PLaMo は PLaMo コミュニティライセンスに従い、個人・非商用は無償、商用利用には PFN への事前登録が必要です。年間売上が 10 億円を超える組織の業務利用は別途契約が必要です。詳細は<a href="#license">ライセンスと利用規約</a>を参照してください。</p>
+        </details>
+        <details>
+          <summary>アンインストール方法を教えてください。</summary>
+          <p>Windows は 設定 → アプリ → インストールされているアプリ →「OverlaySubs」→ アンインストール。macOS は「アプリケーション」フォルダの OverlaySubs をゴミ箱に入れます。モデルと設定はフォルダに残るため、完全に削除する場合は手動で削除してください。詳しくは<a href="#uninstall">アンインストール</a>を参照してください。</p>
+        </details>
+        <details>
+          <summary>クリック透過をオンにしたらオーバーレイを操作できなくなりました。</summary>
+          <p>クリック透過がオンの間は、マウス操作が下の画面に通るためオーバーレイ自体は操作できません。設定画面の「字幕の表示」でクリック透過をオフに戻してください（<a href="#usage">使い方</a>）。</p>
+        </details>
+        <details>
+          <summary>新しいバージョンに更新するには？</summary>
+          <p>自動アップデートはありません。このページのダウンロードリンク、または <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> から最新版をダウンロードしてインストールしてください。設定とモデルはそのまま引き継がれます（<a href="#limits">現状の制限</a>）。</p>
+        </details>
       </div>
     </div>
   </section>
+
 </main>
 
-<footer>
+<footer class="dark">
   <div class="wrap">
     <ul class="foot-links">
       <li><a href="https://github.com/sp-yduck/overlaysubs">GitHub リポジトリ</a></li>
@@ -965,7 +471,7 @@
       同梱している whisper.cpp / llama.cpp / ggml などのサードパーティライセンスは
       <a href="https://github.com/sp-yduck/overlaysubs/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にまとめています。
     </p>
-    <p>OverlaySubs 0.1.0 · © 2026 OverlaySubs contributors · 配布: GitHub Releases</p>
+    <p>OverlaySubs 0.1.0。© 2026 OverlaySubs contributors。配布は GitHub Releases のみです。</p>
   </div>
 </footer>
 </body>
