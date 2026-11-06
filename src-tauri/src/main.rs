@@ -258,14 +258,19 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     let (audio_tx, audio_rx) = mpsc::channel::<Vec<f32>>();
     let (ev_tx, ev_rx) = mpsc::channel::<(Event, usize)>();
     let (stop_tx, stop_rx) = mpsc::channel::<()>();
+    let mut vad = engine::Silero::load(&st.engines.lock().unwrap().as_ref().unwrap().asr.vad_path)?;
     let cap = capture::start(&s.source, audio_tx)?;
+    let vad_app = app.clone();
     std::thread::spawn(move || {
         let mut ep = Endpointer::new(EndpointConfig::default());
         let mut out = Vec::new();
         let mut pos = 0;
         for chunk in audio_rx {
             pos += chunk.len();
-            ep.push(&chunk, &mut out);
+            if let Err(err) = ep.push(&chunk, &mut vad, &mut out) {
+                let _ = vad_app.emit("error", err);
+                return;
+            }
             for e in out.drain(..) {
                 if ev_tx.send((e, pos)).is_err() {
                     return;
