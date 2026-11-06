@@ -36,9 +36,24 @@ Release は作成されません。
 
 ## 2. はじめて公開するとき（初回のみ）
 
-現在このリポジトリは private です。private のままでは Release のファイルを未ログインの人が
-ダウンロードできないため、公開には次の手順が必要です。`gh` は管理者権限（`repo`, `workflow`）で
-ログイン済みである前提です。
+現在このリポジトリは **private** です。private のままでは Release のファイルを未ログインの人が
+ダウンロードできないため、公開が必要です。`gh` は管理者権限（`repo`, `workflow`）でログイン済みで
+ある前提です。
+
+> **重要（Actions の課金）**: private リポジトリの Actions は分数を消費し、お支払いが通っていない
+> または使用上限が 0 の場合、ジョブが起動せず数秒で失敗します（アノテーション:
+> `The job was not started because recent account payments have failed or your spending limit
+> needs to be increased`）。**public リポジトリの Actions は無料・無制限**なので、初回は
+> 「公開 → 設定 → ドライラン → タグ」の順で進めるのが確実です。
+
+推奨順序:
+
+1. 2.1 公開前チェック
+2. 2.4 public に切り替える
+3. 2.5〜2.7 リポジトリ設定（説明・トピック・Pages・脆弱性報告・ラベル）
+4. 2.2 ビルドのドライラン（public なら無料）
+5. 2.8 タグ `v0.1.0` でリリース
+6. 2.9 公開後の確認（未ログインでのダウンロード・Pages）
 
 ### 2.1 公開前チェック
 
@@ -52,9 +67,11 @@ git rev-list --objects --all | git cat-file --batch-check='%(objecttype) %(objec
   | awk '$1=="blob" && $2>1000000 {print $2, $3}' | sort -rn | head
 ```
 
-### 2.2 ビルドのドライラン（公開前でも実行可能）
+### 2.2 ビルドのドライラン（public 化後が確実）
 
 タグを打つ前に、実際にインストーラがビルドできるかを確認します。Release は作成されません。
+private のままだと Actions の課金設定が必要になるため、**2.4 で public にしてから**実行するのが
+確実です（public の Actions は無料）。
 
 ```bash
 gh workflow run release.yml --ref main
@@ -71,25 +88,17 @@ ls -lh overlaysubs-windows-dist overlaysubs-macos-dist
 `verify` と `publish` が skipped、`build` の 2 ジョブが success で、上の 3 ファイルが
 そろっていれば OK です（この時点の artifact は 7 日で消えます）。
 
-### 2.3 リポジトリ名を overlaysubs に変更する（初回のみ）
+### 2.3 リポジトリ名を overlaysubs に変更する（済）
 
-GitHub のリポジトリ名はまだ `floatsubs` です。正式名は **overlaysubs**（表示名 OverlaySubs）なので、
-公開前に変更しておくと README・Pages URL・Release のリンクが最初から一致します（private のうちは
-外部への影響がありません）。
+このリポジトリはすでに **overlaysubs** に改名済みです（旧名 `floatsubs` の URL は GitHub が
+リダイレクトします）。手元の clone の remote が旧名のままなら、次で更新してください。
 
 ```bash
-# カレントディレクトリが sp-yduck/floatsubs の clone であることを確認してから実行（-R は付けない）
-gh repo view --json nameWithOwner
-gh repo rename overlaysubs
-
-# ローカルの remote を新しい URL に更新（GitHub は旧 URL もリダイレクトしますが明示的に）
 git remote set-url origin https://github.com/sp-yduck/overlaysubs.git
+git remote -v
 ```
 
-> **注意**: リポジトリ名を変えると Pages の URL も `https://sp-yduck.github.io/overlaysubs/` に
-> 変わります（旧 URL は自動リダイレクトされません）。まだ Pages を有効化していなければ影響は
-> ありません。すでに変更済みならこの手順は飛ばしてください。以降のコマンドの
-> `sp-yduck/overlaysubs` は、変更前は `sp-yduck/floatsubs` と読み替えてください。
+別名で作り直した場合のみ `gh repo rename overlaysubs` を（private のうちに）実行します。
 
 ### 2.4 public に切り替える（順番に注意）
 
@@ -106,6 +115,8 @@ gh repo edit sp-yduck/overlaysubs \
 
 > **注意**: public にすると **これまでのコミット履歴がすべて公開** されます。private に戻すことは
 > できますが、一度公開された内容は取り消せません。2.1 のチェックを先に済ませてください。
+>
+> public にすると **Actions も無料・無制限** になります（private での課金設定は不要）。
 
 ### 2.5 リポジトリの説明・トピック・Pages を設定する
 
@@ -247,6 +258,17 @@ git tag -d vX.Y.Z
 git tag -a vX.Y.Z -m "OverlaySubs vX.Y.Z"
 git push origin vX.Y.Z
 ```
+
+### CI / リリースのジョブが数秒で失敗する
+
+ジョブが `steps=0` で失敗し、アノテーションに次が出る場合、Actions の課金設定が原因です。
+
+> The job was not started because recent account payments have failed or your spending limit
+> needs to be increased.
+
+対処: **リポジトリを public にする**（public の Actions は無料）か、GitHub の
+**Settings → Billing & plans** でお支払い方法・使用上限を設定してください。private のまま
+リリースする場合も、この設定がないとタグを打ってもビルドが起動しません。
 
 ### タグを打ったのに何も起きない
 
