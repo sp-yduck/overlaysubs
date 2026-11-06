@@ -8,7 +8,7 @@ use capture::Source;
 use floatsubs_core::endpoint::{EndpointConfig, Endpointer, Event};
 use floatsubs_core::export::{self, Entry};
 use floatsubs_core::registry::{Registry, Selection};
-use floatsubs_core::session::{Asr, Session, SessionConfig, Translator};
+use floatsubs_core::session::{Asr, Caption, Session, SessionConfig, Translator};
 use floatsubs_core::tier::{self, Hardware, Tier};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -285,8 +285,32 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     std::thread::spawn(move || {
         let mut session = Session::new(s.session);
         let mut seen = 0;
-        while stop_rx.try_recv().is_err() {
-            let Ok(first) = ev_rx.recv_timeout(std::time::Duration::from_millis(200)) else { continue };
+        let mut last_event = Instant::now();
+        let mut emit = |c: Caption| {
+            let _ = emit_app.emit("caption", &c);
+        };
+        loop {
+            let stopping = stop_rx.try_recv().is_ok();
+            let next = if stopping { None } else { ev_rx.recv_timeout(std::time::Duration::from_millis(200)).ok() };
+            let Some(first) = next else {
+                // The speaker paused mid-sentence, or capture stopped: stop waiting for the rest.
+                if stopping || last_event.elapsed() > std::time::Duration::from_secs(2) {
+                    let mut g = engines.lock().unwrap();
+                    let Some(e) = g.as_mut() else { return };
+                    let n = session.entries.len();
+                    if let Err(err) = session.flush(&mut e.mt, &mut emit) {
+                        let _ = emit_app.emit("error", err);
+                    }
+                    if session.entries.len() != n {
+                        *history.lock().unwrap() = session.entries.clone();
+                    }
+                }
+                if stopping {
+                    return;
+                }
+                continue;
+            };
+            last_event = Instant::now();
             // Under load, skip stale partials: keep every final and only the newest partial.
             let batch: Vec<_> = std::iter::once(first).chain(ev_rx.try_iter()).collect();
             let n = batch.len();
@@ -297,9 +321,7 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
                 let mut g = engines.lock().unwrap();
                 let Some(e) = g.as_mut() else { return };
                 let (asr, mt): (&mut dyn Asr, &mut dyn Translator) = (&mut e.asr, &mut e.mt);
-                if let Err(err) = session.handle(ev, asr, mt, &mut |c| {
-                    let _ = emit_app.emit("caption", &c);
-                }) {
+                if let Err(err) = session.handle(ev, asr, mt, &mut emit) {
                     let _ = emit_app.emit("error", err);
                 }
             }

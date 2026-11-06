@@ -138,6 +138,7 @@ function homePage() {
   <details class="card"><summary>${t("tuning")}</summary>
     ${select(t("form"), "session.form", opts([["", t("form_default")], ["plain", t("plain")], ["polite", t("polite")]], s.session.form), "nullable")}
     ${field(t("context"), "session.use_context", "check")}
+    ${field(t("topic"), "session.topic", "text", `placeholder="${esc(t("topic_ph"))}"`)}
     <label class="f top"><span>${t("glossary")}</span><textarea data-k="session.glossary" data-t="glossary" placeholder="OpenAI=オープンAI">${esc(glossary)}</textarea></label>
   </details>
   ${card(t("recent"), `<div class="hist" data-hist="6"></div>`)}`;

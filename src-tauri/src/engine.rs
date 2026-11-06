@@ -40,12 +40,17 @@ impl Whisper {
 }
 
 impl Asr for Whisper {
-    fn transcribe(&mut self, pcm: &[f32], lang: Option<&str>) -> Result<Transcript, String> {
+    fn transcribe(&mut self, pcm: &[f32], lang: Option<&str>, prompt: &str) -> Result<Transcript, String> {
         let mut st = self.ctx.create_state().map_err(|e| e.to_string())?;
         let mut p = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         p.set_n_threads(self.threads);
         p.set_language(Some(lang.unwrap_or("auto")));
         p.set_no_context(true);
+        // The prompt comes from user settings; set_initial_prompt panics on NUL.
+        let prompt = prompt.replace('\0', "");
+        if !prompt.is_empty() {
+            p.set_initial_prompt(&prompt);
+        }
         p.set_single_segment(true);
         p.set_suppress_blank(true);
         p.set_suppress_nst(true);
@@ -233,6 +238,7 @@ mod tests {
             s.handle(ev, &mut asr, &mut mt, &mut |c| if c.stage == Stage::Final { finals.push(c) }).unwrap();
             eprintln!("utterance took {:?}", t0.elapsed());
         }
+        s.flush(&mut mt, &mut |c| if c.stage == Stage::Final { finals.push(c) }).unwrap();
         for c in &finals {
             eprintln!("[{}] {}\n  → {}", c.lang, c.source, c.translation);
         }
