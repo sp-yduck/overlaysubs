@@ -3,6 +3,7 @@ mod capture;
 mod download;
 mod engine;
 mod hw;
+mod update;
 
 use capture::Source;
 use overlaysubs_core::cache::HardwareCache;
@@ -110,7 +111,7 @@ fn registry(app: &AppHandle) -> Result<Registry, String> {
 }
 
 /// Bump when the terms text changes; users are asked to accept again.
-const TERMS_VERSION: &str = "2";
+const TERMS_VERSION: &str = "3";
 
 /// Kept outside settings.json so a settings reset or schema change never re-asks for consent.
 fn terms_accepted(app: &AppHandle) -> bool {
@@ -161,6 +162,13 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
         devices: capture::devices(),
         hardware: hw::cached(&config_dir(&app)),
     })
+}
+
+/// Check GitHub for a newer release; `None` when up to date or the release is unusable.
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Result<Option<update::UpdateInfo>, String> {
+    let current = app.package_info().version.to_string();
+    tauri::async_runtime::spawn_blocking(move || update::fetch(&current)).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -636,7 +644,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, open_url, show_overlay, set_overlay_preview
+            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, open_url, show_overlay, set_overlay_preview, check_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running overlaysubs");

@@ -24,8 +24,8 @@
     "license": "MIT",
     "copyright": "OverlaySubs contributors. Built with PLaMo.",
     "publisher": "OverlaySubs contributors",
-    "shortDescription": "PCの音声をリアルタイムで文字起こし・翻訳するオフライン字幕アプリ",
-    "longDescription": "PC上で再生されるあらゆる音声をリアルタイムで文字起こし・翻訳し、字幕としてオーバーレイ表示するデスクトップアプリです。\nAPIキー不要・完全オフラインで動作し、音声やテキストが外部に送信されることはありません。",
+    "shortDescription": "PCの音声をリアルタイムで文字起こし・翻訳するデスクトップ字幕アプリ",
+    "longDescription": "PC上で再生されるあらゆる音声をリアルタイムで文字起こし・翻訳し、字幕としてオーバーレイ表示するデスクトップアプリです。\nAPIキー不要で、音声やテキストが外部に送信されることはありません。モデルをダウンロードした後はオフラインでも動作します。",
     "category": "Utility",
     "windows": { "nsis": { "installMode": "currentUser" } },
     "macOS": { "minimumSystemVersion": "13.0" }

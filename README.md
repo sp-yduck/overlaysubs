@@ -8,7 +8,7 @@
 [![Windows x64](https://img.shields.io/badge/platform-Windows%20x64-0078d4.svg)](#requirements)
 [![macOS Apple Silicon](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-lightgrey.svg)](#requirements)
 
-A desktop app that transcribes and translates any audio playing on your PC in real time and shows the result as an overlay of subtitles. Audio and text are processed locally on your device — no API key is needed, and nothing is sent to an external service.
+A desktop app that transcribes and translates any audio playing on your PC in real time and shows the result as an overlay of subtitles. Audio and text are processed locally on your device — no API key is needed, and no audio or text is sent to an external service.
 
 **Built with PLaMo.** Translation uses Preferred Networks' [PLaMo 3 Translate](https://huggingface.co/pfnet/plamo-3-translate-0.8b-GGUF).
 
@@ -62,7 +62,7 @@ Install steps, what to do when Windows SmartScreen or macOS Gatekeeper warns you
 
 - Windows builds require a **Vulkan-capable GPU and current driver** (the official build uses `--features vulkan`). With an old driver the GPU is not used and performance is not usable in real time.
 - There is no Intel Mac build, no 32-bit Windows build, and no Windows on ARM build.
-- The only supported distribution channel is **GitHub Releases**; there is no auto-updater.
+- The only supported distribution channel is **GitHub Releases**; there is no auto-updater. The app only notifies you when a newer release exists and links to its release page.
 
 ## Architecture
 
@@ -89,7 +89,8 @@ WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ Silero VAD endpointer ─
 - Always-on-top, semi-transparent overlay (click-through can be enabled in settings). Original text, font size, font, background opacity, line count, display time, and the "Built with PLaMo" credit are configurable. The overlay appears while translating and hides when translation stops; you can also toggle it from "Show subtitles" in the tray menu or with the switch above the Start button. While translation is stopped, opening "Subtitles" shows the overlay with a sample caption so you can tune the appearance live.
 - Export history as text or SRT.
 - Tray/menu-bar resident, global hotkey (default `CmdOrCtrl+Shift+T`; `Ctrl+Shift+T` on Windows, `Cmd+Shift+T` on macOS) to start/stop. UI in Japanese and English.
-- Audio, transcripts, and translations are never sent anywhere. The only network traffic is the model download. No telemetry. The app works offline once the models are downloaded.
+- At startup the app makes one anonymous request to the GitHub Releases API to check for a newer version; if there is one, a dismissible banner in the settings window shows the latest and current version with "Open release page" and "Later" buttons. Nothing is downloaded or installed automatically, and if the check fails (offline, API error) nothing is shown. Dismissing the banner lasts until the app restarts.
+- Audio, transcripts, and translations are never sent anywhere. No telemetry. The only network access is the model download and one anonymous GitHub API request at startup to check for a newer release (it sends no account, token, or personal data; if it fails, nothing happens). The app works offline once the models are downloaded.
 
 ## Models and tiers
 

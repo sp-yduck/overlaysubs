@@ -242,8 +242,14 @@
         </div>
 
         <div class="block">
+          <h3>New version notifications</h3>
+          <p>At startup the app checks once for a newer version and, if there is one, shows an "Update available" banner at the top of Settings with the latest and current version. Click "Open release page" to open the release page, or "Later" to dismiss it (it stays hidden until the next launch). Nothing is downloaded or installed automatically.</p>
+        </div>
+
+        <div class="block">
           <p>
-            Audio, transcripts and translations are never sent anywhere. The only network access is the model download, and there is no telemetry.
+            Audio, transcripts and translations are never sent anywhere. There is no telemetry.
+            The only network access is the model download and one anonymous GitHub API request at startup to check for a newer release (it sends no account, token or personal data; if it fails, nothing happens).
             Once the models are downloaded, the app works offline.
           </p>
         </div>
@@ -312,7 +318,7 @@
         </div>
         <p>
           The Windows build needs a <strong>Vulkan-capable GPU and an up-to-date driver</strong>. With an old driver the GPU isn't used and the app is too slow to be practical.
-          It is distributed <strong>only via GitHub Releases</strong>, and there is no auto-update.
+          It is distributed <strong>only via GitHub Releases</strong>. There is no auto-update: the app checks at startup whether a newer release exists and notifies you, but never downloads or installs it automatically.
         </p>
 
         <div class="block">
@@ -358,7 +364,7 @@
           <li>Windows <strong>requires a Vulkan-capable GPU and an up-to-date driver</strong>. Without them the app is too slow to be practical.</li>
           <li>System audio capture on macOS (ScreenCaptureKit) is not implemented yet. You need to select a loopback (virtual audio) device as the "Microphone".</li>
           <li>Capturing a single app only, or processing system audio and the microphone at the same time, is not implemented yet.</li>
-          <li><strong>There is no auto-update.</strong> Download new versions manually from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> (the only distribution channel).</li>
+          <li><strong>There is no auto-update.</strong> The app checks for a newer release at startup and notifies you, but it never downloads or installs one. Download new versions manually from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> (the only distribution channel).</li>
         </ul>
       </div>
     </div>
@@ -424,7 +430,7 @@
         </details>
         <details>
           <summary>Does it work offline?</summary>
-          <p>Yes. Once the models are downloaded, transcription and translation work without a network. Audio, transcripts and translations are never sent anywhere.</p>
+          <p>Yes. Once the models are downloaded, transcription and translation work without a network. The startup version check does use the network, but if it can't reach GitHub nothing is shown and nothing else is affected. Audio, transcripts and translations are never sent anywhere.</p>
         </details>
         <details>
           <summary>Can I use it commercially?</summary>
@@ -440,7 +446,7 @@
         </details>
         <details>
           <summary>How do I update to a new version?</summary>
-          <p>There is no auto-update. Download the latest version from the links on this page or from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> and install it. Your settings and models are kept (see <a href="#limits">Limitations</a>).</p>
+          <p>There is no auto-update. When Settings shows a new-version banner, use "Open release page", or download the latest version from the links on this page or from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> and install it. Your settings and models are kept (see <a href="#limits">Limitations</a>).</p>
         </details>
       </div>
     </div>
