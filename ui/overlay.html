@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <title>floatsubs overlay</title>
 <style>
-  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  html { background: transparent; }
+  /* faint tint so the overlay area can be found */
+  body { background: rgba(128,128,128,0.12); border-radius: 8px; }
   body { display: flex; flex-direction: column; justify-content: flex-end; font-family: var(--font); cursor: default; user-select: none; }
   #lines { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; }
   .cap { align-self: center; max-width: 100%; text-align: center; padding: 4px 14px; border-radius: 8px; background: rgba(0,0,0,var(--bg)); color: #fff; font-size: var(--size); line-height: 1.3; text-shadow: 0 1px 3px #000; }

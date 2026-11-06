@@ -406,11 +406,10 @@ fn main() {
             Ok(())
         })
         .on_window_event(|w, e| {
-            // Closing settings keeps the app in the tray.
-            if let tauri::WindowEvent::CloseRequested { api, .. } = e {
+            // Closing settings quits the app so the overlay does not linger.
+            if let tauri::WindowEvent::CloseRequested { .. } = e {
                 if w.label() == "main" {
-                    api.prevent_close();
-                    let _ = w.hide();
+                    w.app_handle().exit(0);
                 }
             }
         })
