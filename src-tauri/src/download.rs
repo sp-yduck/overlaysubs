@@ -33,9 +33,17 @@ pub fn fetch(m: &ModelDef, dir: &Path, progress: &mut dyn FnMut(u64, u64)) -> Re
         progress(done, m.size);
     }
     drop(f);
+    // Hash the whole .part (not the stream) so a resumed download is verified end to end.
     let mut h = Sha256::new();
-    std::io::copy(&mut fs::File::open(&part).map_err(|e| e.to_string())?, &mut h).map_err(|e| e.to_string())?;
-    let got = format!("{:x}", h.finalize());
+    let mut r = fs::File::open(&part).map_err(|e| e.to_string())?;
+    loop {
+        let n = r.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        h.update(&buf[..n]);
+    }
+    let got: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
     if got != m.sha256 {
         let _ = fs::remove_file(&part);
         return Err(format!("{}: checksum mismatch, deleted partial file", m.file));

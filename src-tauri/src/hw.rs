@@ -38,10 +38,13 @@ fn windows_gpu() -> Option<Gpu> {
 }
 
 pub fn detect() -> Hardware {
-    let mut sys = sysinfo::System::new();
-    sys.refresh_memory();
-    sys.refresh_cpu_all();
-    let ram_mb = sys.total_memory() / (1024 * 1024);
+    // sysinfo 0.40 can fail on unsupported platforms; fall back to 0 RAM / no CPU name.
+    let mut sys = sysinfo::System::new().map_err(|e| eprintln!("sysinfo: {e}")).ok();
+    if let Some(s) = sys.as_mut() {
+        s.refresh_memory();
+        s.refresh_cpu_all();
+    }
+    let ram_mb = sys.as_ref().map_or(0, |s| s.total_memory()) / (1024 * 1024);
     let gpu = if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
         Some(Gpu { name: "Apple Silicon".into(), vram_mb: ram_mb, unified: true })
     } else {
@@ -51,6 +54,6 @@ pub fn detect() -> Hardware {
         gpu,
         ram_mb,
         cpu_threads: std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4),
-        cpu_name: sys.cpus().first().map(|c| c.brand().trim().to_string()).unwrap_or_default(),
+        cpu_name: sys.as_ref().and_then(|s| s.cpus().first()).map(|c| c.brand().trim().to_string()).unwrap_or_default(),
     }
 }
