@@ -13,7 +13,7 @@
         "label": "overlay", "title": "OverlaySubs overlay", "url": "overlay.html",
         "width": 1100, "height": 220, "y": 760, "center": true,
         "transparent": true, "decorations": false, "alwaysOnTop": true, "visibleOnAllWorkspaces": true,
-        "skipTaskbar": true, "shadow": false, "focus": false
+        "skipTaskbar": true, "shadow": false, "focus": false, "visible": false
       }
     ]
   },

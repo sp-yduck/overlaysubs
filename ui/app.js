@@ -160,6 +160,16 @@ function overlayPage() {
   ${card("", field(t("hotkey"), "hotkey"))}`;
 }
 
+/** The sidebar switch mirrors the overlay window; patch it in place instead of a full render. */
+function drawOverlayToggle() {
+  const el = $("#overlay-toggle");
+  if (!el || !snap) return;
+  const on = !!snap.overlay_visible;
+  el.classList.toggle("on", on);
+  el.setAttribute("aria-checked", String(on));
+  el.title = on ? t("hide_overlay") : t("show_overlay");
+}
+
 function historyPage() {
   return `<h2>${t("history")}</h2>
   <div class="row">${btn("export-txt", t("export_txt"))}${btn("export-srt", t("export_srt"))}</div>
@@ -195,6 +205,7 @@ function render() {
     <div class="brand">OverlaySubs</div>
     <nav>${Object.keys(PAGES).map((p) => `<button data-act="nav" data-id="${p}" class="${p === page ? "on" : ""}">${t("nav_" + p)}${p === "models" && !ready ? ' <span class="dot warn"></span>' : ""}</button>`).join("")}</nav>
     <div class="spacer"></div>
+    <button id="overlay-toggle" class="ovtoggle${snap.overlay_visible ? " on" : ""}" role="switch" aria-checked="${snap.overlay_visible ? "true" : "false"}" title="${esc(snap.overlay_visible ? t("hide_overlay") : t("show_overlay"))}"><span class="lbl">${t("overlay_toggle")}</span><span class="track"><span class="knob"></span></span></button>
     ${btn("toggle", snap.running ? t("stop") : t("start"), { cls: `start ${snap.running ? "running" : "primary"}`, disabled: !ready })}
     <p class="hint">${snap.running ? `<span class="dot live"></span>${t("live")}` : ready ? `${t("hotkey")}: <code>${esc(s.hotkey)}</code>` : t("need_setup")}</p>
     <select data-k="ui_lang" data-t="str" aria-label="${t("ui_lang")}">${opts([["ja", "日本語"], ["en", "English"]], s.ui_lang)}</select>
@@ -287,6 +298,16 @@ async function act(name, id, el) {
 }
 
 document.addEventListener("click", async (ev) => {
+  const toggle = ev.target.closest("#overlay-toggle");
+  if (!toggle || !snap) return;
+  const show = !snap.overlay_visible;
+  snap.overlay_visible = show;
+  drawOverlayToggle();
+  try { await invoke("show_overlay", { show }); }
+  catch (e) { snap.overlay_visible = !show; drawOverlayToggle(); toast(String(e), "error"); }
+});
+
+document.addEventListener("click", async (ev) => {
   const link = ev.target.closest("a[data-external]");
   if (link) {
     ev.preventDefault();
@@ -317,6 +338,11 @@ listen("download", (e) => {
   if (pct) pct.textContent = `${Math.floor((100 * p.done) / p.total)}%`;
 });
 listen("running", refresh);
+listen("overlay-visible", (e) => {
+  if (!snap) return;
+  snap.overlay_visible = e.payload;
+  drawOverlayToggle();
+});
 listen("error", (e) => toast(String(e.payload), "error"));
 listen("caption", (e) => { if (e.payload.stage === "final") loadHistory(); });
 refresh().then(loadHistory);
