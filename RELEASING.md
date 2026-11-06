@@ -27,7 +27,7 @@ Release に添付される固定名アセット（README やランディング�
 
 固定名にしているのは、`https://github.com/sp-yduck/overlaysubs/releases/latest/download/<名前>`
 という**バージョンを含まない URL** を README・ランディングページ・Release 本文で使い続けるためです。
-名前を変えるときは README / README.en.md / docs/index.html / Release 本文を同時に更新してください。
+名前を変えるときは README.md / README.ja.md / docs/index.html / Release 本文を同時に更新してください。
 
 `workflow_dispatch` は **ビルドのみのドライラン** です。`verify` と `publish` はスキップされ、
 Release は作成されません。
@@ -257,7 +257,7 @@ git push origin vX.Y.Z
 
 ### アセット名や URL を変えたい
 
-固定名は README / README.en.md / docs/index.html / Release 本文 / このドキュメントの契約です。
+固定名は README.md / README.ja.md / docs/index.html / Release 本文 / このドキュメントの契約です。
 `release.yml` のステージング名・サイズ下限・`verify` の `release_exists` 期待値を同時に更新し、
 利用者向けのリンクもすべて揃えてからタグを打ってください。
 

@@ -567,7 +567,8 @@ jobs:
           ## リンク
 
           - [公式サイト（インストール・使い方・FAQ）](https://sp-yduck.github.io/overlaysubs/)
-          - [README（仕組み・ビルド方法）](https://github.com/sp-yduck/overlaysubs#readme)
+          - [README（日本語・仕組みとビルド方法）](https://github.com/sp-yduck/overlaysubs/blob/main/README.ja.md)
+          - [README (English)](https://github.com/sp-yduck/overlaysubs#readme)
           - [OverlaySubs 利用規約（日本語）](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt) / [English](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt)
           - [PLaMo コミュニティライセンス](https://plamo.preferredai.jp/info/plamo-community-license)
           - [リリース一覧](https://github.com/sp-yduck/overlaysubs/releases)
