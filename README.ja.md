@@ -8,7 +8,7 @@
 [![Windows x64](https://img.shields.io/badge/platform-Windows%20x64-0078d4.svg)](#動作環境)
 [![macOS Apple Silicon](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-lightgrey.svg)](#動作環境)
 
-PC 上で再生されるあらゆる音声をリアルタイムで文字起こし・翻訳し、字幕としてオーバーレイ表示するデスクトップアプリです。Tauri 2（Rust）製で、UI はビルド不要の素の HTML/JS です。API キーは不要、音声・テキストは端末の外に出ません。
+PC 上で再生されるあらゆる音声をリアルタイムで文字起こし・翻訳し、字幕としてオーバーレイ表示するデスクトップアプリです。音声とテキストは端末内でローカルに処理されます。API キーは不要で、外部のサービスに送信されることはありません。
 
 **Built with PLaMo.** 翻訳には Preferred Networks の [PLaMo 3 Translate](https://huggingface.co/pfnet/plamo-3-translate-0.8b-GGUF) を使います。
 

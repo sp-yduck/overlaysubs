@@ -8,7 +8,7 @@
 [![Windows x64](https://img.shields.io/badge/platform-Windows%20x64-0078d4.svg)](#requirements)
 [![macOS Apple Silicon](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-lightgrey.svg)](#requirements)
 
-A desktop app that transcribes and translates any audio playing on your PC in real time and shows the result as an overlay of subtitles. Built with Tauri 2 (Rust); the UI is plain HTML/JS with no build step. No API key, and audio and text never leave your device.
+A desktop app that transcribes and translates any audio playing on your PC in real time and shows the result as an overlay of subtitles. Audio and text are processed locally on your device — no API key is needed, and nothing is sent to an external service.
 
 **Built with PLaMo.** Translation uses Preferred Networks' [PLaMo 3 Translate](https://huggingface.co/pfnet/plamo-3-translate-0.8b-GGUF).
 
