@@ -2,7 +2,7 @@ const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 const { save: saveDialog, open: openDialog } = window.__TAURI__.dialog;
 
-let snap, detected, page, progress = {}, benchMsg = "", hist = [], termsLang, agreed = false;
+let snap, page, progress = {}, benchMsg = "", hist = [], termsLang, agreed = false;
 const busy = new Set();
 const $ = (s) => document.querySelector(s);
 const t = (k) => (I18N[snap?.settings.ui_lang] || I18N.ja)[k] || k;
@@ -99,14 +99,16 @@ function modelsPage() {
   const { sel, missing, ready } = setupState();
   const s = snap.settings;
   const total = missing.reduce((a, id) => a + model(id).size, 0);
-  const hw = detected?.hardware;
+  const cached = snap.hardware;
+  const hw = cached?.hardware;
+  const checked = cached?.detected_at > 0 ? `${t("last_checked")} ${new Date(cached.detected_at * 1000).toLocaleDateString(s.ui_lang)} · ` : "";
   const step = (n, done, locked, title, body) =>
     `<div class="step ${done ? "done" : ""} ${locked ? "locked" : ""}"><div class="num">${done ? "✓" : n}</div><div class="body"><h3>${esc(title)}</h3>${body}</div></div>`;
   return `<h2>${t("models")}</h2><p class="muted">${t("models_intro")}</p>
   ${step(1, !!sel, false, t("step_detect"), `<p class="muted">${t("step_detect_desc")}</p>
     <div class="row">${btn("detect", sel ? t("redetect") : t("detect"), { cls: sel ? "" : "primary" })}
     ${s.tier ? `<span class="badge">${t("tier")}: ${esc(s.tier)}</span>` : ""}</div>
-    ${hw ? `<p class="muted small">${esc(hw.cpu_name)} · ${hw.cpu_threads} threads · RAM ${(hw.ram_mb / 1024).toFixed(0)} GB · GPU ${esc(hw.gpu ? `${hw.gpu.name} (${(hw.gpu.vram_mb / 1024).toFixed(1)} GB${hw.gpu.unified ? ", unified" : ""})` : "none")}</p>` : ""}`)}
+    ${hw ? `<p class="muted small">${esc(checked + hw.cpu_name)} · ${hw.cpu_threads} threads · RAM ${(hw.ram_mb / 1024).toFixed(0)} GB · GPU ${esc(hw.gpu ? `${hw.gpu.name} (${(hw.gpu.vram_mb / 1024).toFixed(1)} GB${hw.gpu.unified ? ", unified" : ""})` : "none")}</p>` : ""}`)}
   ${step(2, ready, !sel, t("step_download"), sel
     ? `<p class="muted">${t("step_download_desc")}</p>
       ${modelRow("asr", "asr")}${modelRow("translator", "translator")}${modelRow("vad", "vad")}
@@ -247,11 +249,11 @@ async function act(name, id, el) {
     return refresh();
   }
   if (name === "detect") {
-    detected = await invoke("detect");
-    snap.settings.tier = detected.tier;
-    snap.settings.selection = detected.selection;
+    const d = await invoke("detect");
+    snap.settings.tier = d.tier;
+    snap.settings.selection = d.selection;
     await invoke("save_settings", { settings: snap.settings });
-    toast(`${t("detected")}: ${t("tier")} ${detected.tier}`);
+    toast(`${t("detected")}: ${t("tier")} ${d.tier}`);
   }
   if (name === "download") {
     const s = snap.settings.selection;

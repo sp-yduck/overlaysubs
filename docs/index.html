@@ -281,7 +281,7 @@
             </table>
           </div>
           <p>
-            このフォルダには、モデル（<code>models</code>）、設定（<code>settings.json</code>）、利用規約への同意（<code>terms-accepted</code>）が保存されます。
+            このフォルダには、モデル（<code>models</code>）、設定（<code>settings.json</code>）、利用規約への同意（<code>terms-accepted</code>）、検出したハードウェア（<code>hardware.json</code>）が保存されます。
             再インストール時にモデルを再ダウンロードしたくない場合は残しておき、完全に削除する場合はフォルダごと削除してください。
           </p>
         </div>
@@ -336,7 +336,7 @@
             </table>
           </div>
           <p class="muted">
-            数値は <code>models.json</code> の宣言サイズの合計（Silero VAD の約 0.9MB を含む）です。初回セットアップで「PC の性能を調べる」を実行すると、ハードウェアからティアが決まりモデルが自動選択されます。設定画面では使用するモデル（Whisper / PLaMo）を個別に変更できます。
+            数値は <code>models.json</code> の宣言サイズの合計（Silero VAD の約 0.9MB を含む）です。初回セットアップで「PC の性能を調べる」を実行すると、ハードウェアからティアが決まりモデルが自動選択されます。設定画面では使用するモデル（Whisper / PLaMo）を個別に変更できます。検出結果は設定フォルダの <code>hardware.json</code> に保存され、次回起動時は再調査せずに表示されます。ハードウェアを変更したときは「もう一度調べる」を実行してください。
           </p>
           <p class="muted">
             ティアの目安: High は VRAM 12GB 以上、Mid は VRAM 8GB、Low は VRAM 4〜6GB、CPU は GPU がない場合または VRAM 4GB 未満です（Apple Silicon はメモリ量で判定）。

@@ -1,5 +1,15 @@
+use overlaysubs_core::cache::HardwareCache;
 use overlaysubs_core::tier::{Gpu, Hardware};
+use std::path::Path;
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// Cache of the last probe, next to settings.json. Derived data: safe to delete.
+const CACHE_FILE: &str = "hardware.json";
+
+/// Distinguishes back-to-back writers (e.g. a re-check while the benchmark probes). Each writer
+/// renames its own complete file into place, so a reader never sees a partial cache.
+static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
 
 fn run(cmd: &str, args: &[&str]) -> Option<String> {
     let mut c = Command::new(cmd);
@@ -37,7 +47,8 @@ fn windows_gpu() -> Option<Gpu> {
     None
 }
 
-pub fn detect() -> Hardware {
+/// Spawns nvidia-smi / PowerShell, so it only runs when [`detect`] is called.
+fn probe() -> Hardware {
     // sysinfo 0.40 can fail on unsupported platforms; fall back to 0 RAM / no CPU name.
     let mut sys = sysinfo::System::new().map_err(|e| eprintln!("sysinfo: {e}")).ok();
     if let Some(s) = sys.as_mut() {
@@ -55,5 +66,32 @@ pub fn detect() -> Hardware {
         ram_mb,
         cpu_threads: std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4),
         cpu_name: sys.as_ref().and_then(|s| s.cpus().first()).map(|c| c.brand().trim().to_string()).unwrap_or_default(),
+    }
+}
+
+/// The last probe without touching the hardware, or `None` when there is no usable cache.
+pub fn cached(dir: &Path) -> Option<HardwareCache> {
+    HardwareCache::parse(&std::fs::read_to_string(dir.join(CACHE_FILE)).ok()?)
+}
+
+/// The cached hardware, or a fresh probe when there is none (e.g. after an update that added the cache).
+pub fn cached_or_detect(dir: &Path) -> Hardware {
+    cached(dir).map_or_else(|| detect(dir), |cache| cache.hardware)
+}
+
+/// Probes the machine and caches the result, so the setup screen can show it on later launches.
+pub fn detect(dir: &Path) -> Hardware {
+    let hardware = probe();
+    // Best effort: if the cache cannot be written, the next launch simply probes again.
+    save(dir, &HardwareCache::new(hardware.clone()));
+    hardware
+}
+
+fn save(dir: &Path, cache: &HardwareCache) {
+    let tmp = dir.join(format!("{CACHE_FILE}.{}.{}.tmp", std::process::id(), TMP_SEQ.fetch_add(1, Ordering::Relaxed)));
+    let written = std::fs::create_dir_all(dir).and_then(|()| std::fs::write(&tmp, cache.to_json()));
+    // Rename rather than writing in place: `snapshot` may read the cache concurrently.
+    if written.is_err() || std::fs::rename(&tmp, dir.join(CACHE_FILE)).is_err() {
+        let _ = std::fs::remove_file(&tmp);
     }
 }

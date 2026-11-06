@@ -5,6 +5,7 @@ mod engine;
 mod hw;
 
 use capture::Source;
+use overlaysubs_core::cache::HardwareCache;
 use overlaysubs_core::endpoint::{EndpointConfig, Endpointer, Event};
 use overlaysubs_core::export::{self, Entry};
 use overlaysubs_core::registry::{Registry, Selection};
@@ -119,6 +120,8 @@ struct Snapshot {
     running: bool,
     models_dir: PathBuf,
     devices: capture::Devices,
+    /// Last "Check this PC" result from disk, so the model setup screen can show it again after a restart.
+    hardware: Option<HardwareCache>,
 }
 
 #[tauri::command]
@@ -127,7 +130,16 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
     let registry = registry(&app)?;
     let dir = models_dir(&app, &settings);
     let downloaded = registry.models.iter().filter(|m| dir.join(&m.file).exists()).map(|m| m.id.clone()).collect();
-    Ok(Snapshot { running: st.running.lock().unwrap().is_some(), terms_accepted: terms_accepted(&app), settings, registry, downloaded, models_dir: dir, devices: capture::devices() })
+    Ok(Snapshot {
+        running: st.running.lock().unwrap().is_some(),
+        terms_accepted: terms_accepted(&app),
+        settings,
+        registry,
+        downloaded,
+        models_dir: dir,
+        devices: capture::devices(),
+        hardware: hw::cached(&config_dir(&app)),
+    })
 }
 
 #[tauri::command]
@@ -149,9 +161,10 @@ struct Detected {
     selection: Selection,
 }
 
+/// Detects the hardware and caches it, so the setup screen can show the result on later launches.
 #[tauri::command]
 fn detect(app: AppHandle) -> Result<Detected, String> {
-    let hardware = hw::detect();
+    let hardware = hw::detect(&config_dir(&app));
     let tier = tier::select_tier(&hardware);
     let selection = registry(&app)?.defaults(tier).ok_or("no models for tier")?;
     Ok(Detected { hardware, tier, selection })
@@ -236,7 +249,7 @@ async fn benchmark(app: AppHandle) -> Result<Bench, String> {
         let took = t0.elapsed().as_secs_f32();
         let cur = st.settings.lock().unwrap().tier.unwrap_or(Tier::Mid);
         let downgraded_to = match (tier::too_slow(took, secs), cur.lower()) {
-            (true, Some(t)) => Some(Detected { hardware: hw::detect(), tier: t, selection: registry(&app)?.defaults(t).unwrap() }),
+            (true, Some(t)) => Some(Detected { hardware: hw::cached_or_detect(&config_dir(&app)), tier: t, selection: registry(&app)?.defaults(t).unwrap() }),
             _ => None,
         };
         Ok(Bench { rtf: took / secs, downgraded_to })
