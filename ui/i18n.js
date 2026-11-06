@@ -24,9 +24,10 @@ const I18N = {
     glossary: "用語集（1行に「原語=訳語」）", recent: "最近の字幕", no_history: "まだ字幕はありません",
     asr: "音声認識", translator: "翻訳", vad: "VAD", models_dir: "保存先", change: "変更", delete: "削除", deleted: "削除しました", downloaded: "取得済み", missing: "未取得",
     advanced: "詳細設定", gpu_layers: "翻訳モデルのGPUレイヤー数（0でCPU）", whisper_gpu: "音声認識にGPUを使う",
-    overlay: "字幕の表示", show_source: "原文も表示", font_size: "文字サイズ", font: "フォント", bg: "背景の不透明度", lines: "表示行数", linger: "表示時間（秒）", click_through: "クリック透過",
+    overlay: "字幕の表示", show_source: "原文も表示", font_size: "文字サイズ", font: "フォント", bg: "背景の不透明度", lines: "表示行数", linger: "表示時間（秒）", click_through: "クリック透過", show_credit: "「Built with PLaMo」を表示",
+    credit_off_note: "オフにして配信・録画で字幕を公開する場合は、概要欄などに「Built with PLaMo」と明記してください。",
     history: "履歴", export_txt: "テキストで保存", export_srt: "SRTで保存", exported: "保存しました",
-    output_note: "字幕を公開・配布する場合は、PLaMoによる出力である旨を明示してください。元コンテンツの著作権にもご注意ください。",
+    output_note: "公開・配布する場合は「Built with PLaMo」と明記してください。元コンテンツの著作権にもご注意ください。",
     ui_lang: "表示言語", about: "情報", saved: "保存しました", invalid_number: "数値を入力してください",
     rtf: "リアルタイム係数", downgrade: "リアルタイムに間に合わないため1段下げました",
   },
@@ -55,12 +56,13 @@ const I18N = {
     glossary: "Glossary (one \"source=target\" per line)", recent: "Recent subtitles", no_history: "No subtitles yet",
     asr: "Speech recognition", translator: "Translation", vad: "VAD", models_dir: "Folder", change: "Change", delete: "Delete", deleted: "Deleted", downloaded: "downloaded", missing: "not downloaded",
     advanced: "Advanced", gpu_layers: "Translator GPU layers (0 = CPU)", whisper_gpu: "Use GPU for speech recognition",
-    overlay: "Subtitles", show_source: "Show original text", font_size: "Font size", font: "Font", bg: "Background opacity", lines: "Lines", linger: "Display time (s)", click_through: "Click-through",
+    overlay: "Subtitles", show_source: "Show original text", font_size: "Font size", font: "Font", bg: "Background opacity", lines: "Lines", linger: "Display time (s)", click_through: "Click-through", show_credit: "Show \"Built with PLaMo\"",
+    credit_off_note: "If you turn this off and publish subtitles in a stream or recording, state \"Built with PLaMo\" elsewhere, e.g. in the description.",
     history: "History", export_txt: "Save as text", export_srt: "Save as SRT", exported: "Saved",
-    output_note: "If you publish or distribute subtitles, state that they are PLaMo output. Mind the copyright of the source content too.",
+    output_note: "If you publish or distribute this, state \"Built with PLaMo\". Mind the copyright of the source content too.",
     ui_lang: "UI language", about: "About", saved: "Saved", invalid_number: "Enter a number",
     rtf: "Real-time factor", downgrade: "Too slow for real time; dropped one tier",
   },
 };
 const LANGS = { en: "English", ja: "日本語", ko: "한국어", zh: "中文", es: "Español", fr: "Français", de: "Deutsch", it: "Italiano", pt: "Português", ru: "Русский", vi: "Tiếng Việt", th: "ไทย", id: "Indonesia", ar: "العربية", hi: "हिन्दी", nl: "Nederlands", pl: "Polski" };
-const OVERLAY_DEFAULTS = { showSource: true, fontSize: 28, font: "system-ui, sans-serif", bg: 0.55, lines: 2, linger: 8, clickThrough: false };
+const OVERLAY_DEFAULTS = { showSource: true, fontSize: 28, font: "system-ui, sans-serif", bg: 0.55, lines: 2, linger: 8, clickThrough: false, showCredit: true };
