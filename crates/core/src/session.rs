@@ -10,8 +10,8 @@ pub struct Transcript {
 }
 
 pub trait Asr: Send {
-    /// `lang = None` auto-detects.
-    fn transcribe(&mut self, pcm: &[f32], lang: Option<&str>) -> Result<Transcript, String>;
+    /// `lang = None` auto-detects. `prompt` biases spelling (glossary terms, previous sentence); may be empty.
+    fn transcribe(&mut self, pcm: &[f32], lang: Option<&str>, prompt: &str) -> Result<Transcript, String>;
 }
 
 pub trait Translator: Send {
@@ -19,6 +19,7 @@ pub trait Translator: Send {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SessionConfig {
     pub source_lang: Option<String>,
     pub target_lang: String,
@@ -27,11 +28,13 @@ pub struct SessionConfig {
     pub form: Option<Form>,
     pub use_context: bool,
     pub glossary: Vec<(String, String)>,
+    /// Free-text hint for the translator, e.g. "Overwatch coaching stream".
+    pub topic: String,
 }
 
 impl Default for SessionConfig {
     fn default() -> Self {
-        Self { source_lang: None, target_lang: "ja".into(), alt_target_lang: "en".into(), form: None, use_context: true, glossary: vec![] }
+        Self { source_lang: None, target_lang: "ja".into(), alt_target_lang: "en".into(), form: None, use_context: true, glossary: vec![], topic: String::new() }
     }
 }
 
@@ -70,18 +73,42 @@ pub fn is_hallucination(text: &str) -> bool {
 }
 
 const HISTORY: usize = 3;
+/// A fragment without sentence-ending punctuation is held and merged with the next one, up to this length.
+const MAX_HOLD_CHARS: usize = 150;
+/// shortcut: char cap approximating whisper's ~224-token prompt limit; count tokens if long prompts get cut.
+const MAX_PROMPT_CHARS: usize = 150;
+
+pub fn ends_sentence(text: &str) -> bool {
+    text.trim_end().trim_end_matches(['"', '\'', '」', '』', ')', '）', '”', '’']).ends_with(['.', '?', '!', '。', '？', '！', '…'])
+}
+
+fn join(a: &str, b: &str, lang: &str) -> String {
+    match (a.is_empty(), lang) {
+        (true, _) => b.to_string(),
+        (false, "ja" | "zh") => format!("{a}{b}"),
+        _ => format!("{a} {b}"),
+    }
+}
+
+/// An unfinished sentence waiting for its continuation.
+struct Pending {
+    text: String,
+    lang: String,
+    start_ms: u64,
+}
 
 pub struct Session {
     pub cfg: SessionConfig,
     pub entries: Vec<Entry>,
     history: Vec<(String, String)>,
+    pending: Option<Pending>,
     next_id: u64,
     pos_ms: u64,
 }
 
 impl Session {
     pub fn new(cfg: SessionConfig) -> Self {
-        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0 }
+        Self { cfg, entries: vec![], history: vec![], pending: None, next_id: 0, pos_ms: 0 }
     }
 
     /// Advance the wall clock used for history timestamps (call with every captured chunk).
@@ -89,46 +116,86 @@ impl Session {
         self.pos_ms += (samples * 1000 / RATE) as u64;
     }
 
+    /// Glossary source terms, then the previous sentence; the front is cut first when too long.
+    pub fn asr_prompt(&self) -> String {
+        let terms: Vec<&str> = self.cfg.glossary.iter().map(|(s, _)| s.as_str()).collect();
+        let prev = match (&self.pending, self.history.last()) {
+            _ if !self.cfg.use_context => "",
+            (Some(p), _) => &p.text,
+            (None, Some((src, _))) => src,
+            (None, None) => "",
+        };
+        // Whisper mimics the prompt's style, so the term list ends with a period to keep punctuation on.
+        let p = match (terms.is_empty(), prev.is_empty()) {
+            (true, _) => prev.to_string(),
+            (false, true) => format!("{}.", terms.join(", ")),
+            (false, false) => format!("{}. {prev}", terms.join(", ")),
+        };
+        let n = p.chars().count();
+        p.chars().skip(n.saturating_sub(MAX_PROMPT_CHARS)).collect()
+    }
+
     pub fn handle(&mut self, ev: Event, asr: &mut dyn Asr, mt: &mut dyn Translator, emit: &mut dyn FnMut(Caption)) -> Result<(), String> {
         let (pcm, fin) = match ev {
             Event::Partial(p) => (p, false),
             Event::Final(p) => (p, true),
         };
-        let t = asr.transcribe(&pcm, self.cfg.source_lang.as_deref())?;
+        let t = asr.transcribe(&pcm, self.cfg.source_lang.as_deref(), &self.asr_prompt())?;
         if is_hallucination(&t.text) {
             return Ok(());
         }
-        let id = self.next_id;
-        let target = if t.lang == self.cfg.target_lang { self.cfg.alt_target_lang.clone() } else { self.cfg.target_lang.clone() };
-        let history = if self.cfg.use_context { &self.history[..] } else { &[] };
-        let req = TranslateRequest {
-            text: &t.text,
-            source_lang: Some(&t.lang),
-            target_lang: &target,
-            form: if target == "ja" { self.cfg.form } else { None },
-            context: None,
-            history,
-            glossary: &self.cfg.glossary,
-        };
-        let mut cap = Caption { id, stage: Stage::Partial, lang: t.lang.clone(), source: t.text.clone(), translation: String::new() };
-        if !fin {
-            emit(cap.clone());
-            cap.translation = mt.translate(&req, &mut |_| {})?;
-            emit(cap);
-            return Ok(());
+        let start_ms = self.pending.as_ref().map_or(self.pos_ms.saturating_sub((pcm.len() * 1000 / RATE) as u64), |p| p.start_ms);
+        let text = join(self.pending.as_ref().map_or("", |p| &p.text), &t.text, &t.lang);
+        if fin && (ends_sentence(&text) || text.chars().count() >= MAX_HOLD_CHARS) {
+            self.pending = None;
+            return self.finalize(text, t.lang, start_ms, mt, emit);
         }
-        cap.stage = Stage::Streaming;
+        if fin {
+            self.pending = Some(Pending { text: text.clone(), lang: t.lang.clone(), start_ms });
+        }
+        // Not final yet: show the source, then a draft translation under the same id.
+        let mut cap = Caption { id: self.next_id, stage: Stage::Partial, lang: t.lang, source: text, translation: String::new() };
+        emit(cap.clone());
+        cap.translation = self.translate(&cap.source, &cap.lang, mt, &mut |_| {})?;
+        emit(cap);
+        Ok(())
+    }
+
+    /// Finalize a held fragment, e.g. after the speaker has been quiet for a while.
+    pub fn flush(&mut self, mt: &mut dyn Translator, emit: &mut dyn FnMut(Caption)) -> Result<(), String> {
+        match self.pending.take() {
+            Some(p) => self.finalize(p.text, p.lang, p.start_ms, mt, emit),
+            None => Ok(()),
+        }
+    }
+
+    fn translate(&self, text: &str, lang: &str, mt: &mut dyn Translator, on_piece: &mut dyn FnMut(&str)) -> Result<String, String> {
+        let target = if lang == self.cfg.target_lang { &self.cfg.alt_target_lang } else { &self.cfg.target_lang };
+        // Only matching entries, so a long glossary neither bloats the prompt nor leaks unrelated terms.
+        let glossary: Vec<_> = self.cfg.glossary.iter().filter(|(s, _)| text.contains(s.as_str())).cloned().collect();
+        let req = TranslateRequest {
+            text,
+            source_lang: Some(lang),
+            target_lang: target,
+            form: if target == "ja" { self.cfg.form } else { None },
+            context: Some(&self.cfg.topic),
+            history: if self.cfg.use_context { &self.history } else { &[] },
+            glossary: &glossary,
+        };
+        Ok(mt.translate(&req, on_piece)?.trim().to_string())
+    }
+
+    fn finalize(&mut self, text: String, lang: String, start_ms: u64, mt: &mut dyn Translator, emit: &mut dyn FnMut(Caption)) -> Result<(), String> {
+        let mut cap = Caption { id: self.next_id, stage: Stage::Streaming, lang, source: text, translation: String::new() };
         let mut acc = String::new();
-        let out = mt.translate(&req, &mut |piece| {
+        cap.translation = self.translate(&cap.source, &cap.lang, mt, &mut |piece| {
             acc.push_str(piece);
             emit(Caption { translation: acc.clone(), ..cap.clone() });
         })?;
         cap.stage = Stage::Final;
-        cap.translation = out.trim().to_string();
         emit(cap.clone());
         self.next_id += 1;
-        let dur = (pcm.len() * 1000 / RATE) as u64;
-        self.entries.push(Entry { start_ms: self.pos_ms.saturating_sub(dur), end_ms: self.pos_ms, lang: t.lang, source: cap.source.clone(), translation: cap.translation.clone() });
+        self.entries.push(Entry { start_ms, end_ms: self.pos_ms, lang: cap.lang, source: cap.source.clone(), translation: cap.translation.clone() });
         self.history.push((cap.source, cap.translation));
         if self.history.len() > HISTORY {
             self.history.remove(0);
@@ -141,37 +208,46 @@ impl Session {
 mod tests {
     use super::*;
 
-    struct FakeAsr(Vec<&'static str>);
+    /// Returns scripted texts and records the prompts it was given.
+    struct FakeAsr(Vec<&'static str>, Vec<String>);
     impl Asr for FakeAsr {
-        fn transcribe(&mut self, _: &[f32], _: Option<&str>) -> Result<Transcript, String> {
+        fn transcribe(&mut self, _: &[f32], _: Option<&str>, prompt: &str) -> Result<Transcript, String> {
+            self.1.push(prompt.to_string());
             let text = self.0.remove(0).to_string();
             let lang = if text.is_ascii() { "en" } else { "ja" }.to_string();
             Ok(Transcript { text, lang })
         }
     }
+    fn asr(texts: Vec<&'static str>) -> FakeAsr {
+        FakeAsr(texts, vec![])
+    }
+    /// Records "src>dst h<history> <text> [glossary] {context}" per call.
     struct FakeMt(Vec<String>);
     impl Translator for FakeMt {
         fn translate(&mut self, r: &TranslateRequest, on: &mut dyn FnMut(&str)) -> Result<String, String> {
-            self.0.push(format!("{}>{} h{}", r.source_lang.unwrap(), r.target_lang, r.history.len()));
+            let g: Vec<_> = r.glossary.iter().map(|(s, _)| s.as_str()).collect();
+            self.0.push(format!("{}>{} h{} {} {:?} {:?}", r.source_lang.unwrap(), r.target_lang, r.history.len(), r.text, g, r.context.unwrap_or("")));
             on("訳");
             on("文");
             Ok("訳文".into())
         }
     }
+    const SEC: usize = 16000;
+    fn fin(s: &mut Session, a: &mut FakeAsr, mt: &mut FakeMt, caps: &mut Vec<Caption>) {
+        s.handle(Event::Final(vec![0.0; SEC]), a, mt, &mut |c| caps.push(c)).unwrap();
+    }
 
     #[test]
     fn final_streams_then_records_history_and_routes_language() {
         let mut s = Session::new(SessionConfig::default());
-        let mut asr = FakeAsr(vec!["Hello there", "Thank you for watching!", "こんにちは"]);
-        let mut mt = FakeMt(vec![]);
-        let mut caps = vec![];
+        let (mut a, mut mt, mut caps) = (asr(vec!["Hello there.", "Thank you for watching!", "こんにちは。"]), FakeMt(vec![]), vec![]);
         for _ in 0..3 {
-            s.handle(Event::Final(vec![0.0; 16000]), &mut asr, &mut mt, &mut |c| caps.push(c)).unwrap();
+            fin(&mut s, &mut a, &mut mt, &mut caps);
         }
         let stages: Vec<_> = caps.iter().map(|c| c.stage).collect();
         assert_eq!(stages, [Stage::Streaming, Stage::Streaming, Stage::Final, Stage::Streaming, Stage::Streaming, Stage::Final]);
         assert_eq!(caps[1].translation, "訳文");
-        assert_eq!(mt.0, ["en>ja h0", "ja>en h1"], "hallucination dropped, ja speech goes to alt target with context");
+        assert!(mt.0[0].starts_with("en>ja h0") && mt.0[1].starts_with("ja>en h1"), "hallucination dropped, ja speech goes to alt target with context: {:?}", mt.0);
         assert_eq!(s.entries.len(), 2);
     }
 
@@ -179,9 +255,90 @@ mod tests {
     fn partial_emits_source_then_translation_without_recording() {
         let mut s = Session::new(SessionConfig::default());
         let mut caps = vec![];
-        s.handle(Event::Partial(vec![0.0; 16000]), &mut FakeAsr(vec!["Hello"]), &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        s.handle(Event::Partial(vec![0.0; SEC]), &mut asr(vec!["Hello"]), &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
         assert_eq!(caps.len(), 2);
         assert!(caps[0].translation.is_empty() && caps[1].translation == "訳文" && caps[1].stage == Stage::Partial);
         assert!(s.entries.is_empty());
+    }
+
+    #[test]
+    fn unfinished_sentence_is_held_and_merged_with_the_next_final() {
+        let mut s = Session::new(SessionConfig::default());
+        let (mut a, mut mt, mut caps) = (asr(vec!["So when you blink", "you should already be behind them."]), FakeMt(vec![]), vec![]);
+        s.tick(SEC);
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        assert!(s.entries.is_empty() && caps.iter().all(|c| c.stage == Stage::Partial && c.id == 0), "held fragment shows as a draft");
+        s.tick(2 * SEC);
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        assert_eq!(s.entries.len(), 1);
+        let e = &s.entries[0];
+        assert_eq!(e.source, "So when you blink you should already be behind them.");
+        assert_eq!((e.start_ms, e.end_ms), (0, 3000), "entry spans both fragments");
+        assert_eq!(caps.last().unwrap().id, 0, "the merged final replaces the draft");
+    }
+
+    #[test]
+    fn japanese_fragments_join_without_space_and_flush_finalizes() {
+        let mut s = Session::new(SessionConfig::default());
+        let (mut a, mut mt, mut caps) = (asr(vec!["ブリンクを使うのが", "早すぎます"]), FakeMt(vec![]), vec![]);
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        assert!(s.entries.is_empty());
+        s.flush(&mut mt, &mut |c| caps.push(c)).unwrap();
+        assert_eq!(s.entries[0].source, "ブリンクを使うのが早すぎます");
+        s.flush(&mut mt, &mut |c| caps.push(c)).unwrap();
+        assert_eq!(s.entries.len(), 1, "second flush is a no-op");
+    }
+
+    #[test]
+    fn long_held_text_is_finalized_anyway() {
+        let mut s = Session::new(SessionConfig::default());
+        let long: &'static str = Box::leak("word ".repeat(40).into_boxed_str());
+        let (mut a, mut mt, mut caps) = (asr(vec![long]), FakeMt(vec![]), vec![]);
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        assert_eq!(s.entries.len(), 1);
+    }
+
+    #[test]
+    fn glossary_and_previous_sentence_go_to_asr_topic_and_matching_terms_to_mt() {
+        let cfg = SessionConfig {
+            glossary: vec![("Tracer".into(), "トレーサー".into()), ("Blink".into(), "ブリンク".into())],
+            topic: "Overwatch coaching".into(),
+            ..Default::default()
+        };
+        let mut s = Session::new(cfg);
+        let (mut a, mut mt, mut caps) = (asr(vec!["Tracer is fast.", "Use it later."]), FakeMt(vec![]), vec![]);
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        assert_eq!(a.1, ["Tracer, Blink.", "Tracer, Blink. Tracer is fast."]);
+        assert_eq!(mt.0[0], r#"en>ja h0 Tracer is fast. ["Tracer"] "Overwatch coaching""#);
+        assert!(mt.0[1].contains("[]"), "no matching terms: {}", mt.0[1]);
+    }
+
+    #[test]
+    fn asr_prompt_keeps_the_tail_and_respects_use_context() {
+        let mut s = Session::new(SessionConfig { glossary: vec![("x".repeat(200), "y".into())], ..Default::default() });
+        let (mut a, mut mt, mut caps) = (asr(vec!["Done."]), FakeMt(vec![]), vec![]);
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        let p = s.asr_prompt();
+        assert!(p.chars().count() == MAX_PROMPT_CHARS && p.ends_with(". Done."), "{p}");
+        s.cfg.use_context = false;
+        assert!(!s.asr_prompt().contains("Done."));
+    }
+
+    #[test]
+    fn sentence_end_detection() {
+        for t in ["Hi.", "本当？", "いいね！」", "そうです。 ", "Really?\""] {
+            assert!(ends_sentence(t), "{t}");
+        }
+        for t in ["So when", "그래서", "1,000"] {
+            assert!(!ends_sentence(t), "{t}");
+        }
+    }
+
+    #[test]
+    fn old_settings_without_new_fields_still_load() {
+        let c: SessionConfig = serde_json::from_str(r#"{"source_lang":null,"target_lang":"ja","alt_target_lang":"en","form":null,"use_context":true,"glossary":[["a","b"]]}"#).unwrap();
+        assert!(c.topic.is_empty() && c.glossary.len() == 1);
     }
 }

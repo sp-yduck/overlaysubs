@@ -1,4 +1,5 @@
-//! whisper.cpp and llama.cpp adapters for the core `Asr` / `Translator` traits.
+//! whisper.cpp and llama.cpp adapters for the core `Asr` / `Translator` / `Vad` traits.
+use floatsubs_core::endpoint::{Vad, FRAME};
 use floatsubs_core::pfml::{self, TranslateRequest};
 use floatsubs_core::session::{Asr, Transcript, Translator};
 use llama_cpp_2::context::params::LlamaContextParams;
@@ -9,11 +10,11 @@ use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::sampling::LlamaSampler;
 use std::num::NonZeroU32;
 use std::path::Path;
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperVadParams};
+use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperVadContext, WhisperVadContextParams, WhisperVadParams};
 
 pub struct Whisper {
     ctx: WhisperContext,
-    vad_path: String,
+    pub vad_path: String,
     threads: i32,
 }
 
@@ -39,12 +40,17 @@ impl Whisper {
 }
 
 impl Asr for Whisper {
-    fn transcribe(&mut self, pcm: &[f32], lang: Option<&str>) -> Result<Transcript, String> {
+    fn transcribe(&mut self, pcm: &[f32], lang: Option<&str>, prompt: &str) -> Result<Transcript, String> {
         let mut st = self.ctx.create_state().map_err(|e| e.to_string())?;
         let mut p = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         p.set_n_threads(self.threads);
         p.set_language(Some(lang.unwrap_or("auto")));
         p.set_no_context(true);
+        // The prompt comes from user settings; set_initial_prompt panics on NUL.
+        let prompt = prompt.replace('\0', "");
+        if !prompt.is_empty() {
+            p.set_initial_prompt(&prompt);
+        }
         p.set_single_segment(true);
         p.set_suppress_blank(true);
         p.set_suppress_nst(true);
@@ -59,6 +65,37 @@ impl Asr for Whisper {
         let text: String = (0..st.full_n_segments()).filter_map(|i| st.get_segment(i)).map(|s| s.to_string()).collect();
         let lang = whisper_rs::get_lang_str(st.full_lang_id_from_state()).unwrap_or("en").to_string();
         Ok(Transcript { text: text.trim().to_string(), lang })
+    }
+}
+
+/// Silero VAD for endpointing. whisper.cpp resets the LSTM state on every call, so each call
+/// re-scores the last `CONTEXT` samples to warm it up and returns only the new frames' probabilities.
+pub struct Silero {
+    ctx: WhisperVadContext,
+    history: Vec<f32>,
+}
+
+const CONTEXT: usize = 16 * FRAME; // ~0.5 s
+
+impl Silero {
+    pub fn load(path: &str) -> Result<Self, String> {
+        // Without a log backend feature this discards whisper.cpp's per-call INFO lines.
+        whisper_rs::install_logging_hooks();
+        let mut p = WhisperVadContextParams::new();
+        p.set_n_threads(1);
+        Ok(Self { ctx: WhisperVadContext::new(path, p).map_err(|e| e.to_string())?, history: vec![] })
+    }
+}
+
+impl Vad for Silero {
+    fn probs(&mut self, pcm: &[f32]) -> Result<Vec<f32>, String> {
+        self.history.extend_from_slice(pcm);
+        self.ctx.detect_speech(&self.history).map_err(|e| e.to_string())?;
+        let p = self.ctx.probabilities();
+        let out = p[p.len() - pcm.len() / FRAME..].to_vec();
+        let excess = self.history.len().saturating_sub(CONTEXT);
+        self.history.drain(..excess);
+        Ok(out)
     }
 }
 
@@ -137,13 +174,52 @@ mod tests {
     use floatsubs_core::registry::Registry;
     use floatsubs_core::session::{Session, SessionConfig, Stage};
 
+    /// 16 kHz mono s16 WAV from FLOATSUBS_WAV.
+    fn wav() -> Vec<f32> {
+        let wav = std::fs::read(std::env::var("FLOATSUBS_WAV").unwrap()).unwrap();
+        let data = wav.windows(4).position(|w| w == b"data").unwrap() + 8;
+        wav[data..].chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect()
+    }
+
+    /// Prints where the energy gate and Silero cut the clip, fed in 10 ms chunks like live capture.
+    /// Run: FLOATSUBS_WAV=path/to/16k-mono.wav cargo test -p floatsubs endpoint_dump -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn endpoint_dump() {
+        let reg = Registry::parse(include_str!("../../models.json")).unwrap();
+        let dir = std::env::temp_dir().join("floatsubs-models");
+        let m = reg.get("silero-vad-v6.2.0").unwrap();
+        crate::download::fetch(m, &dir, &mut |_, _| {}).unwrap();
+        let pcm = wav();
+        let vads: [(&str, Box<dyn floatsubs_core::endpoint::Vad>); 2] =
+            [("energy", Box::new(floatsubs_core::endpoint::Energy(0.01))), ("silero", Box::new(Silero::load(&dir.join(&m.file).to_string_lossy()).unwrap()))];
+        for (name, mut vad) in vads {
+            let mut ep = Endpointer::new(EndpointConfig::default());
+            let (mut evs, mut pos, t0) = (vec![], 0, std::time::Instant::now());
+            for chunk in pcm.chunks(160).chain(std::iter::once(&[0.0; 16_000][..])) {
+                pos += chunk.len();
+                ep.push(chunk, vad.as_mut(), &mut evs).unwrap();
+                for e in evs.drain(..) {
+                    if let Event::Final(v) = e {
+                        eprintln!("{name}: final emitted at {:6.2}s, {:5.2}s long", pos as f32 / 16_000.0, v.len() as f32 / 16_000.0);
+                    }
+                }
+            }
+            eprintln!("{name}: {:?} for {:.1}s of audio", t0.elapsed(), pos as f32 / 16_000.0);
+        }
+    }
+
     /// Downloads ~0.7 GB. Run: FLOATSUBS_WAV=path/to/16k-mono.wav cargo test -p floatsubs -- --ignored
+    /// Optional: FLOATSUBS_LANG (spoken language, default en), FLOATSUBS_ASR (model id, default whisper-base),
+    /// FLOATSUBS_GLOSSARY ("src=dst;src=dst", empty for none), FLOATSUBS_TOPIC, FLOATSUBS_SOURCE_LANG (fixes the spoken language).
     #[test]
     #[ignore]
     fn real_models_transcribe_and_translate() {
+        let env = |k: &str, d: &str| std::env::var(k).unwrap_or_else(|_| d.into());
         let reg = Registry::parse(include_str!("../../models.json")).unwrap();
         let dir = std::env::temp_dir().join("floatsubs-models");
-        let ids = ["whisper-base", "plamo-3-translate-0.8b-q4_k_m", "silero-vad-v6.2.0"];
+        let asr_id = env("FLOATSUBS_ASR", "whisper-base");
+        let ids = [asr_id.as_str(), "plamo-3-translate-0.8b-q4_k_m", "silero-vad-v6.2.0"];
         for id in ids {
             crate::download::fetch(reg.get(id).unwrap(), &dir, &mut |_, _| {}).unwrap();
         }
@@ -153,23 +229,28 @@ mod tests {
         let mut asr = Whisper::load(&p(0), &p(2), false, threads).unwrap();
         let mut mt = Plamo::load(&p(1), 0, threads).unwrap();
 
-        let wav = std::fs::read(std::env::var("FLOATSUBS_WAV").unwrap()).unwrap();
-        let pcm: Vec<f32> = wav[44..].chunks(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect();
+        let pcm = wav();
         let mut ep = Endpointer::new(EndpointConfig::default());
         let mut evs = vec![];
-        ep.push(&pcm, &mut evs);
-        ep.push(&vec![0.0; 16_000], &mut evs);
-        let mut s = Session::new(SessionConfig::default());
+        let mut vad = Silero::load(&asr.vad_path).unwrap();
+        ep.push(&pcm, &mut vad, &mut evs).unwrap();
+        ep.push(&vec![0.0; 16_000], &mut vad, &mut evs).unwrap();
+        let lang = env("FLOATSUBS_LANG", "en");
+        // Glossary terms reach Whisper as its prompt.
+        let glossary = env("FLOATSUBS_GLOSSARY", "Blink=ブリンク;Tracer=トレーサー").split(';').filter_map(|e| e.split_once('=')).map(|(a, b)| (a.into(), b.into())).collect();
+        let source_lang = std::env::var("FLOATSUBS_SOURCE_LANG").ok();
+        let mut s = Session::new(SessionConfig { glossary, topic: env("FLOATSUBS_TOPIC", ""), source_lang, ..Default::default() });
         let mut finals = vec![];
         for ev in evs.into_iter().filter(|e| matches!(e, Event::Final(_))) {
             let t0 = std::time::Instant::now();
             s.handle(ev, &mut asr, &mut mt, &mut |c| if c.stage == Stage::Final { finals.push(c) }).unwrap();
             eprintln!("utterance took {:?}", t0.elapsed());
         }
+        s.flush(&mut mt, &mut |c| if c.stage == Stage::Final { finals.push(c) }).unwrap();
         for c in &finals {
             eprintln!("[{}] {}\n  → {}", c.lang, c.source, c.translation);
         }
         assert!(!finals.is_empty(), "speech produced captions");
-        assert!(finals.iter().all(|c| c.lang == "en" && c.translation.chars().any(|ch| ('\u{3040}'..='\u{30ff}').contains(&ch) || ('\u{4e00}'..='\u{9fff}').contains(&ch))), "English speech translated into Japanese");
+        assert!(finals.iter().all(|c| c.lang == lang && c.translation.chars().any(|ch| ('\u{3040}'..='\u{30ff}').contains(&ch) || ('\u{4e00}'..='\u{9fff}').contains(&ch))), "{lang} speech translated into Japanese");
     }
 }
