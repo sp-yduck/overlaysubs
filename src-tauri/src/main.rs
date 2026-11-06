@@ -86,6 +86,8 @@ struct App {
     overlay_item: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
     /// Bumped on every start; lets a stale session skip hiding a newer one.
     session_seq: AtomicU64,
+    /// Set while `start` is loading models, so a concurrent start (hotkey/tray) is ignored.
+    starting: AtomicBool,
     /// True while the appearance settings preview a sample caption in the overlay.
     overlay_preview: AtomicBool,
     /// Overlay visibility to restore when the preview ends (running or manually shown).
@@ -287,15 +289,41 @@ async fn benchmark(app: AppHandle) -> Result<Bench, String> {
     .map_err(|e| e.to_string())?
 }
 
+/// Starting translation blocks for seconds (model loading) and shows the overlay window,
+/// updates the tray menu and evaluates scripts in the webviews. A synchronous command runs
+/// all of that inside the webview IPC callback on the main thread, and re-entering the
+/// window/WebView2 machinery from there hangs or aborts the app (regression since the overlay
+/// show/hide feature), so both commands run on the blocking pool instead.
 #[tauri::command]
-fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
+async fn start(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || start_impl(&app)).await.map_err(|e| e.to_string())?
+}
+
+/// See [`start`]. Also used by the tray menu and the global shortcut, which must not block
+/// the main thread either.
+fn start_impl(app: &AppHandle) -> Result<(), String> {
+    let st = app.state::<App>();
     if st.running.lock().unwrap().is_some() {
         return Ok(());
     }
-    if !terms_accepted(&app) {
+    if !terms_accepted(app) {
         return Err("terms not accepted".into());
     }
-    ensure_engines(&app, &st)?;
+    // Claim the session before the slow model load: a second start (button + hotkey) must not
+    // run alongside this one, and a delayed hide from the previous session must not hide this
+    // session's overlay.
+    if st.starting.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+    let session_id = st.session_seq.fetch_add(1, Ordering::SeqCst) + 1;
+    st.overlay_hide_pending.store(false, Ordering::SeqCst);
+    let res = start_session(app, &st, session_id);
+    st.starting.store(false, Ordering::SeqCst);
+    res
+}
+
+fn start_session(app: &AppHandle, st: &App, session_id: u64) -> Result<(), String> {
+    ensure_engines(app, st)?;
     let s = st.settings.lock().unwrap().clone();
     let (audio_tx, audio_rx) = mpsc::channel::<Vec<f32>>();
     let (ev_tx, ev_rx) = mpsc::channel::<(Event, usize)>();
@@ -324,7 +352,6 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     let history = st.history.clone();
     history.lock().unwrap().clear();
     let emit_app = app.clone();
-    let session_id = st.session_seq.fetch_add(1, Ordering::SeqCst) + 1;
     let session_thread = std::thread::spawn(move || {
         let mut session = Session::new(s.session);
         let mut seen = 0;
@@ -372,20 +399,27 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
         }
     });
     *st.running.lock().unwrap() = Some(Running { _capture: cap, stop_tx, id: session_id, session: session_thread });
-    st.overlay_hide_pending.store(false, Ordering::SeqCst);
-    set_overlay_visible(&app, true);
+    set_overlay_visible(app, true);
     app.emit("running", true).map_err(|e| e.to_string())
 }
 
+/// See [`start`] for why this runs on the blocking pool: stopping also shows/hides the
+/// overlay and updates the tray menu.
 #[tauri::command]
-fn stop(app: AppHandle, st: State<App>) -> Result<(), String> {
+async fn stop(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || stop_impl(&app)).await.map_err(|e| e.to_string())?
+}
+
+/// See [`start`]. Also used by the tray menu and the global shortcut.
+fn stop_impl(app: &AppHandle) -> Result<(), String> {
+    let st = app.state::<App>();
     // Bind first so the `running` mutex guard is released before any window work.
     let running = st.running.lock().unwrap().take();
     let Some(running) = running else {
         // Not translating: make sure a manually shown overlay does not linger, but keep it
         // while the appearance settings are previewing a sample caption.
         if !st.overlay_preview.load(Ordering::SeqCst) {
-            set_overlay_visible(&app, false);
+            set_overlay_visible(app, false);
         }
         return app.emit("running", false).map_err(|e| e.to_string());
     };
@@ -405,12 +439,16 @@ fn stop(app: AppHandle, st: State<App>) -> Result<(), String> {
 }
 
 fn toggle(app: &AppHandle) {
-    let st = app.state::<App>();
-    let running = st.running.lock().unwrap().is_some();
-    let r = if running { stop(app.clone(), st) } else { start(app.clone(), st) };
-    if let Err(e) = r {
-        let _ = app.emit("error", e);
-    }
+    // Tray clicks and the global shortcut arrive on the main thread; run the blocking
+    // start/stop off it, like the commands above.
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let running = app.state::<App>().running.lock().unwrap().is_some();
+        let res = if running { stop_impl(&app) } else { start_impl(&app) };
+        if let Err(e) = res {
+            let _ = app.emit("error", e);
+        }
+    });
 }
 
 /// The single entry point for overlay visibility: window, tray check state, overlay
@@ -446,16 +484,18 @@ fn hide_overlay_if_session(app: &AppHandle, session_id: u64) {
         let st = app.state::<App>();
         let _switch = st.overlay_switch.lock().unwrap();
         if st.session_seq.load(Ordering::SeqCst) != session_id {
-            return;
+            // A newer session took over; its overlay must stay visible.
+        } else {
+            st.overlay_hide_pending.store(false, Ordering::SeqCst);
+            // Keep the overlay up while the appearance settings preview a sample caption; the
+            // preview restores the visibility when it ends.
+            if !st.overlay_preview.load(Ordering::SeqCst) {
+                apply_overlay_visible(app, false);
+            }
         }
-        st.overlay_hide_pending.store(false, Ordering::SeqCst);
-        // Keep the overlay up while the appearance settings preview a sample caption; the
-        // preview restores the visibility when it ends.
-        if st.overlay_preview.load(Ordering::SeqCst) {
-            return;
-        }
-        apply_overlay_visible(app, false);
     }
+    // Sync unconditionally: the early returns used to skip this and leave the tray check
+    // state out of sync with what is on screen.
     sync_overlay_check(app);
 }
 
