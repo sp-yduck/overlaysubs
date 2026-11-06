@@ -79,7 +79,7 @@ WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ Silero VAD endpointer ─
 
 ## Features
 
-- First run asks you to accept the OverlaySubs Terms of Use (with the PLaMo Community License as an appendix). Acceptance is stored in `terms-accepted` and not asked again until the terms version changes. "Check this PC" in the settings window detects your hardware and picks a tier (High / Mid / Low / CPU).
+- First run asks you to accept the OverlaySubs Terms of Use (with the PLaMo Community License as an appendix). Acceptance is stored in `terms-accepted` and not asked again until the terms version changes. "Check this PC" in the settings window detects your hardware and picks a tier (High / Mid / Low / CPU). The result is cached in `hardware.json`, so later launches show it without probing again; "Check again" re-runs the check.
 - Models download from Hugging Face automatically, resume after interruption, and are verified with SHA-256. No account or token required.
 - You can run the optional speed check (benchmark); if it cannot keep up in real time, it switches to one tier lower.
 - Audio input is Windows WASAPI loopback (system audio) or a microphone. On macOS you pick a loopback input device as the microphone.
@@ -93,7 +93,7 @@ WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ Silero VAD endpointer ─
 
 ## Models and tiers
 
-The tier is decided when you run "Check this PC" in first-run setup, and the models for that tier are selected automatically. The settings window lets you change the individual Whisper / PLaMo / VAD models.
+The tier is decided when you run "Check this PC" in first-run setup, and the models for that tier are selected automatically. The settings window lets you change the individual Whisper / PLaMo / VAD models. The detection result is cached; run "Check again" after changing the hardware, such as a new GPU.
 
 | Tier | Detected when | Whisper | PLaMo 3 Translate | First download |
 |---|---|---|---|---|

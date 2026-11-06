@@ -281,7 +281,7 @@
             </table>
           </div>
           <p>
-            This folder holds the models (<code>models</code>), settings (<code>settings.json</code>) and your acceptance of the terms (<code>terms-accepted</code>).
+            This folder holds the models (<code>models</code>), settings (<code>settings.json</code>), your acceptance of the terms (<code>terms-accepted</code>) and the detected hardware (<code>hardware.json</code>).
             Keep it if you don't want to download the models again when reinstalling; delete the whole folder to remove everything.
           </p>
         </div>
@@ -336,7 +336,7 @@
             </table>
           </div>
           <p class="muted">
-            Sizes are the sum of the sizes declared in <code>models.json</code> (including Silero VAD, about 0.9 MB). Running "Check this PC" during first-run setup determines your tier from the hardware and picks the models. You can change the Whisper / PLaMo models individually in Settings.
+            Sizes are the sum of the sizes declared in <code>models.json</code> (including Silero VAD, about 0.9 MB). Running "Check this PC" during first-run setup determines your tier from the hardware and picks the models. You can change the Whisper / PLaMo models individually in Settings. The result is cached in <code>hardware.json</code> in the config folder, so later launches show it without probing again; run "Check again" after changing the hardware.
           </p>
           <p class="muted">
             Tier guide: High is 12 GB+ VRAM, Mid is 8 GB VRAM, Low is 4–6 GB VRAM, and CPU is for no GPU or under 4 GB VRAM (Apple Silicon is judged by memory size).
