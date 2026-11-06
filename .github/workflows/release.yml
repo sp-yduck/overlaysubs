@@ -34,7 +34,7 @@ jobs:
     outputs:
       release_exists: ${{ steps.existing.outputs.release_exists }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check tag, tauri.conf.json and crate versions agree
         env:
@@ -142,7 +142,7 @@ jobs:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     steps:
       - run: git config --global core.longpaths true
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       # Keeps the whisper.cpp / llama.cpp builds between runs.
       - uses: Swatinem/rust-cache@v2
@@ -427,7 +427,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v4
         with:
