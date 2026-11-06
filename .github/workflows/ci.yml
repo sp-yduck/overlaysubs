@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Bundles are slow and eat Actions minutes, so they only run when started by hand.
+  workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -11,14 +13,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test -p floatsubs-core
   bundle:
+    if: github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
             features: vulkan
+            target: C:\t
           - os: macos-15
             features: metal
+            target: target
     runs-on: ${{ matrix.os }}
     env:
       # libgit2 hits MAX_PATH on llama.cpp's submodule; the git CLI honours core.longpaths.
@@ -27,6 +32,11 @@ jobs:
       - run: git config --global core.longpaths true
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      # Keeps the whisper.cpp / llama.cpp builds between runs.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> ${{ matrix.target }}"
+          key: ${{ matrix.features }}
       - if: matrix.features == 'vulkan'
         shell: pwsh
         run: |
@@ -36,7 +46,6 @@ jobs:
           if (!(Test-Path "C:\VulkanSDK\$v\Include\vulkan\vulkan.h")) { throw "Vulkan SDK install failed" }
           "VULKAN_SDK=C:\VulkanSDK\$v" >> $env:GITHUB_ENV
           "C:\VulkanSDK\$v\Bin" >> $env:GITHUB_PATH
-      - run: cargo install tauri-cli --version "^2" --locked
       - if: runner.os == 'Windows'
         shell: pwsh
         # MSBuild caps paths at 260 chars; whisper.cpp's Vulkan shader build nests deep, so use a short target dir.
@@ -52,7 +61,8 @@ jobs:
           Copy-Item C:\t\release\build\llama-cpp-sys-2-*\out\bin\*.dll src-tauri/libs/
           if (!(Test-Path src-tauri/libs/llama.dll)) { throw "llama.dll was not staged" }
           Get-ChildItem src-tauri/libs
-      - run: cargo tauri build --features ${{ matrix.features }}
+      # The npm package ships a prebuilt CLI; `cargo install tauri-cli` took up to 19 minutes.
+      - run: npx --yes @tauri-apps/cli@^2 build --features ${{ matrix.features }}
         working-directory: src-tauri
       - if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
