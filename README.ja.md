@@ -15,13 +15,13 @@ PC 上で再生されるあらゆる音声をリアルタイムで文字起こ�
 ## スクリーンショット
 
 **設定画面（翻訳）** — 言語・翻訳の調整・最近の字幕。
-![設定画面](docs/images/ui-settings.png)
+[![設定画面](docs/images/ui-settings.png)](docs/images/ui-settings.png)
 
 **モデルの準備** — 初回起動時にハードウェアを判定し、ティアに合ったモデルをダウンロードします。
-![モデルの準備画面](docs/images/ui-model-setup.png)
+[![モデルの準備画面](docs/images/ui-model-setup.png)](docs/images/ui-model-setup.png)
 
 **字幕オーバーレイ** — 他のアプリの上に重ねて表示されます。クリック透過は設定でオンにできます（背景はイメージ）。
-![字幕オーバーレイ](docs/images/overlay.jpg)
+[![字幕オーバーレイ](docs/images/overlay.jpg)](docs/images/overlay.jpg)
 
 ## 利用者向け（ダウンロード・インストール）
 

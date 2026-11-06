@@ -15,13 +15,13 @@ A desktop app that transcribes and translates any audio playing on your PC in re
 ## Screenshots
 
 **Settings** — translation options, languages and recent subtitles.
-![Settings screen](docs/images/ui-settings-en.png)
+[![Settings screen](docs/images/ui-settings-en.png)](docs/images/ui-settings-en.png)
 
 **Model setup** — on first run the app detects your hardware, picks a tier and downloads the matching models.
-![Model setup screen](docs/images/ui-model-setup-en.png)
+[![Model setup screen](docs/images/ui-model-setup-en.png)](docs/images/ui-model-setup-en.png)
 
 **Subtitle overlay** — drawn on top of other apps; click-through is available in the settings (background is illustrative).
-![Subtitle overlay](docs/images/overlay.jpg)
+[![Subtitle overlay](docs/images/overlay.jpg)](docs/images/overlay.jpg)
 
 ## For users (download and install)
 
