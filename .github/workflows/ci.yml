@@ -1,5 +1,8 @@
 name: ci
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -14,7 +17,7 @@ jobs:
         include:
           - os: windows-latest
             features: vulkan
-          - os: macos-14
+          - os: macos-15
             features: metal
     runs-on: ${{ matrix.os }}
     env:
@@ -46,14 +49,20 @@ jobs:
           New-Item -ItemType File -Force src-tauri/libs/placeholder.dll | Out-Null
           cargo build --release -p floatsubs --features ${{ matrix.features }}
           Remove-Item src-tauri/libs/placeholder.dll
-          Copy-Item C:\t\release\*.dll src-tauri/libs/
+          Copy-Item C:\t\release\build\llama-cpp-sys-2-*\out\bin\*.dll src-tauri/libs/
+          if (!(Test-Path src-tauri/libs/llama.dll)) { throw "llama.dll was not staged" }
           Get-ChildItem src-tauri/libs
       - run: cargo tauri build --features ${{ matrix.features }}
         working-directory: src-tauri
-      - uses: actions/upload-artifact@v4
+      - if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
         with:
-          name: floatsubs-${{ matrix.os }}
+          name: floatsubs-windows
           path: |
             C:/t/release/bundle/msi/*.msi
             C:/t/release/bundle/nsis/*.exe
-            target/release/bundle/dmg/*.dmg
+      - if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: floatsubs-macos
+          path: target/release/bundle/dmg/*.dmg
