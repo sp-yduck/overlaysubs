@@ -23,7 +23,6 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 struct Settings {
-    license_accepted: bool,
     models_dir: Option<PathBuf>,
     tier: Option<Tier>,
     selection: Option<Selection>,
@@ -41,7 +40,6 @@ struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            license_accepted: false,
             models_dir: None,
             tier: None,
             selection: None,
@@ -91,6 +89,21 @@ fn registry(app: &AppHandle) -> Result<Registry, String> {
     }
 }
 
+/// Bump when the terms text changes; users are asked to accept again.
+const TERMS_VERSION: &str = "1";
+
+/// Kept outside settings.json so a settings reset or schema change never re-asks for consent.
+fn terms_accepted(app: &AppHandle) -> bool {
+    std::fs::read_to_string(config_dir(app).join("terms-accepted")).is_ok_and(|v| v.trim() == TERMS_VERSION)
+}
+
+#[tauri::command]
+fn accept_terms(app: AppHandle) -> Result<(), String> {
+    let dir = config_dir(&app);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join("terms-accepted"), TERMS_VERSION).map_err(|e| e.to_string())
+}
+
 fn save(app: &AppHandle, s: &Settings) -> Result<(), String> {
     let dir = config_dir(app);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -100,6 +113,7 @@ fn save(app: &AppHandle, s: &Settings) -> Result<(), String> {
 #[derive(Serialize)]
 struct Snapshot {
     settings: Settings,
+    terms_accepted: bool,
     registry: Registry,
     downloaded: Vec<String>,
     running: bool,
@@ -113,7 +127,7 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
     let registry = registry(&app)?;
     let dir = models_dir(&app, &settings);
     let downloaded = registry.models.iter().filter(|m| dir.join(&m.file).exists()).map(|m| m.id.clone()).collect();
-    Ok(Snapshot { running: st.running.lock().unwrap().is_some(), settings, registry, downloaded, models_dir: dir, devices: capture::devices() })
+    Ok(Snapshot { running: st.running.lock().unwrap().is_some(), terms_accepted: terms_accepted(&app), settings, registry, downloaded, models_dir: dir, devices: capture::devices() })
 }
 
 #[tauri::command]
@@ -236,8 +250,8 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     if st.running.lock().unwrap().is_some() {
         return Ok(());
     }
-    if !st.settings.lock().unwrap().license_accepted {
-        return Err("license not accepted".into());
+    if !terms_accepted(&app) {
+        return Err("terms not accepted".into());
     }
     ensure_engines(&app, &st)?;
     let s = st.settings.lock().unwrap().clone();
@@ -323,13 +337,15 @@ fn export_history(st: State<App>, path: PathBuf, format: String, with_source: bo
     std::fs::write(path, body).map_err(|e| e.to_string())
 }
 
+/// floatsubs terms with the PLaMo Community License attached as an appendix.
 #[tauri::command]
-fn license_text(lang: String) -> &'static str {
-    if lang == "ja" {
-        include_str!("../../licenses/PLaMo-Community-License.ja.txt")
+fn terms_text(lang: String) -> String {
+    let (terms, plamo, head) = if lang == "ja" {
+        (include_str!("../../licenses/floatsubs-terms.ja.txt"), include_str!("../../licenses/PLaMo-Community-License.ja.txt"), "別紙")
     } else {
-        include_str!("../../licenses/PLaMo-Community-License.en.txt")
-    }
+        (include_str!("../../licenses/floatsubs-terms.en.txt"), include_str!("../../licenses/PLaMo-Community-License.en.txt"), "Appendix")
+    };
+    format!("{terms}\n\n――――――――――\n{head}\n\n{plamo}")
 }
 
 #[tauri::command]
@@ -353,7 +369,16 @@ fn main() {
         .manage(App::default())
         .setup(|app| {
             let h = app.handle().clone();
-            let s: Settings = std::fs::read_to_string(config_dir(&h).join("settings.json")).ok().and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default();
+            let path = config_dir(&h).join("settings.json");
+            let s: Settings = match std::fs::read_to_string(&path) {
+                Err(_) => Settings::default(),
+                Ok(j) => serde_json::from_str(&j).unwrap_or_else(|e| {
+                    // Keep the unreadable file instead of silently overwriting it on the next save.
+                    eprintln!("settings.json: {e}; moved to settings.json.bak");
+                    let _ = std::fs::rename(&path, path.with_extension("json.bak"));
+                    Settings::default()
+                }),
+            };
             if let Err(e) = h.global_shortcut().register(s.hotkey.as_str()) {
                 eprintln!("hotkey {}: {e}", s.hotkey);
             }
@@ -390,7 +415,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, license_text, set_click_through
+            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through
         ])
         .run(tauri::generate_context!())
         .expect("error while running floatsubs");

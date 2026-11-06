@@ -70,5 +70,7 @@ mod tests {
         assert!(r.get(&mid.asr).unwrap().file.contains("turbo"));
         assert!(r.get(&mid.translator).unwrap().file.contains("plamo"));
         assert!(r.models.iter().all(|m| m.sha256.len() == 64 && m.url.starts_with("https://")));
+        // A moving ref like `main` lets upstream re-uploads break the pinned sha256.
+        assert!(r.models.iter().all(|m| !m.url.contains("/resolve/main/")));
     }
 }
