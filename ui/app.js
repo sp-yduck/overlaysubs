@@ -3,6 +3,7 @@ const { listen } = window.__TAURI__.event;
 const { save: saveDialog, open: openDialog } = window.__TAURI__.dialog;
 
 let snap, page, progress = {}, benchMsg = "", hist = [], termsLang, agreed = false;
+let updateInfo = null, updateChecked = false;
 const busy = new Set();
 const $ = (s) => document.querySelector(s);
 const t = (k) => (I18N[snap?.settings.ui_lang] || I18N.ja)[k] || k;
@@ -28,7 +29,18 @@ function toast(msg, kind = "ok") {
 async function refresh() {
   snap = await invoke("snapshot");
   snap.settings.overlay = { ...OVERLAY_DEFAULTS, ...snap.settings.overlay };
+  if (snap.terms_accepted) checkUpdate();
   render();
+}
+
+/** Checks GitHub once per app session; offline or API errors stay quiet. */
+async function checkUpdate() {
+  if (updateChecked) return;
+  updateChecked = true;
+  try {
+    const u = await invoke("check_update");
+    if (u) { updateInfo = u; showUpdateBanner(); }
+  } catch { /* offline / API error: stay quiet */ }
 }
 
 async function persist() {
@@ -186,6 +198,21 @@ function aboutPage() {
     <pre class="license" id="terms"></pre>`)}`;
 }
 
+function updateBanner() {
+  if (!updateInfo) return "";
+  const msg = t("update_available").replace("{latest}", esc(updateInfo.latest)).replace("{current}", esc(updateInfo.current));
+  return `<div class="update-banner" role="status" aria-live="polite">
+    <div class="msg"><b>${esc(t("update_title"))}</b> ${msg}</div>
+    <div class="row">${btn("open-release", t("update_open"), { cls: "primary small" })}${btn("dismiss-update", t("update_later"), { cls: "small" })}</div>
+  </div>`;
+}
+
+/** Insert the banner in place: the check can resolve seconds after startup, so a full render would steal focus. */
+function showUpdateBanner() {
+  const host = $("#page");
+  if (host && !$(".update-banner")) host.insertAdjacentHTML("afterbegin", updateBanner());
+}
+
 const PAGES = { home: homePage, models: modelsPage, overlay: overlayPage, history: historyPage, about: aboutPage };
 
 function render() {
@@ -211,7 +238,7 @@ function render() {
     <p class="hint">${snap.running ? `<span class="dot live"></span>${t("live")}` : ready ? `${t("hotkey")}: <code>${esc(s.hotkey)}</code>` : t("need_setup")}</p>
     <select data-k="ui_lang" data-t="str" aria-label="${t("ui_lang")}">${opts([["ja", "日本語"], ["en", "English"]], s.ui_lang)}</select>
   </aside>
-  <section id="page" data-page="${page}">${PAGES[page]()}</section>`;
+  <section id="page" data-page="${page}">${updateBanner()}${PAGES[page]()}</section>`;
   $("#page").scrollTop = keep;
   drawHistory();
   if (page === "about") loadTerms();
@@ -309,6 +336,8 @@ async function act(name, id, el) {
     const path = await saveDialog({ defaultPath: `overlaysubs.${format}`, filters: [{ name: format, extensions: [format] }] });
     if (path) { await invoke("export_history", { path, format, withSource: snap.settings.overlay.showSource }); toast(t("exported")); toast(t("output_note"), "warn"); }
   }
+  if (name === "open-release") return invoke("open_url", { url: updateInfo.url }).catch((e) => toast(String(e), "error"));
+  if (name === "dismiss-update") { updateInfo = null; return render(); }
   await refresh();
 }
 

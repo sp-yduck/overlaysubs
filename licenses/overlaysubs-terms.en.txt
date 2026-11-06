@@ -1,4 +1,4 @@
-OverlaySubs Terms of Use (version 2)
+OverlaySubs Terms of Use (version 3)
 
 1. These Terms
 You must accept these Terms to use OverlaySubs (the "App"). If you do not accept, you may not use the App.
@@ -20,7 +20,7 @@ Whisper (OpenAI, MIT License) for speech recognition and Silero VAD (MIT License
 5.2 If you publish or distribute subtitles, respect the copyright of the source content and the platform's terms.
 
 6. Privacy
-Audio, transcripts and translations are processed only on your device and are never sent out. The only network traffic is model downloads (Hugging Face). There is no telemetry.
+Audio, transcripts and translations are processed only on your device and are never sent out. There is no telemetry. The only network access is model downloads (Hugging Face) and one anonymous request to the GitHub API at startup to check for a newer release (it sends no account, token, or personal data; if it fails, nothing happens).
 
 7. Disclaimer
 The developers are not liable for any damage arising from use of the App.

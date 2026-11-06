@@ -36,6 +36,10 @@ const I18N = {
     output_note: "公開・配布する場合は PLaMo 3 のライセンスに従ってください。元コンテンツの著作権にもご注意ください。",
     ui_lang: "表示言語", about: "情報", saved: "保存しました", invalid_number: "数値を入力してください",
     rtf: "リアルタイム係数", downgrade: "リアルタイムに間に合わないため1段下げました",
+    update_title: "新しいバージョンがあります",
+    update_available: "v{latest} が公開されています（現在 v{current}）",
+    update_open: "リリースページを開く",
+    update_later: "後で",
   },
   en: {
     terms_title: "OverlaySubs Terms of Use",
@@ -69,6 +73,10 @@ const I18N = {
     output_note: "If you publish or distribute this, follow the PLaMo 3 license. Mind the copyright of the source content too.",
     ui_lang: "UI language", about: "About", saved: "Saved", invalid_number: "Enter a number",
     rtf: "Real-time factor", downgrade: "Too slow for real time; dropped one tier",
+    update_title: "Update available",
+    update_available: "v{latest} is available (you have v{current})",
+    update_open: "Open release page",
+    update_later: "Later",
   },
 };
 const LANGS = { en: "English", ja: "日本語", ko: "한국어", zh: "中文", es: "Español", fr: "Français", de: "Deutsch", it: "Italiano", pt: "Português", ru: "Русский", vi: "Tiếng Việt", th: "ไทย", id: "Indonesia", ar: "العربية", hi: "हिन्दी", nl: "Nederlands", pl: "Polski" };
