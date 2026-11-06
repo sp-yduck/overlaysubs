@@ -13,10 +13,11 @@ use overlaysubs_core::session::{Asr, Caption, Session, SessionConfig, Translator
 use overlaysubs_core::tier::{self, Hardware, Tier};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -64,6 +65,10 @@ struct Engines {
 struct Running {
     _capture: capture::Capture,
     stop_tx: mpsc::Sender<()>,
+    /// Identifies this session so a delayed hide cannot hide a newer session's overlay.
+    id: u64,
+    /// Joined after stop so the overlay is hidden only once the last utterance is flushed.
+    session: std::thread::JoinHandle<()>,
 }
 
 #[derive(Default)]
@@ -72,6 +77,14 @@ struct App {
     engines: Arc<Mutex<Option<Engines>>>,
     running: Mutex<Option<Running>>,
     history: Arc<Mutex<Vec<Entry>>>,
+    /// Transient: the overlay starts hidden and is not persisted across launches.
+    overlay_visible: AtomicBool,
+    /// Serializes visibility changes so concurrent toggles apply in order.
+    overlay_switch: Mutex<()>,
+    /// Tray item whose check state mirrors `overlay_visible`.
+    overlay_item: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
+    /// Bumped on every start; lets a stale session skip hiding a newer one.
+    session_seq: AtomicU64,
 }
 
 fn config_dir(app: &AppHandle) -> PathBuf {
@@ -118,6 +131,7 @@ struct Snapshot {
     registry: Registry,
     downloaded: Vec<String>,
     running: bool,
+    overlay_visible: bool,
     models_dir: PathBuf,
     devices: capture::Devices,
     /// Last "Check this PC" result from disk, so the model setup screen can show it again after a restart.
@@ -132,6 +146,7 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
     let downloaded = registry.models.iter().filter(|m| dir.join(&m.file).exists()).map(|m| m.id.clone()).collect();
     Ok(Snapshot {
         running: st.running.lock().unwrap().is_some(),
+        overlay_visible: st.overlay_visible.load(Ordering::Relaxed),
         terms_accepted: terms_accepted(&app),
         settings,
         registry,
@@ -295,7 +310,8 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     let history = st.history.clone();
     history.lock().unwrap().clear();
     let emit_app = app.clone();
-    std::thread::spawn(move || {
+    let session_id = st.session_seq.fetch_add(1, Ordering::SeqCst) + 1;
+    let session_thread = std::thread::spawn(move || {
         let mut session = Session::new(s.session);
         let mut seen = 0;
         let mut last_event = Instant::now();
@@ -341,15 +357,31 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
             *history.lock().unwrap() = session.entries.clone();
         }
     });
-    *st.running.lock().unwrap() = Some(Running { _capture: cap, stop_tx });
+    *st.running.lock().unwrap() = Some(Running { _capture: cap, stop_tx, id: session_id, session: session_thread });
+    set_overlay_visible(&app, true);
     app.emit("running", true).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn stop(app: AppHandle, st: State<App>) -> Result<(), String> {
-    if let Some(r) = st.running.lock().unwrap().take() {
-        let _ = r.stop_tx.send(());
-    }
+    // Bind first so the `running` mutex guard is released before any window work.
+    let running = st.running.lock().unwrap().take();
+    let Some(running) = running else {
+        // Not translating: make sure a manually shown overlay does not linger.
+        set_overlay_visible(&app, false);
+        return app.emit("running", false).map_err(|e| e.to_string());
+    };
+    let Running { _capture, stop_tx, id, session } = running;
+    let _ = stop_tx.send(());
+    drop(_capture);
+    // The session thread flushes the pending utterance after stop; hide only once it is
+    // done (plus a short grace period) so the final subtitle is actually shown.
+    let hide_app = app.clone();
+    std::thread::spawn(move || {
+        let _ = session.join();
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        hide_overlay_if_session(&hide_app, id);
+    });
     app.emit("running", false).map_err(|e| e.to_string())
 }
 
@@ -359,6 +391,74 @@ fn toggle(app: &AppHandle) {
     let r = if running { stop(app.clone(), st) } else { start(app.clone(), st) };
     if let Err(e) = r {
         let _ = app.emit("error", e);
+    }
+}
+
+/// The single entry point for overlay visibility: window, tray check state, overlay
+/// webview and the settings UI all stay in sync.
+fn set_overlay_visible(app: &AppHandle, show: bool) {
+    {
+        let st = app.state::<App>();
+        let _switch = st.overlay_switch.lock().unwrap();
+        apply_overlay_visible(app, show);
+    }
+    sync_overlay_check(app);
+}
+
+fn toggle_overlay(app: &AppHandle) {
+    let st = app.state::<App>();
+    let show = {
+        let _switch = st.overlay_switch.lock().unwrap();
+        let show = !st.overlay_visible.load(Ordering::SeqCst);
+        apply_overlay_visible(app, show);
+        show
+    };
+    sync_overlay_check(app);
+}
+
+/// Hides the overlay only if `session_id` is still the current session, so a stop that
+/// overlaps a quick restart does not hide the new session's overlay.
+fn hide_overlay_if_session(app: &AppHandle, session_id: u64) {
+    {
+        let st = app.state::<App>();
+        let _switch = st.overlay_switch.lock().unwrap();
+        if st.session_seq.load(Ordering::SeqCst) != session_id {
+            return;
+        }
+        apply_overlay_visible(app, false);
+    }
+    sync_overlay_check(app);
+}
+
+/// Window, state and events. Callers must hold `overlay_switch`.
+fn apply_overlay_visible(app: &AppHandle, show: bool) {
+    let st = app.state::<App>();
+    match app.get_webview_window("overlay") {
+        Some(w) => {
+            let res = if show { w.show() } else { w.hide() };
+            if let Err(e) = res {
+                eprintln!("overlay visibility ({show}): {e}");
+            }
+        }
+        None => eprintln!("overlay window not found"),
+    }
+    st.overlay_visible.store(show, Ordering::SeqCst);
+    if !show {
+        // A hidden webview has its timers throttled, so clear captions as it disappears
+        // rather than on the next show (which could discard a caption emitted in between).
+        let _ = app.emit_to("overlay", "overlay-hidden", ());
+    }
+    let _ = app.emit("overlay-visible", show);
+}
+
+/// `set_checked` blocks on the main thread, so it must run after `overlay_switch` is released
+/// to keep a tray click and a hotkey press from deadlocking.
+fn sync_overlay_check(app: &AppHandle) {
+    let st = app.state::<App>();
+    let show = st.overlay_visible.load(Ordering::SeqCst);
+    let item = st.overlay_item.lock().unwrap().clone();
+    if let Some(item) = item {
+        let _ = item.set_checked(show);
     }
 }
 
@@ -414,6 +514,12 @@ fn set_click_through(app: AppHandle, on: bool) -> Result<(), String> {
     w.set_ignore_cursor_events(on).map_err(|e| e.to_string())
 }
 
+/// Show or hide the overlay window from the settings UI.
+#[tauri::command]
+fn show_overlay(app: AppHandle, show: bool) {
+    set_overlay_visible(&app, show);
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -445,14 +551,17 @@ fn main() {
             *app.state::<App>().settings.lock().unwrap() = s;
 
             let toggle_i = MenuItem::with_id(app, "toggle", "Start / Stop", true, None::<&str>)?;
+            let overlay_i = CheckMenuItem::with_id(app, "overlay", "Show subtitles", true, false, None::<&str>)?;
+            *app.state::<App>().overlay_item.lock().unwrap() = Some(overlay_i.clone());
             let show_i = MenuItem::with_id(app, "show", "Settings", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("OverlaySubs — Built with PLaMo")
-                .menu(&Menu::with_items(app, &[&toggle_i, &show_i, &quit_i])?)
+                .menu(&Menu::with_items(app, &[&toggle_i, &overlay_i, &show_i, &quit_i])?)
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "toggle" => toggle(app),
+                    "overlay" => toggle_overlay(app),
                     "show" => {
                         if let Some(w) = app.get_webview_window("main") {
                             let _ = w.show();
@@ -474,7 +583,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, open_url
+            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, open_url, show_overlay
         ])
         .run(tauri::generate_context!())
         .expect("error while running overlaysubs");

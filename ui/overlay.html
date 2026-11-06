@@ -6,9 +6,9 @@
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; }
   html { background: transparent; }
-  /* faint tint so the overlay area can be found */
-  body { background: rgba(128,128,128,0.12); border-radius: 8px; }
-  body { display: flex; flex-direction: column; justify-content: flex-end; font-family: var(--font); cursor: default; user-select: none; }
+  /* transparent while idle; a faint tint appears on hover so the area can still be found */
+  body { display: flex; flex-direction: column; justify-content: flex-end; font-family: var(--font); cursor: default; user-select: none; background: transparent; border-radius: 8px; }
+  body:hover { background: rgba(128,128,128,0.12); }
   #lines { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; }
   .cap { align-self: center; max-width: 100%; text-align: center; padding: 4px 14px; border-radius: 8px; background: rgba(0,0,0,var(--bg)); color: #fff; font-size: var(--size); line-height: 1.3; text-shadow: 0 1px 3px #000; }
   .cap .src { display: block; font-size: 0.6em; color: #cfd6e2; }

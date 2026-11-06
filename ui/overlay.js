@@ -30,5 +30,8 @@ listen("caption", (e) => {
   draw();
 });
 listen("settings", (e) => apply(e.payload));
+// Hidden windows have their timers throttled, so drop captions as the overlay disappears
+// rather than when it is shown again (that could discard a caption emitted in between).
+listen("overlay-hidden", () => { caps.clear(); draw(); });
 setInterval(draw, 500);
 invoke("snapshot").then((s) => apply(s.settings));

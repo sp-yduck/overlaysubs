@@ -147,7 +147,10 @@ function homePage() {
 }
 
 function overlayPage() {
+  const on = snap.overlay_visible;
   return `<h2>${t("overlay")}</h2>
+  ${card(t("overlay_visibility"), `<div class="row" id="overlay-visibility">${btn("overlay-visible", on ? t("hide_overlay") : t("show_overlay"))}<span class="muted">${on ? t("overlay_shown") : t("overlay_hidden")}</span></div>
+    <p class="muted small">${t("overlay_auto_hide_note")}</p>`)}
   ${card("", `${field(t("show_source"), "overlay.showSource", "check")}
     ${field(t("click_through"), "overlay.clickThrough", "check")}
     ${field(t("show_credit"), "overlay.showCredit", "check")}
@@ -158,6 +161,14 @@ function overlayPage() {
     ${field(t("lines"), "overlay.lines", "number", 'min="1" max="6"')}
     ${field(t("linger"), "overlay.linger", "number", 'min="1" max="60"')}`)}
   ${card("", field(t("hotkey"), "hotkey"))}`;
+}
+
+/** Patch just the visibility control so tray/hotkey toggles don't re-render the whole page. */
+function drawOverlayVisibility() {
+  const el = $("#overlay-visibility");
+  if (!el) return;
+  const on = snap.overlay_visible;
+  el.innerHTML = `${btn("overlay-visible", on ? t("hide_overlay") : t("show_overlay"))}<span class="muted">${on ? t("overlay_shown") : t("overlay_hidden")}</span>`;
 }
 
 function historyPage() {
@@ -273,6 +284,7 @@ async function act(name, id, el) {
     toast(t("bench_done"));
   }
   if (name === "toggle") await invoke(snap.running ? "stop" : "start");
+  if (name === "overlay-visible") await invoke("show_overlay", { show: !snap.overlay_visible });
   if (name === "delete") { await invoke("delete_model", { id }); toast(t("deleted")); }
   if (name === "dir") {
     const d = await openDialog({ directory: true });
@@ -317,6 +329,11 @@ listen("download", (e) => {
   if (pct) pct.textContent = `${Math.floor((100 * p.done) / p.total)}%`;
 });
 listen("running", refresh);
+listen("overlay-visible", (e) => {
+  if (!snap) return;
+  snap.overlay_visible = e.payload;
+  drawOverlayVisibility();
+});
 listen("error", (e) => toast(String(e.payload), "error"));
 listen("caption", (e) => { if (e.payload.stage === "final") loadHistory(); });
 refresh().then(loadHistory);
