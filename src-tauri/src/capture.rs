@@ -23,15 +23,19 @@ pub struct Devices {
 
 pub fn devices() -> Devices {
     let h = cpal::default_host();
-    let names = |it: Option<Box<dyn Iterator<Item = cpal::Device>>>| it.map(|d| d.filter_map(|d| d.name().ok()).collect()).unwrap_or_default();
+    let names = |it: Option<Box<dyn Iterator<Item = cpal::Device>>>| it.map(|d| d.filter_map(|d| name(&d)).collect()).unwrap_or_default();
     Devices {
         outputs: names(h.output_devices().ok().map(|d| Box::new(d) as _)),
         inputs: names(h.input_devices().ok().map(|d| Box::new(d) as _)),
     }
 }
 
-fn find(mut it: impl Iterator<Item = cpal::Device>, name: &str) -> Option<cpal::Device> {
-    it.find(|d| d.name().is_ok_and(|n| n == name))
+fn name(d: &cpal::Device) -> Option<String> {
+    d.description().ok().map(|x| x.name().to_string())
+}
+
+fn find(mut it: impl Iterator<Item = cpal::Device>, want: &str) -> Option<cpal::Device> {
+    it.find(|d| name(d).is_some_and(|n| n == want))
 }
 
 pub struct Capture {
@@ -76,13 +80,13 @@ pub fn start(src: &Source, tx: Sender<Vec<f32>>) -> Result<Capture, String> {
     // cpal streams are !Send on some hosts, so the stream lives and dies on its own thread.
     std::thread::spawn(move || {
         let channels = config.channels() as usize;
-        let mut rs = Resampler::new(config.sample_rate().0 as usize);
+        let mut rs = Resampler::new(config.sample_rate() as usize);
         let err = |e| eprintln!("capture error: {e}");
         let cfg = config.config();
         let stream = match config.sample_format() {
-            cpal::SampleFormat::F32 => device.build_input_stream(&cfg, move |d: &[f32], _: &_| { let _ = tx.send(rs.push(d, channels)); }, err, None),
+            cpal::SampleFormat::F32 => device.build_input_stream(cfg, move |d: &[f32], _: &_| { let _ = tx.send(rs.push(d, channels)); }, err, None),
             cpal::SampleFormat::I16 => device.build_input_stream(
-                &cfg,
+                cfg,
                 move |d: &[i16], _: &_| {
                     let f: Vec<f32> = d.iter().map(|s| *s as f32 / 32768.0).collect();
                     let _ = tx.send(rs.push(&f, channels));
@@ -90,7 +94,17 @@ pub fn start(src: &Source, tx: Sender<Vec<f32>>) -> Result<Capture, String> {
                 err,
                 None,
             ),
-            f => Err(cpal::BuildStreamError::BackendSpecific { err: cpal::BackendSpecificError { description: format!("unsupported sample format {f}") } }),
+            // cpal 0.18 ranks I32 above I16 in the default config when F32 is unavailable.
+            cpal::SampleFormat::I32 => device.build_input_stream(
+                cfg,
+                move |d: &[i32], _: &_| {
+                    let f: Vec<f32> = d.iter().map(|s| *s as f32 / 2147483648.0).collect();
+                    let _ = tx.send(rs.push(&f, channels));
+                },
+                err,
+                None,
+            ),
+            f => Err(cpal::Error::with_message(cpal::ErrorKind::UnsupportedConfig, format!("unsupported sample format {f}"))),
         };
         let stream = match stream.map_err(|e| e.to_string()).and_then(|s| s.play().map(|_| s).map_err(|e| e.to_string())) {
             Ok(s) => s,
