@@ -138,6 +138,15 @@ jobs:
     env:
       # libgit2 hits MAX_PATH on llama.cpp's submodule; the git CLI honours core.longpaths.
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+      # whisper-rs-sys forwards GGML_* environment variables to whisper.cpp's CMake, and ggml
+      # defaults GGML_NATIVE=ON, i.e. it compiles for the CPU of the machine that builds it
+      # (-march=native / /arch:AVX512). A binary built like that dies with
+      # STATUS_ILLEGAL_INSTRUCTION (0xc000001d) on CPUs that lack those instructions, which is
+      # exactly what happened to the Windows builds: the first CPU-only code path (the VAD,
+      # because GPU VAD is force-disabled upstream) aborted the process on start.
+      # llama.cpp already forces GGML_NATIVE=OFF unless target-cpu=native; do the same for
+      # whisper.cpp so release binaries run on every supported CPU.
+      GGML_NATIVE: "OFF"
     steps:
       - run: git config --global core.longpaths true
       - uses: actions/checkout@v7
@@ -152,7 +161,11 @@ jobs:
         with:
           workspaces: "."
           cache-directories: ${{ runner.os == 'Windows' && 'C:\t' || '' }}
-          key: ${{ matrix.features }}
+          # Bump the suffix whenever the C/C++ build flags change: cargo does not rerun
+          # whisper-rs-sys/llama-cpp-sys build scripts for a changed GGML_* environment, so a
+          # restored target dir would keep the old (native) objects. "native-off" is the
+          # GGML_NATIVE=OFF build below.
+          key: ${{ matrix.features }}-native-off
 
       # --- Windows: Vulkan SDK (same pin as the previous ci.yml bundle job) ---
       - name: Install Vulkan SDK

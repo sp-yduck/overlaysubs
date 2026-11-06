@@ -246,6 +246,18 @@ Actions のログを確認します。よくある原因:
 gh run rerun <run-id> --failed
 ```
 
+### 配布した版が一部の PC で「不正命令」で落ちる（0xc000001d）
+
+リリースビルドが GitHub ランナーの CPU 向けにコンパイルされてしまうと、その命令（AVX-512 など）を
+持たない CPU では `STATUS_ILLEGAL_INSTRUCTION (0xc000001d)` で即終了します。イベントビューアの
+「アプリケーション エラー」で **例外コード `0xc000001d`・障害モジュールがアプリ本体**ならこれです。
+whisper.cpp / ggml は `GGML_NATIVE` が既定で ON のため、明示的に OFF にしないとビルドマシンの CPU に
+最適化されます（llama.cpp は既定で OFF、whisper.cpp は `release.yml` の build ジョブで
+`GGML_NATIVE=OFF` を渡しています）。
+
+`GGML_*` の設定を変えたときは、rust-cache の `key` の接尾辞（現在は `-native-off`）も更新してください。
+キャッシュが復元されると C/C++ のオブジェクトが再利用され、設定変更が反映されません。
+
 ### 同じバージョンで作り直したい
 
 Release に 4 アセットがそろっていると、`verify` が「公開済み」と判断して **ビルドをスキップ** します
