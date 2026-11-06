@@ -75,11 +75,11 @@ WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ Silero VAD endpointer ─
 - `ui` is the settings window and overlay: plain HTML/JS/CSS with no build step; `ui/i18n.js` holds the Japanese and English strings.
 - The ASR and translation engines sit behind the `session::Asr` / `session::Translator` traits and can be swapped.
 - `models.json` defines the models (URL, size, SHA-256, tier). URLs are pinned to Hugging Face commits (using `main` would break the hash when upstream re-uploads). Placing a `models.json` in the config folder overrides the bundled one without an app update.
-- `licenses/` ships the OverlaySubs Terms of Use and the PLaMo Community License (Japanese and English); `THIRD_PARTY_NOTICES.md` lists the bundled libraries' licenses.
+- `licenses/` ships the OverlaySubs Terms of Use (Japanese and English); `THIRD_PARTY_NOTICES.md` lists the bundled libraries' licenses. The PLaMo 3 license is not bundled; the app and docs link to the official page instead.
 
 ## Features
 
-- First run asks you to accept the OverlaySubs Terms of Use (with the PLaMo Community License as an appendix). Acceptance is stored in `terms-accepted` and not asked again until the terms version changes. "Check this PC" in the settings window detects your hardware and picks a tier (High / Mid / Low / CPU). The result is cached in `hardware.json`, so later launches show it without probing again; "Check again" re-runs the check.
+- First run asks you to accept the OverlaySubs Terms of Use. Acceptance is stored in `terms-accepted` and not asked again until the terms version changes. "Check this PC" in the settings window detects your hardware and picks a tier (High / Mid / Low / CPU). The result is cached in `hardware.json`, so later launches show it without probing again; "Check again" re-runs the check.
 - Models download from Hugging Face automatically, resume after interruption, and are verified with SHA-256. No account or token required.
 - You can run the optional speed check (benchmark); if it cannot keep up in real time, it switches to one tier lower.
 - Audio input is Windows WASAPI loopback (system audio) or a microphone. On macOS you pick a loopback input device as the microphone.
@@ -158,10 +158,8 @@ Pushing a `v*` tag makes the release workflow build the bundles and publish them
 ## License
 
 - **The app code is MIT licensed** ([LICENSE](LICENSE)).
-- Use of the app is governed by the [OverlaySubs Terms of Use](licenses/overlaysubs-terms.ja.txt) ([English](licenses/overlaysubs-terms.en.txt)). The terms include the [PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license) as an appendix, accepted together on first launch. The full texts ship in [`licenses/`](licenses/) and are also available from "About" in the app.
-  - Personal and non-commercial use is free.
-  - Commercial use requires prior registration. Business use by you or your affiliates with annual revenue over JPY 1 billion requires a separate agreement with Preferred Networks.
-  - If you publish or distribute subtitles or other output, state that it is PLaMo output. Exported text/SRT does not include the credit, so state it yourself when publishing. The subtitle overlay shows `Built with PLaMo` by default (can be turned off in settings).
+- Use of the app is governed by the [OverlaySubs Terms of Use](licenses/overlaysubs-terms.ja.txt) ([English](licenses/overlaysubs-terms.en.txt)). You accept them on first launch, and they are also available from "About" in the app.
+- Use of the PLaMo 3 Translate translation model is governed by the [PLaMo 3 license](https://plamo.preferredai.jp/info/plamo-community-license-en).
 - If you publish subtitles for streams or videos, mind the copyright of the source content.
 - Whisper models (MIT) and Silero VAD (MIT) follow their own licenses.
 - Third-party licenses for the bundled whisper.cpp / llama.cpp / ggml are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

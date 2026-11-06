@@ -71,7 +71,7 @@ function termsView() {
     <h1>OverlaySubs <span class="badge">Built with PLaMo</span></h1>
     <h2>${t("terms_title")}</h2>
     <p>${t("terms_intro")}</p>
-    <ul class="muted">${["terms_pt_plamo", "terms_pt_corp", "terms_pt_output", "terms_pt_privacy"].map((k) => `<li>${t(k)}</li>`).join("")}</ul>
+    <p class="muted">${t("about_plamo_license")}</p>
     <div class="seg">${btn("terms-ja", "日本語", { cls: termsLang === "ja" ? "on" : "" })}${btn("terms-en", "English", { cls: termsLang === "en" ? "on" : "" })}</div>
     <pre class="license" id="terms"></pre>
     <label class="chk"><input type="checkbox" id="agree" ${agreed ? "checked" : ""}> ${t("terms_agree")}</label>
@@ -170,7 +170,7 @@ function historyPage() {
 function aboutPage() {
   return `<h2>${t("about")}</h2>
   ${card("", `<p>OverlaySubs · MIT License. Translation: <b>Built with PLaMo</b> (PLaMo 3 Translate, Preferred Networks). Speech: whisper.cpp. VAD: Silero.</p>
-    <p class="muted">${t("terms_pt_corp")}</p>`)}
+    <p class="muted">${t("about_plamo_license")}</p>`)}
   ${card(t("terms_title"), `<div class="seg">${btn("terms-ja", "日本語", { cls: termsLang === "ja" ? "on" : "" })}${btn("terms-en", "English", { cls: termsLang === "en" ? "on" : "" })}</div>
     <pre class="license" id="terms"></pre>`)}`;
 }
@@ -287,6 +287,12 @@ async function act(name, id, el) {
 }
 
 document.addEventListener("click", async (ev) => {
+  const link = ev.target.closest("a[data-external]");
+  if (link) {
+    ev.preventDefault();
+    invoke("open_url", { url: link.href }).catch((e) => toast(String(e), "error"));
+    return;
+  }
   const el = ev.target.closest("[data-act]");
   if (!el || el.disabled) return;
   const { act: name, id } = el.dataset;

@@ -75,11 +75,11 @@ WASAPI loopback / マイク ─▶ 16kHz mono ─▶ Silero VAD による発話�
 - `ui` は設定画面とオーバーレイです。ビルド不要の素の HTML/JS/CSS で、`ui/i18n.js` に日本語と英語の文言があります。
 - 翻訳エンジンと音声認識は `session::Translator` / `session::Asr` トレイトの裏にあり、差し替えられます。
 - `models.json` がモデル定義（URL、サイズ、SHA-256、ティア）です。URL は Hugging Face のコミットに固定しています（`main` だと上流の再アップロードでハッシュが合わなくなるため）。設定フォルダに `models.json` を置くと、アプリを更新せずに上書きできます。
-- `licenses/` に OverlaySubs 利用規約と PLaMo コミュニティライセンス（日英）、`THIRD_PARTY_NOTICES.md` に同梱ライブラリのライセンスを置いています。
+- `licenses/` に OverlaySubs 利用規約（日英）、`THIRD_PARTY_NOTICES.md` に同梱ライブラリのライセンスを置いています。PLaMo 3 のライセンスは同梱せず、公式ページへのリンクのみを掲載します。
 
 ## 機能
 
-- 初回起動で OverlaySubs 利用規約（PLaMo コミュニティライセンスを別紙として含む）に同意します。同意は設定フォルダの `terms-accepted` に保存し、規約の版が変わるまで再表示しません。設定画面の「PC の性能を調べる」でハードウェアを検出し、ティア（High / Mid / Low / CPU）に応じたモデルを自動選択します。検出結果は `hardware.json` にキャッシュし、次回起動時はハードウェアを調べ直さずに表示します（「もう一度調べる」で再検出）。
+- 初回起動で OverlaySubs 利用規約に同意します。同意は設定フォルダの `terms-accepted` に保存し、規約の版が変わるまで再表示しません。設定画面の「PC の性能を調べる」でハードウェアを検出し、ティア（High / Mid / Low / CPU）に応じたモデルを自動選択します。検出結果は `hardware.json` にキャッシュし、次回起動時はハードウェアを調べ直さずに表示します（「もう一度調べる」で再検出）。
 - モデルは Hugging Face から自動ダウンロードします。中断しても再開でき、SHA-256 で検証します。アカウントやトークンは不要です。
 - 任意の速度チェック（ベンチマーク）を実行でき、リアルタイムに間に合わなければ1段下げたモデルに切り替えます。
 - 音声入力は Windows の WASAPI loopback（システム音声）とマイク。macOS ではループバック入力デバイスをマイクとして選びます。
@@ -158,10 +158,8 @@ OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
 ## ライセンス
 
 - **アプリのコードは MIT ライセンスです**（[LICENSE](LICENSE)）。
-- アプリの利用条件は [OverlaySubs 利用規約](licenses/overlaysubs-terms.ja.txt)（[English](licenses/overlaysubs-terms.en.txt)）です。規約は [PLaMo コミュニティライセンス](https://plamo.preferredai.jp/info/plamo-community-license) を別紙として含み、初回起動時にまとめて同意を求めます。全文を [`licenses/`](licenses/) に同梱し、アプリの「情報」からも参照できます。
-  - 個人・非商用の利用は無償です。
-  - 商用利用には事前登録が必要です。また、本人または関連会社の年間売上が10億円を超える組織が業務で使う場合は、Preferred Networks との別途契約が必要です。
-  - 字幕などの出力を公開・配布する場合は、PLaMo による出力である旨を明示してください。保存したテキスト/SRT には表記を入れないので、公開時はご自身で明記してください。字幕オーバーレイには既定で `Built with PLaMo` を表示します（設定でオフにできます）。
+- アプリの利用条件は [OverlaySubs 利用規約](licenses/overlaysubs-terms.ja.txt)（[English](licenses/overlaysubs-terms.en.txt)）です。初回起動時に同意を求め、アプリの「情報」からも参照できます。
+- 翻訳モデル PLaMo 3 Translate の利用条件は [PLaMo 3 のライセンス](https://plamo.preferredai.jp/info/plamo-community-license-ja) に従います。
 - 配信や動画の字幕を公開する場合は、元コンテンツの著作権にも注意してください。
 - Whisper モデル（MIT）と Silero VAD（MIT）は、それぞれのライセンスに従います。
 - 同梱している whisper.cpp / llama.cpp / ggml などのサードパーティライセンスは [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にまとめています。

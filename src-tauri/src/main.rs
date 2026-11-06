@@ -91,7 +91,7 @@ fn registry(app: &AppHandle) -> Result<Registry, String> {
 }
 
 /// Bump when the terms text changes; users are asked to accept again.
-const TERMS_VERSION: &str = "1";
+const TERMS_VERSION: &str = "2";
 
 /// Kept outside settings.json so a settings reset or schema change never re-asks for consent.
 fn terms_accepted(app: &AppHandle) -> bool {
@@ -377,15 +377,35 @@ fn export_history(st: State<App>, path: PathBuf, format: String, with_source: bo
     std::fs::write(path, body).map_err(|e| e.to_string())
 }
 
-/// OverlaySubs terms with the PLaMo Community License attached as an appendix.
+/// OverlaySubs terms. The PLaMo 3 license is linked from the terms, not bundled.
 #[tauri::command]
 fn terms_text(lang: String) -> String {
-    let (terms, plamo, head) = if lang == "ja" {
-        (include_str!("../../licenses/overlaysubs-terms.ja.txt"), include_str!("../../licenses/PLaMo-Community-License.ja.txt"), "別紙")
+    if lang == "ja" {
+        include_str!("../../licenses/overlaysubs-terms.ja.txt").to_string()
     } else {
-        (include_str!("../../licenses/overlaysubs-terms.en.txt"), include_str!("../../licenses/PLaMo-Community-License.en.txt"), "Appendix")
+        include_str!("../../licenses/overlaysubs-terms.en.txt").to_string()
+    }
+}
+
+/// Open an https URL in the user's default browser.
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") {
+        return Err("only https URLs can be opened".into());
+    }
+    #[cfg(target_os = "windows")]
+    let status = {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", url.as_str()])
+            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+            .status()
     };
-    format!("{terms}\n\n――――――――――\n{head}\n\n{plamo}")
+    #[cfg(target_os = "macos")]
+    let status = std::process::Command::new("open").arg(&url).status();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let status = std::process::Command::new("xdg-open").arg(&url).status();
+    status.map(|_| ()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -454,7 +474,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through
+            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, open_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running overlaysubs");
