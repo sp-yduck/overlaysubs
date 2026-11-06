@@ -1,6 +1,6 @@
 # Security Policy / セキュリティポリシー
 
-floatsubs のセキュリティに関心を持っていただきありがとうございます。このページでは、サポート対象のバージョンと、脆弱性の報告方法を説明します。
+OverlaySubs のセキュリティに関心を持っていただきありがとうございます。このページでは、サポート対象のバージョンと、脆弱性の報告方法を説明します。
 
 ## Supported versions / サポート対象バージョン
 
@@ -17,7 +17,7 @@ floatsubs のセキュリティに関心を持っていただきありがとう�
 
 1. リポジトリの **「Security」タブ** を開きます。
 2. **「Report a vulnerability」** をクリックします（GitHub Security Advisories の非公開レポート）。
-   - 直接のリンク: <https://github.com/sp-yduck/floatsubs/security/advisories/new>
+   - 直接のリンク: <https://github.com/sp-yduck/overlaysubs/security/advisories/new>
 
 報告には、可能な範囲で次を含めてください。
 
@@ -44,7 +44,7 @@ floatsubs のセキュリティに関心を持っていただきありがとう�
 
 - モデル自体の品質・翻訳の誤り・幻覚（hallucination）。上流プロジェクト（whisper.cpp / Silero VAD / PLaMo）やモデルの提供元に報告してください。
 - 上流の依存ライブラリ（Tauri、cpal、whisper-rs、llama-cpp-2 など）の脆弱性そのもの。上流に報告してください（本アプリへの影響は歓迎します）。
-- **SmartScreen / Gatekeeper の警告**。配布ビルドが未署名・未公証であることによる既知の動作で、セキュリティ上の欠陥ではありません。手順は [公式サイトの「警告が表示されたとき」](https://sp-yduck.github.io/floatsubs/#warning) に記載しています。
+- **SmartScreen / Gatekeeper の警告**。配布ビルドが未署名・未公証であることによる既知の動作で、セキュリティ上の欠陥ではありません。手順は [公式サイトの「警告が表示されたとき」](https://sp-yduck.github.io/overlaysubs/#warning) に記載しています。
 - サードパーティ製のループバック（仮想オーディオ）デバイスやドライバの問題。
 - フィッシング、ソーシャルエンジニアリング、物理アクセス。
 - サービス妨害（DoS）や、非現実的なリソース消費を要求する攻撃。
@@ -62,4 +62,4 @@ floatsubs のセキュリティに関心を持っていただきありがとう�
 
 ## Contact / 連絡先
 
-上記の GitHub Security Advisories が**唯一の窓口**です。開発者の個人メールアドレスは公開していません。セキュリティに関係しない一般的な質問は、[公式サイトの FAQ](https://sp-yduck.github.io/floatsubs/#faq) を確認したうえで Issue を作成してください。
+上記の GitHub Security Advisories が**唯一の窓口**です。開発者の個人メールアドレスは公開していません。セキュリティに関係しない一般的な質問は、[公式サイトの FAQ](https://sp-yduck.github.io/overlaysubs/#faq) を確認したうえで Issue を作成してください。

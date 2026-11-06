@@ -78,8 +78,8 @@ jobs:
 
           # The stable asset names are hard-coded, so the product name is part of the contract.
           product=$(jq -r '.productName' src-tauri/tauri.conf.json)
-          if [ "$product" != "floatsubs" ]; then
-            echo "::error file=src-tauri/tauri.conf.json::productName is '$product'; release asset names assume 'floatsubs'."
+          if [ "$product" != "OverlaySubs" ]; then
+            echo "::error file=src-tauri/tauri.conf.json::productName is '$product'; the release asset contract and macOS app checks assume 'OverlaySubs'."
             exit 1
           fi
 
@@ -91,7 +91,7 @@ jobs:
         run: |
           set -euo pipefail
           release_exists=false
-          expected="SHA256SUMS.txt,floatsubs-macos-arm64.dmg,floatsubs-windows-x64-setup.exe,floatsubs-windows-x64.msi"
+          expected="SHA256SUMS.txt,overlaysubs-macos-arm64.dmg,overlaysubs-windows-x64-setup.exe,overlaysubs-windows-x64.msi"
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "No release exists for $TAG yet; the build will run."
           elif json=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
@@ -174,7 +174,7 @@ jobs:
           New-Item -ItemType Directory -Force src-tauri/libs | Out-Null
           # tauri-build checks the glob during this build too; a placeholder satisfies it until the real DLLs exist.
           New-Item -ItemType File -Force src-tauri/libs/placeholder.dll | Out-Null
-          cargo build --release -p floatsubs --features ${{ matrix.features }}
+          cargo build --release -p overlaysubs --features ${{ matrix.features }}
           Remove-Item src-tauri/libs/placeholder.dll
           Copy-Item C:\t\release\build\llama-cpp-sys-2-*\out\bin\*.dll src-tauri/libs/
           if (!(Test-Path src-tauri/libs/llama.dll)) { throw "llama.dll was not staged" }
@@ -199,9 +199,9 @@ jobs:
           if (-not $msi) { throw "MSI installer not found under C:\t\release\bundle\msi" }
           if ($nsis.Name -notlike "*-setup.exe") { throw "Unexpected NSIS installer name: $($nsis.Name)" }
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item $nsis.FullName "dist\floatsubs-windows-x64-setup.exe" -Force
-          Copy-Item $msi.FullName "dist\floatsubs-windows-x64.msi" -Force
-          $expected = @("floatsubs-windows-x64-setup.exe", "floatsubs-windows-x64.msi")
+          Copy-Item $nsis.FullName "dist\overlaysubs-windows-x64-setup.exe" -Force
+          Copy-Item $msi.FullName "dist\overlaysubs-windows-x64.msi" -Force
+          $expected = @("overlaysubs-windows-x64-setup.exe", "overlaysubs-windows-x64.msi")
           $actual = @(Get-ChildItem dist -File | ForEach-Object { $_.Name })
           if (Compare-Object $expected $actual) { throw "dist does not contain exactly the expected files: $($actual -join ', ')" }
           foreach ($name in $expected) {
@@ -219,7 +219,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: floatsubs-windows-dist
+          name: overlaysubs-windows-dist
           path: dist/
           if-no-files-found: error
           retention-days: 7
@@ -280,13 +280,34 @@ jobs:
             echo "::error::could not mount $dmg"
             exit 1
           }
-          app=$(find "$mountpoint" -maxdepth 2 -type d -name 'floatsubs.app' -print -quit)
+          # productName (OverlaySubs) and the Cargo binary name (overlaysubs) differ, so do not
+          # hard-code either: locate the .app inside the mounted DMG, then read CFBundleExecutable.
+          app=$(find "$mountpoint" -type d -name '*.app' -print -quit)
           if [ -z "$app" ] || [ ! -d "$app" ]; then
-            echo "::error::floatsubs.app not found inside $dmg"
+            echo "::error::no .app bundle found inside $dmg"
             ls -la "$mountpoint"
             exit 1
           fi
           echo "app: $app"
+          echo "app bundle name: $(basename "$app")"
+
+          executable_name=$(plutil -extract CFBundleExecutable raw -o - "$app/Contents/Info.plist" 2>/dev/null || true)
+          if [ -z "$executable_name" ] || [ ! -x "$app/Contents/MacOS/$executable_name" ]; then
+            echo "CFBundleExecutable is unusable ('$executable_name'); falling back to the first executable in Contents/MacOS"
+            executable_name=""
+            for candidate in "$app/Contents/MacOS"/*; do
+              if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+                executable_name=${candidate##*/}
+                break
+              fi
+            done
+          fi
+          if [ -z "$executable_name" ] || [ ! -x "$app/Contents/MacOS/$executable_name" ]; then
+            echo "::error::no runnable main executable found in $app/Contents/MacOS"
+            ls -la "$app/Contents/MacOS"
+            exit 1
+          fi
+          echo "main executable: $app/Contents/MacOS/$executable_name"
 
           # The MIT notices for the bundled native libraries must ship inside the app.
           if [ ! -f "$app/Contents/Resources/THIRD_PARTY_NOTICES.md" ]; then
@@ -327,8 +348,10 @@ jobs:
             exit 1
           fi
           missing=0
-          for lib in $(otool -L "$app/Contents/MacOS/floatsubs" | awk '/@rpath\// {print $1}' | sort -u); do
+          checked=0
+          for lib in $(otool -L "$app/Contents/MacOS/$executable_name" | awk '/@rpath\// {print $1}' | sort -u); do
             name=${lib#@rpath/}
+            checked=$((checked + 1))
             if [ ! -e "$frameworks/$name" ]; then
               echo "::error::$lib is referenced by the binary but missing from Contents/Frameworks"
               missing=1
@@ -337,7 +360,11 @@ jobs:
             fi
           done
           [ "$missing" -eq 0 ] || exit 1
-          echo "all @rpath dependencies are present in Contents/Frameworks"
+          if [ "$checked" -eq 0 ]; then
+            echo "::warning::the main executable has no @rpath dependencies; the Contents/Frameworks check was vacuous"
+          else
+            echo "all $checked @rpath dependencies are present in Contents/Frameworks"
+          fi
 
           # Nested Frameworks: arm64 linker output is already ad-hoc signed, so this normally
           # passes; keep it non-fatal so a bundler-level detail cannot block a release.
@@ -356,18 +383,18 @@ jobs:
             exit 1
           fi
           mkdir -p dist
-          cp "$dmg" dist/floatsubs-macos-arm64.dmg
-          bytes=$(stat -f%z dist/floatsubs-macos-arm64.dmg)
+          cp "$dmg" dist/overlaysubs-macos-arm64.dmg
+          bytes=$(stat -f%z dist/overlaysubs-macos-arm64.dmg)
           if [ "$bytes" -lt $((10 * 1024 * 1024)) ]; then
-            echo "::error::floatsubs-macos-arm64.dmg is implausibly small ($bytes bytes, expected at least 10 MB)"
+            echo "::error::overlaysubs-macos-arm64.dmg is implausibly small ($bytes bytes, expected at least 10 MB)"
             exit 1
           fi
           count=$(find dist -type f | wc -l | tr -d ' ')
-          if [ "$count" -ne 1 ] || [ ! -f dist/floatsubs-macos-arm64.dmg ]; then
+          if [ "$count" -ne 1 ] || [ ! -f dist/overlaysubs-macos-arm64.dmg ]; then
             echo "::error::dist does not contain exactly the expected file: $(find dist -type f)"
             exit 1
           fi
-          echo "floatsubs-macos-arm64.dmg: $bytes bytes"
+          echo "overlaysubs-macos-arm64.dmg: $bytes bytes"
           ls -l dist
           # Make the dry-run artifact name/size visible on the run summary page.
           {
@@ -375,14 +402,14 @@ jobs:
             echo ""
             echo "| file | bytes |"
             echo "|---|---|"
-            echo "| floatsubs-macos-arm64.dmg | $bytes |"
+            echo "| overlaysubs-macos-arm64.dmg | $bytes |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload macOS dist artifact
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: floatsubs-macos-dist
+          name: overlaysubs-macos-dist
           path: dist/
           if-no-files-found: error
           retention-days: 7
@@ -404,12 +431,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: floatsubs-windows-dist
+          name: overlaysubs-windows-dist
           path: dist/windows
 
       - uses: actions/download-artifact@v4
         with:
-          name: floatsubs-macos-dist
+          name: overlaysubs-macos-dist
           path: dist/macos
 
       - name: Collect the stable-named assets
@@ -417,9 +444,9 @@ jobs:
           set -euo pipefail
           mkdir -p dist/release
           for name in \
-            floatsubs-windows-x64-setup.exe \
-            floatsubs-windows-x64.msi \
-            floatsubs-macos-arm64.dmg; do
+            overlaysubs-windows-x64-setup.exe \
+            overlaysubs-windows-x64.msi \
+            overlaysubs-macos-arm64.dmg; do
             src=$(find dist/windows dist/macos -type f -name "$name" -print -quit)
             if [ -z "$src" ]; then
               echo "::error::$name is missing from the downloaded build artifacts"
@@ -447,13 +474,13 @@ jobs:
             fi
             echo "$file: $bytes bytes"
           }
-          check_size floatsubs-windows-x64-setup.exe $((5 * 1024 * 1024))
-          check_size floatsubs-windows-x64.msi $((5 * 1024 * 1024))
-          check_size floatsubs-macos-arm64.dmg $((10 * 1024 * 1024))
+          check_size overlaysubs-windows-x64-setup.exe $((5 * 1024 * 1024))
+          check_size overlaysubs-windows-x64.msi $((5 * 1024 * 1024))
+          check_size overlaysubs-macos-arm64.dmg $((10 * 1024 * 1024))
           sha256sum \
-            floatsubs-windows-x64-setup.exe \
-            floatsubs-windows-x64.msi \
-            floatsubs-macos-arm64.dmg > SHA256SUMS.txt
+            overlaysubs-windows-x64-setup.exe \
+            overlaysubs-windows-x64.msi \
+            overlaysubs-macos-arm64.dmg > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Generate release notes
@@ -468,9 +495,9 @@ jobs:
               else printf "%.1f KB", b / 1000;
             }'
           }
-          size_exe=$(human_size "$(stat -c %s dist/release/floatsubs-windows-x64-setup.exe)")
-          size_msi=$(human_size "$(stat -c %s dist/release/floatsubs-windows-x64.msi)")
-          size_dmg=$(human_size "$(stat -c %s dist/release/floatsubs-macos-arm64.dmg)")
+          size_exe=$(human_size "$(stat -c %s dist/release/overlaysubs-windows-x64-setup.exe)")
+          size_msi=$(human_size "$(stat -c %s dist/release/overlaysubs-windows-x64.msi)")
+          size_dmg=$(human_size "$(stat -c %s dist/release/overlaysubs-macos-arm64.dmg)")
 
           # Quoted heredoc: no shell expansion, so backticks, $ and quotes stay literal.
           # @@MARKERS@@ are substituted afterwards with sed.
@@ -484,10 +511,10 @@ jobs:
 
           | ファイル | 対象 | 種類 | サイズ |
           |---|---|---|---|
-          | [floatsubs-windows-x64-setup.exe](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-windows-x64-setup.exe) | Windows 10/11 (64bit) | インストーラ（推奨） | @@SIZE_EXE@@ |
-          | [floatsubs-windows-x64.msi](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-windows-x64.msi) | Windows 10/11 (64bit) | MSI（管理者配布向け） | @@SIZE_MSI@@ |
-          | [floatsubs-macos-arm64.dmg](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-macos-arm64.dmg) | macOS 13 以降（Apple Silicon） | ディスクイメージ | @@SIZE_DMG@@ |
-          | [SHA256SUMS.txt](https://github.com/sp-yduck/floatsubs/releases/latest/download/SHA256SUMS.txt) | すべて | SHA-256 チェックサム | - |
+          | [overlaysubs-windows-x64-setup.exe](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe) | Windows 10/11 (64bit) | インストーラ（推奨） | @@SIZE_EXE@@ |
+          | [overlaysubs-windows-x64.msi](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64.msi) | Windows 10/11 (64bit) | MSI（管理者配布向け） | @@SIZE_MSI@@ |
+          | [overlaysubs-macos-arm64.dmg](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg) | macOS 13 以降（Apple Silicon） | ディスクイメージ | @@SIZE_DMG@@ |
+          | [SHA256SUMS.txt](https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt) | すべて | SHA-256 チェックサム | - |
 
           - Windows は 64bit (x64) のみです。Windows 10 / 11 に対応しています。
           - macOS は Apple Silicon（M1 以降）のみです。macOS 13 以降が必要です。Intel Mac 用のビルドはありません。
@@ -497,13 +524,13 @@ jobs:
 
           ### Windows
 
-          1. `floatsubs-windows-x64-setup.exe` をダウンロードして実行します（MSI 版が必要な場合は `floatsubs-windows-x64.msi`）。
+          1. `overlaysubs-windows-x64-setup.exe` をダウンロードして実行します（MSI 版が必要な場合は `overlaysubs-windows-x64.msi`）。
           2. 「Windows によって PC が保護されました」と表示されたら、**[詳細情報]** をクリックし、**[実行]** を選びます。このアプリはコード署名を行っていないため、初回のみこの警告が表示されます。
           3. 画面の指示に従ってインストールします。初回起動時に利用規約への同意を求められます。
 
           ### macOS
 
-          1. `floatsubs-macos-arm64.dmg` をダウンロードして開き、`floatsubs` を「Applications」フォルダにドラッグします。
+          1. `overlaysubs-macos-arm64.dmg` をダウンロードして開き、`OverlaySubs` を「Applications」フォルダにドラッグします。
           2. 初回起動時に「開発元を検証できません」と表示されたら、アプリを **右クリック →［開く］** を選び、確認ダイアログで **［開く］** を押します。
              うまくいかない場合は、**[システム設定] → [プライバシーとセキュリティ]** を開き、「セキュリティ」の項目にある **[このまま開く]** を押してください。
           3. 2 回目以降は通常どおり起動できます。
@@ -524,26 +551,26 @@ jobs:
           **Windows（PowerShell）**
 
           ```powershell
-          Get-FileHash .\floatsubs-windows-x64-setup.exe -Algorithm SHA256
-          Get-FileHash .\floatsubs-windows-x64.msi -Algorithm SHA256
+          Get-FileHash .\overlaysubs-windows-x64-setup.exe -Algorithm SHA256
+          Get-FileHash .\overlaysubs-windows-x64.msi -Algorithm SHA256
           ```
 
           **macOS（ターミナル）**
 
           ```bash
           cd ~/Downloads
-          shasum -a 256 floatsubs-macos-arm64.dmg
+          shasum -a 256 overlaysubs-macos-arm64.dmg
           ```
 
           表示された値が `SHA256SUMS.txt` の該当行と一致すれば正常です。
 
           ## リンク
 
-          - [公式サイト（インストール・使い方・FAQ）](https://sp-yduck.github.io/floatsubs/)
-          - [README（仕組み・ビルド方法）](https://github.com/sp-yduck/floatsubs#readme)
-          - [floatsubs 利用規約（日本語）](https://github.com/sp-yduck/floatsubs/blob/main/licenses/floatsubs-terms.ja.txt) / [English](https://github.com/sp-yduck/floatsubs/blob/main/licenses/floatsubs-terms.en.txt)
+          - [公式サイト（インストール・使い方・FAQ）](https://sp-yduck.github.io/overlaysubs/)
+          - [README（仕組み・ビルド方法）](https://github.com/sp-yduck/overlaysubs#readme)
+          - [OverlaySubs 利用規約（日本語）](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt) / [English](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt)
           - [PLaMo コミュニティライセンス](https://plamo.preferredai.jp/info/plamo-community-license)
-          - [リリース一覧](https://github.com/sp-yduck/floatsubs/releases)
+          - [リリース一覧](https://github.com/sp-yduck/overlaysubs/releases)
 
           アプリのコードは MIT ライセンスです。翻訳には Preferred Networks の PLaMo 3 Translate を使用しています（**Built with PLaMo**）。
           BODY
@@ -585,11 +612,11 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          title="floatsubs $TAG"
+          title="OverlaySubs $TAG"
           assets=(
-            dist/release/floatsubs-windows-x64-setup.exe
-            dist/release/floatsubs-windows-x64.msi
-            dist/release/floatsubs-macos-arm64.dmg
+            dist/release/overlaysubs-windows-x64-setup.exe
+            dist/release/overlaysubs-windows-x64.msi
+            dist/release/overlaysubs-macos-arm64.dmg
             dist/release/SHA256SUMS.txt
           )
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -625,9 +652,9 @@ jobs:
           echo "$json" | jq .
           echo "$json" | jq -e '.isDraft == false and .isPrerelease == false' > /dev/null
           for asset in \
-            floatsubs-windows-x64-setup.exe \
-            floatsubs-windows-x64.msi \
-            floatsubs-macos-arm64.dmg \
+            overlaysubs-windows-x64-setup.exe \
+            overlaysubs-windows-x64.msi \
+            overlaysubs-macos-arm64.dmg \
             SHA256SUMS.txt; do
             echo "$json" | jq -e --arg name "$asset" 'any(.assets[]; .name == $name and .size > 0)' > /dev/null \
               || { echo "::error::asset $asset is missing or empty in release $TAG"; exit 1; }

@@ -1,7 +1,7 @@
 const I18N = {
   ja: {
-    terms_title: "floatsubs 利用規約",
-    terms_intro: "floatsubsを使うには利用規約への同意が必要です。規約には翻訳モデルPLaMoのコミュニティライセンス（Preferred Networks）が別紙として含まれます。主な内容：",
+    terms_title: "OverlaySubs 利用規約",
+    terms_intro: "OverlaySubsを使うには利用規約への同意が必要です。規約には翻訳モデルPLaMoのコミュニティライセンス（Preferred Networks）が別紙として含まれます。主な内容：",
     terms_pt_plamo: "個人・非商用の利用は無償です。商用利用はPFNへの事前登録が必要です。",
     terms_pt_corp: "年間売上10億円を超える組織（関連会社を含む）の業務利用には、PFNとの別途契約が必要です。",
     terms_pt_output: "字幕を公開・配布する場合は、PLaMoによる出力である旨を明示し、元コンテンツの著作権に注意してください。",
@@ -32,8 +32,8 @@ const I18N = {
     rtf: "リアルタイム係数", downgrade: "リアルタイムに間に合わないため1段下げました",
   },
   en: {
-    terms_title: "floatsubs Terms of Use",
-    terms_intro: "You must accept the Terms to use floatsubs. They include the community license of the PLaMo translation model (Preferred Networks) as an appendix. Key points:",
+    terms_title: "OverlaySubs Terms of Use",
+    terms_intro: "You must accept the Terms to use OverlaySubs. They include the community license of the PLaMo translation model (Preferred Networks) as an appendix. Key points:",
     terms_pt_plamo: "Personal and non-commercial use is free. Commercial use requires prior registration with PFN.",
     terms_pt_corp: "Business use by organizations (including affiliates) with annual revenue over JPY 1 billion needs a separate agreement with PFN.",
     terms_pt_output: "If you publish or distribute subtitles, state that they are PLaMo output and mind the source content's copyright.",

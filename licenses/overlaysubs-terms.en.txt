@@ -1,7 +1,7 @@
-floatsubs Terms of Use (version 1)
+OverlaySubs Terms of Use (version 1)
 
 1. These Terms
-You must accept these Terms to use floatsubs (the "App"). These Terms include the attached PLaMo Community License Agreement. If you do not accept, you may not use the App.
+You must accept these Terms to use OverlaySubs (the "App"). These Terms include the attached PLaMo Community License Agreement. If you do not accept, you may not use the App.
 
 2. License of the App
 The App's source code is provided under the MIT License. The App is provided "as is", without warranty of any kind, express or implied.

@@ -1,7 +1,7 @@
-# floatsubs
+# OverlaySubs
 
-[![CI](https://github.com/sp-yduck/floatsubs/actions/workflows/ci.yml/badge.svg)](https://github.com/sp-yduck/floatsubs/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/sp-yduck/floatsubs?label=release&sort=semver)](https://github.com/sp-yduck/floatsubs/releases/latest)
+[![CI](https://github.com/sp-yduck/overlaysubs/actions/workflows/ci.yml/badge.svg)](https://github.com/sp-yduck/overlaysubs/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/sp-yduck/overlaysubs?label=release&sort=semver)](https://github.com/sp-yduck/overlaysubs/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Windows x64](https://img.shields.io/badge/platform-Windows%20x64-0078d4.svg)](#動作環境)
 [![macOS Apple Silicon](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-lightgrey.svg)](#動作環境)
@@ -14,16 +14,16 @@ PC 上で再生されるあらゆる音声をリアルタイムで文字起こ�
 
 **GitHub アカウントは不要です。** アプリを使うだけなら、公式サイトの手順に従ってダウンロードして実行してください。
 
-- 公式サイト（ダウンロード・インストール・使い方・FAQ・アンインストール・ライセンス）: <https://sp-yduck.github.io/floatsubs/>
-- Windows 10 / 11（x64）: [floatsubs-windows-x64-setup.exe](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-windows-x64-setup.exe)（通常はこちら）
-- Windows（MSI）: [floatsubs-windows-x64.msi](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-windows-x64.msi)（管理者権限でインストールされます。通常は `.exe` を推奨）
-- macOS 13 以降（Apple Silicon）: [floatsubs-macos-arm64.dmg](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-macos-arm64.dmg)（Intel Mac 版はありません）
-- チェックサム: [SHA256SUMS.txt](https://github.com/sp-yduck/floatsubs/releases/latest/download/SHA256SUMS.txt) / リリース一覧: <https://github.com/sp-yduck/floatsubs/releases/latest>
+- 公式サイト（ダウンロード・インストール・使い方・FAQ・アンインストール・ライセンス）: <https://sp-yduck.github.io/overlaysubs/>
+- Windows 10 / 11（x64）: [overlaysubs-windows-x64-setup.exe](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe)（通常はこちら）
+- Windows（MSI）: [overlaysubs-windows-x64.msi](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64.msi)（管理者権限でインストールされます。通常は `.exe` を推奨）
+- macOS 13 以降（Apple Silicon）: [overlaysubs-macos-arm64.dmg](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg)（Intel Mac 版はありません）
+- チェックサム: [SHA256SUMS.txt](https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt) / リリース一覧: <https://github.com/sp-yduck/overlaysubs/releases/latest>
 
 インストール手順・警告が出たときの操作・SHA-256 の確認・使い方・FAQ・アンインストールは、すべて公式サイトにまとめています。
-[インストール](https://sp-yduck.github.io/floatsubs/#install) / [警告が表示されたとき](https://sp-yduck.github.io/floatsubs/#warning) / [使い方](https://sp-yduck.github.io/floatsubs/#usage) / [FAQ](https://sp-yduck.github.io/floatsubs/#faq) / [アンインストール](https://sp-yduck.github.io/floatsubs/#uninstall) / [ライセンスと利用規約](https://sp-yduck.github.io/floatsubs/#license)
+[インストール](https://sp-yduck.github.io/overlaysubs/#install) / [警告が表示されたとき](https://sp-yduck.github.io/overlaysubs/#warning) / [使い方](https://sp-yduck.github.io/overlaysubs/#usage) / [FAQ](https://sp-yduck.github.io/overlaysubs/#faq) / [アンインストール](https://sp-yduck.github.io/overlaysubs/#uninstall) / [ライセンスと利用規約](https://sp-yduck.github.io/overlaysubs/#license)
 
-> 配布ビルドは**未署名・未公証**です（Windows はコード署名なし、macOS は Developer ID 署名・公証なしの **ad-hoc 署名のみ**）。初回起動時に SmartScreen / Gatekeeper の警告が表示されますが、アプリ自体に問題があるという意味ではありません。回避手順は公式サイトの[警告が表示されたとき](https://sp-yduck.github.io/floatsubs/#warning)を参照してください（Gatekeeper / SmartScreen をシステム全体で無効にしないでください）。
+> 配布ビルドは**未署名・未公証**です（Windows はコード署名なし、macOS は Developer ID 署名・公証なしの **ad-hoc 署名のみ**）。初回起動時に SmartScreen / Gatekeeper の警告が表示されますが、アプリ自体に問題があるという意味ではありません。回避手順は公式サイトの[警告が表示されたとき](https://sp-yduck.github.io/overlaysubs/#warning)を参照してください（Gatekeeper / SmartScreen をシステム全体で無効にしないでください）。
 
 ## 目次
 
@@ -56,16 +56,16 @@ PC 上で再生されるあらゆる音声をリアルタイムで文字起こ�
 WASAPI loopback / マイク ─▶ 16kHz mono ─▶ Silero VAD による発話区切り ─▶ whisper.cpp ─▶ PLaMo 3 Translate (llama.cpp) ─▶ オーバーレイ
 ```
 
-- `crates/core` はエンジン非依存のロジックです。ティア選択、モデル定義、PFML3 プロンプト、発話区切り、セッション、文単位の翻訳、SRT 出力を持ちます。`cargo test -p floatsubs-core` で検証できます。
+- `crates/core` はエンジン非依存のロジックです。ティア選択、モデル定義、PFML3 プロンプト、発話区切り、セッション、文単位の翻訳、SRT 出力を持ちます。`cargo test -p overlaysubs-core` で検証できます。
 - `src-tauri` は Tauri アプリ本体です。音声キャプチャ、whisper.cpp / llama.cpp アダプタ、モデルのダウンロード、トレイ、ホットキー、設定の保存を担当します。
 - `ui` は設定画面とオーバーレイです。ビルド不要の素の HTML/JS/CSS で、`ui/i18n.js` に日本語と英語の文言があります。
 - 翻訳エンジンと音声認識は `session::Translator` / `session::Asr` トレイトの裏にあり、差し替えられます。
 - `models.json` がモデル定義（URL、サイズ、SHA-256、ティア）です。URL は Hugging Face のコミットに固定しています（`main` だと上流の再アップロードでハッシュが合わなくなるため）。設定フォルダに `models.json` を置くと、アプリを更新せずに上書きできます。
-- `licenses/` に floatsubs 利用規約と PLaMo コミュニティライセンス（日英）、`THIRD_PARTY_NOTICES.md` に同梱ライブラリのライセンスを置いています。
+- `licenses/` に OverlaySubs 利用規約と PLaMo コミュニティライセンス（日英）、`THIRD_PARTY_NOTICES.md` に同梱ライブラリのライセンスを置いています。
 
 ## 機能
 
-- 初回起動で floatsubs 利用規約（PLaMo コミュニティライセンスを別紙として含む）に同意します。同意は設定フォルダの `terms-accepted` に保存し、規約の版が変わるまで再表示しません。設定画面の「PC の性能を調べる」でハードウェアを検出し、ティア（High / Mid / Low / CPU）に応じたモデルを自動選択します。
+- 初回起動で OverlaySubs 利用規約（PLaMo コミュニティライセンスを別紙として含む）に同意します。同意は設定フォルダの `terms-accepted` に保存し、規約の版が変わるまで再表示しません。設定画面の「PC の性能を調べる」でハードウェアを検出し、ティア（High / Mid / Low / CPU）に応じたモデルを自動選択します。
 - モデルは Hugging Face から自動ダウンロードします。中断しても再開でき、SHA-256 で検証します。アカウントやトークンは不要です。
 - 任意の速度チェック（ベンチマーク）を実行でき、リアルタイムに間に合わなければ1段下げたモデルに切り替えます。
 - 音声入力は Windows の WASAPI loopback（システム音声）とマイク。macOS ではループバック入力デバイスをマイクとして選びます。
@@ -120,14 +120,14 @@ whisper.cpp と llama.cpp はどちらも ggml を含むため、同じプロセ
 ネットワーク不要のコアテストは、プルリクエストで CI（`.github/workflows/ci.yml`）が実行します。
 
 ```bash
-cargo test -p floatsubs-core   # ティア選択・モデル定義・PFML3・発話区切り・セッション・SRT
-cargo test -p floatsubs        # src-tauri のユニットテスト
+cargo test -p overlaysubs-core   # ティア選択・モデル定義・PFML3・発話区切り・セッション・SRT
+cargo test -p overlaysubs        # src-tauri のユニットテスト
 ```
 
 実モデルを使うエンドツーエンドのテストは既定で `ignore` されています（16kHz モノラルの WAV が必要、約 0.7GB のモデルをダウンロードします）。
 
 ```bash
-FLOATSUBS_WAV=path/to/16k-mono.wav cargo test -p floatsubs -- --ignored
+OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
 ```
 
 タグ `v*` を push するとリリース用ワークフローがバンドルをビルドして GitHub Releases に公開します。手順は [RELEASING.md](RELEASING.md) を参照してください。
@@ -144,7 +144,7 @@ FLOATSUBS_WAV=path/to/16k-mono.wav cargo test -p floatsubs -- --ignored
 ## ライセンス
 
 - **アプリのコードは MIT ライセンスです**（[LICENSE](LICENSE)）。
-- アプリの利用条件は [floatsubs 利用規約](licenses/floatsubs-terms.ja.txt)（[English](licenses/floatsubs-terms.en.txt)）です。規約は [PLaMo コミュニティライセンス](https://plamo.preferredai.jp/info/plamo-community-license) を別紙として含み、初回起動時にまとめて同意を求めます。全文を [`licenses/`](licenses/) に同梱し、アプリの「情報」からも参照できます。
+- アプリの利用条件は [OverlaySubs 利用規約](licenses/overlaysubs-terms.ja.txt)（[English](licenses/overlaysubs-terms.en.txt)）です。規約は [PLaMo コミュニティライセンス](https://plamo.preferredai.jp/info/plamo-community-license) を別紙として含み、初回起動時にまとめて同意を求めます。全文を [`licenses/`](licenses/) に同梱し、アプリの「情報」からも参照できます。
   - 個人・非商用の利用は無償です。
   - 商用利用には事前登録が必要です。また、本人または関連会社の年間売上が10億円を超える組織が業務で使う場合は、Preferred Networks との別途契約が必要です。
   - 字幕などの出力を公開・配布する場合は、PLaMo による出力である旨を明示してください。保存したテキスト/SRT には表記を入れないので、公開時はご自身で明記してください。字幕オーバーレイには既定で `Built with PLaMo` を表示します（設定でオフにできます）。

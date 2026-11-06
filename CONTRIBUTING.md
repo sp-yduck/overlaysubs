@@ -1,6 +1,6 @@
-# Contributing to floatsubs
+# Contributing to OverlaySubs
 
-floatsubs へのコントリビューションを歓迎します。バグ報告・機能要望・翻訳の改善・ドキュメントの修正など、コード以外の貢献も歓迎です。
+OverlaySubs へのコントリビューションを歓迎します。バグ報告・機能要望・翻訳の改善・ドキュメントの修正など、コード以外の貢献も歓迎です。
 
 このプロジェクトは [Contributor Covenant 2.1](CODE_OF_CONDUCT.md) を採用しています。参加する前に目を通してください。
 
@@ -44,22 +44,22 @@ $env:CARGO_TARGET_DIR = "C:\t"
 ネットワーク不要のコアテスト（プルリクエストで CI が実行するのはこれです）。
 
 ```bash
-cargo test -p floatsubs-core
+cargo test -p overlaysubs-core
 ```
 
-`floatsubs-core` はティア選択、モデル定義、PFML3 プロンプト、発話区切り、セッション、SRT 出力を検証します。
+`overlaysubs-core` はティア選択、モデル定義、PFML3 プロンプト、発話区切り、セッション、SRT 出力を検証します。
 
 実モデルを使うエンドツーエンドのテストは、既定では `ignore` されています。16kHz モノラルの WAV を用意すると実行できます（約 0.7GB のモデルをダウンロードします）。
 
 ```bash
-FLOATSUBS_WAV=path/to/16k-mono.wav cargo test -p floatsubs -- --ignored
+OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
 ```
 
 変更した範囲に応じて、これらのテストも実行してください。
 
 ```bash
-cargo test -p floatsubs          # src-tauri のユニットテスト
-cargo build -p floatsubs         # コンパイルが通ることを確認
+cargo test -p overlaysubs          # src-tauri のユニットテスト
+cargo build -p overlaysubs         # コンパイルが通ることを確認
 ```
 
 ## ビルドと起動
@@ -91,7 +91,7 @@ npx --yes @tauri-apps/cli@^2 build --features metal    # macOS
 | `src-tauri/capabilities/` | Tauri の権限設定。新しい API を使うときはここも更新します。 |
 | `ui/` | 設定画面とオーバーレイ。ビルド不要の素の HTML/JS/CSS。`ui/i18n.js` に日本語と英語の文言があります。 |
 | `models.json` | モデル定義（URL・サイズ・SHA-256・ティア）。 |
-| `licenses/` | floatsubs 利用規約と PLaMo コミュニティライセンス（日英）。 |
+| `licenses/` | OverlaySubs 利用規約と PLaMo コミュニティライセンス（日英）。 |
 | `scripts/` | バンドル用の補助スクリプト。 |
 | `docs/` | 利用者向けドキュメント（GitHub Pages のソース、`docs/index.html`）。インストール・使い方・FAQ・ライセンスをここに集約します。外部 CDN やフォントは使わず、単体で完結させてください。 |
 
@@ -128,12 +128,12 @@ Fix Windows bundle paths exceeding MAX_PATH
 1. リポジトリを fork し、`main` から作業ブランチを作ります（例: `feat/silero-vad`, `fix/windows-paths`）。
 2. 変更をコミットします。
 3. `main` に向けて Pull Request を作成します。テンプレートのチェックリストに沿って記入してください。
-4. **CI（`cargo test -p floatsubs-core`）が通ることが必須です。**
+4. **CI（`cargo test -p overlaysubs-core`）が通ることが必須です。**
 5. レビューでの指摘に対応します。
 
 PR を出す前に、次を確認してください。
 
-- `cargo test -p floatsubs-core` が通る。
+- `cargo test -p overlaysubs-core` が通る。
 - 秘密情報（API キー、トークン、個人情報、ローカルのパス）を含めていない。
 - UI の文言を変更した場合、`ui/i18n.js` の日本語と英語の両方を更新した。
 - 動作やインストール手順が変わる場合、docs/index.html（利用者向け）と README / README.en.md（開発者向け）を更新した。

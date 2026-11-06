@@ -1,11 +1,11 @@
 [package]
-name = "floatsubs"
+name = "overlaysubs"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "Local real-time speech translation overlay"
-repository = "https://github.com/sp-yduck/floatsubs"
-homepage = "https://sp-yduck.github.io/floatsubs/"
+repository = "https://github.com/sp-yduck/overlaysubs"
+homepage = "https://sp-yduck.github.io/overlaysubs/"
 readme = "../README.md"
 keywords = ["translation", "speech-recognition", "overlay", "tauri", "whisper"]
 categories = ["multimedia::audio", "gui"]
@@ -14,7 +14,7 @@ categories = ["multimedia::audio", "gui"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-floatsubs-core = { path = "../crates/core" }
+overlaysubs-core = { path = "../crates/core" }
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-dialog = "2"

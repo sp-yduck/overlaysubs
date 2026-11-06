@@ -1,7 +1,7 @@
 //! whisper.cpp and llama.cpp adapters for the core `Asr` / `Translator` / `Vad` traits.
-use floatsubs_core::endpoint::{Vad, FRAME};
-use floatsubs_core::pfml::{self, TranslateRequest};
-use floatsubs_core::session::{Asr, Transcript, Translator};
+use overlaysubs_core::endpoint::{Vad, FRAME};
+use overlaysubs_core::pfml::{self, TranslateRequest};
+use overlaysubs_core::session::{Asr, Transcript, Translator};
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
@@ -170,29 +170,29 @@ fn find(hay: &[u8], needle: &[u8]) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use floatsubs_core::endpoint::{EndpointConfig, Endpointer, Event};
-    use floatsubs_core::registry::Registry;
-    use floatsubs_core::session::{Session, SessionConfig, Stage};
+    use overlaysubs_core::endpoint::{EndpointConfig, Endpointer, Event};
+    use overlaysubs_core::registry::Registry;
+    use overlaysubs_core::session::{Session, SessionConfig, Stage};
 
-    /// 16 kHz mono s16 WAV from FLOATSUBS_WAV.
+    /// 16 kHz mono s16 WAV from OVERLAYSUBS_WAV.
     fn wav() -> Vec<f32> {
-        let wav = std::fs::read(std::env::var("FLOATSUBS_WAV").unwrap()).unwrap();
+        let wav = std::fs::read(std::env::var("OVERLAYSUBS_WAV").unwrap()).unwrap();
         let data = wav.windows(4).position(|w| w == b"data").unwrap() + 8;
         wav[data..].chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect()
     }
 
     /// Prints where the energy gate and Silero cut the clip, fed in 10 ms chunks like live capture.
-    /// Run: FLOATSUBS_WAV=path/to/16k-mono.wav cargo test -p floatsubs endpoint_dump -- --ignored --nocapture
+    /// Run: OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs endpoint_dump -- --ignored --nocapture
     #[test]
     #[ignore]
     fn endpoint_dump() {
         let reg = Registry::parse(include_str!("../../models.json")).unwrap();
-        let dir = std::env::temp_dir().join("floatsubs-models");
+        let dir = std::env::temp_dir().join("overlaysubs-models");
         let m = reg.get("silero-vad-v6.2.0").unwrap();
         crate::download::fetch(m, &dir, &mut |_, _| {}).unwrap();
         let pcm = wav();
-        let vads: [(&str, Box<dyn floatsubs_core::endpoint::Vad>); 2] =
-            [("energy", Box::new(floatsubs_core::endpoint::Energy(0.01))), ("silero", Box::new(Silero::load(&dir.join(&m.file).to_string_lossy()).unwrap()))];
+        let vads: [(&str, Box<dyn overlaysubs_core::endpoint::Vad>); 2] =
+            [("energy", Box::new(overlaysubs_core::endpoint::Energy(0.01))), ("silero", Box::new(Silero::load(&dir.join(&m.file).to_string_lossy()).unwrap()))];
         for (name, mut vad) in vads {
             let mut ep = Endpointer::new(EndpointConfig::default());
             let (mut evs, mut pos, t0) = (vec![], 0, std::time::Instant::now());
@@ -209,16 +209,16 @@ mod tests {
         }
     }
 
-    /// Downloads ~0.7 GB. Run: FLOATSUBS_WAV=path/to/16k-mono.wav cargo test -p floatsubs -- --ignored
-    /// Optional: FLOATSUBS_LANG (spoken language, default en), FLOATSUBS_ASR (model id, default whisper-base),
-    /// FLOATSUBS_GLOSSARY ("src=dst;src=dst", empty for none), FLOATSUBS_TOPIC, FLOATSUBS_SOURCE_LANG (fixes the spoken language).
+    /// Downloads ~0.7 GB. Run: OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
+    /// Optional: OVERLAYSUBS_LANG (spoken language, default en), OVERLAYSUBS_ASR (model id, default whisper-base),
+    /// OVERLAYSUBS_GLOSSARY ("src=dst;src=dst", empty for none), OVERLAYSUBS_TOPIC, OVERLAYSUBS_SOURCE_LANG (fixes the spoken language).
     #[test]
     #[ignore]
     fn real_models_transcribe_and_translate() {
         let env = |k: &str, d: &str| std::env::var(k).unwrap_or_else(|_| d.into());
         let reg = Registry::parse(include_str!("../../models.json")).unwrap();
-        let dir = std::env::temp_dir().join("floatsubs-models");
-        let asr_id = env("FLOATSUBS_ASR", "whisper-base");
+        let dir = std::env::temp_dir().join("overlaysubs-models");
+        let asr_id = env("OVERLAYSUBS_ASR", "whisper-base");
         let ids = [asr_id.as_str(), "plamo-3-translate-0.8b-q4_k_m", "silero-vad-v6.2.0"];
         for id in ids {
             crate::download::fetch(reg.get(id).unwrap(), &dir, &mut |_, _| {}).unwrap();
@@ -235,11 +235,11 @@ mod tests {
         let mut vad = Silero::load(&asr.vad_path).unwrap();
         ep.push(&pcm, &mut vad, &mut evs).unwrap();
         ep.push(&vec![0.0; 16_000], &mut vad, &mut evs).unwrap();
-        let lang = env("FLOATSUBS_LANG", "en");
+        let lang = env("OVERLAYSUBS_LANG", "en");
         // Glossary terms reach Whisper as its prompt.
-        let glossary = env("FLOATSUBS_GLOSSARY", "Blink=ブリンク;Tracer=トレーサー").split(';').filter_map(|e| e.split_once('=')).map(|(a, b)| (a.into(), b.into())).collect();
-        let source_lang = std::env::var("FLOATSUBS_SOURCE_LANG").ok();
-        let mut s = Session::new(SessionConfig { glossary, topic: env("FLOATSUBS_TOPIC", ""), source_lang, ..Default::default() });
+        let glossary = env("OVERLAYSUBS_GLOSSARY", "Blink=ブリンク;Tracer=トレーサー").split(';').filter_map(|e| e.split_once('=')).map(|(a, b)| (a.into(), b.into())).collect();
+        let source_lang = std::env::var("OVERLAYSUBS_SOURCE_LANG").ok();
+        let mut s = Session::new(SessionConfig { glossary, topic: env("OVERLAYSUBS_TOPIC", ""), source_lang, ..Default::default() });
         let mut finals = vec![];
         for ev in evs.into_iter().filter(|e| matches!(e, Event::Final(_))) {
             let t0 = std::time::Instant::now();

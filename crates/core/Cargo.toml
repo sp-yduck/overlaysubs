@@ -1,11 +1,11 @@
 [package]
-name = "floatsubs-core"
+name = "overlaysubs-core"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-description = "Engine-agnostic core for floatsubs: tiers, model registry, prompts, segmentation and SRT export"
-repository = "https://github.com/sp-yduck/floatsubs"
-homepage = "https://sp-yduck.github.io/floatsubs/"
+description = "Engine-agnostic core for OverlaySubs: tiers, model registry, prompts, segmentation and SRT export"
+repository = "https://github.com/sp-yduck/overlaysubs"
+homepage = "https://sp-yduck.github.io/overlaysubs/"
 readme = "../../README.md"
 keywords = ["translation", "speech-recognition", "subtitles", "srt", "whisper"]
 categories = ["multimedia::audio", "text-processing"]

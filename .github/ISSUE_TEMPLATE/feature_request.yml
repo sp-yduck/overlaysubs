@@ -6,9 +6,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        機能要望ありがとうございます。まず [README](https://github.com/sp-yduck/floatsubs#readme) と既存の Issue で、同じ提案がないか確認してください。
+        機能要望ありがとうございます。まず [README](https://github.com/sp-yduck/overlaysubs#readme) と既存の Issue で、同じ提案がないか確認してください。
 
-        **セキュリティ上の問題は公開 Issue に書かず、[SECURITY.md](https://github.com/sp-yduck/floatsubs/blob/main/SECURITY.md) の手順で報告してください。**
+        **セキュリティ上の問題は公開 Issue に書かず、[SECURITY.md](https://github.com/sp-yduck/overlaysubs/blob/main/SECURITY.md) の手順で報告してください。**
 
   - type: checkboxes
     id: preflight

@@ -1,4 +1,4 @@
-use floatsubs_core::tier::{Gpu, Hardware};
+use overlaysubs_core::tier::{Gpu, Hardware};
 use std::process::Command;
 
 fn run(cmd: &str, args: &[&str]) -> Option<String> {

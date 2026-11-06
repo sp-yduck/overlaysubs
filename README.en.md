@@ -1,7 +1,7 @@
-# floatsubs
+# OverlaySubs
 
-[![CI](https://github.com/sp-yduck/floatsubs/actions/workflows/ci.yml/badge.svg)](https://github.com/sp-yduck/floatsubs/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/sp-yduck/floatsubs?label=release&sort=semver)](https://github.com/sp-yduck/floatsubs/releases/latest)
+[![CI](https://github.com/sp-yduck/overlaysubs/actions/workflows/ci.yml/badge.svg)](https://github.com/sp-yduck/overlaysubs/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/sp-yduck/overlaysubs?label=release&sort=semver)](https://github.com/sp-yduck/overlaysubs/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Windows x64](https://img.shields.io/badge/platform-Windows%20x64-0078d4.svg)](#requirements)
 [![macOS Apple Silicon](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-lightgrey.svg)](#requirements)
@@ -14,16 +14,16 @@ A desktop app that transcribes and translates any audio playing on your PC in re
 
 **You do not need a GitHub account.** If you just want to use the app, follow the instructions on the official site.
 
-- Official site (download, install, usage, FAQ, uninstall, license): <https://sp-yduck.github.io/floatsubs/>
-- Windows 10 / 11 (x64): [floatsubs-windows-x64-setup.exe](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-windows-x64-setup.exe) (recommended)
-- Windows (MSI): [floatsubs-windows-x64.msi](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-windows-x64.msi) (installs per-machine and asks for Administrator; the `.exe` is recommended)
-- macOS 13+ (Apple Silicon): [floatsubs-macos-arm64.dmg](https://github.com/sp-yduck/floatsubs/releases/latest/download/floatsubs-macos-arm64.dmg) (no Intel Mac build)
-- Checksums: [SHA256SUMS.txt](https://github.com/sp-yduck/floatsubs/releases/latest/download/SHA256SUMS.txt) / releases: <https://github.com/sp-yduck/floatsubs/releases/latest>
+- Official site (download, install, usage, FAQ, uninstall, license): <https://sp-yduck.github.io/overlaysubs/>
+- Windows 10 / 11 (x64): [overlaysubs-windows-x64-setup.exe](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe) (recommended)
+- Windows (MSI): [overlaysubs-windows-x64.msi](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64.msi) (installs per-machine and asks for Administrator; the `.exe` is recommended)
+- macOS 13+ (Apple Silicon): [overlaysubs-macos-arm64.dmg](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg) (no Intel Mac build)
+- Checksums: [SHA256SUMS.txt](https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt) / releases: <https://github.com/sp-yduck/overlaysubs/releases/latest>
 
 Install steps, what to do when Windows SmartScreen or macOS Gatekeeper warns you, SHA-256 verification, usage, the FAQ, and uninstalling are all on the official site:
-[Install](https://sp-yduck.github.io/floatsubs/#install) / [Warnings](https://sp-yduck.github.io/floatsubs/#warning) / [Usage](https://sp-yduck.github.io/floatsubs/#usage) / [FAQ](https://sp-yduck.github.io/floatsubs/#faq) / [Uninstall](https://sp-yduck.github.io/floatsubs/#uninstall) / [License and terms](https://sp-yduck.github.io/floatsubs/#license)
+[Install](https://sp-yduck.github.io/overlaysubs/#install) / [Warnings](https://sp-yduck.github.io/overlaysubs/#warning) / [Usage](https://sp-yduck.github.io/overlaysubs/#usage) / [FAQ](https://sp-yduck.github.io/overlaysubs/#faq) / [Uninstall](https://sp-yduck.github.io/overlaysubs/#uninstall) / [License and terms](https://sp-yduck.github.io/overlaysubs/#license)
 
-> The builds are **not signed with an Apple Developer ID or a Windows code-signing certificate, and not notarized** (the macOS app is ad-hoc signed only), so SmartScreen / Gatekeeper warn on first launch. That does not mean the app is unsafe. See [Warnings](https://sp-yduck.github.io/floatsubs/#warning) on the site, and never disable Gatekeeper or SmartScreen system-wide.
+> The builds are **not signed with an Apple Developer ID or a Windows code-signing certificate, and not notarized** (the macOS app is ad-hoc signed only), so SmartScreen / Gatekeeper warn on first launch. That does not mean the app is unsafe. See [Warnings](https://sp-yduck.github.io/overlaysubs/#warning) on the site, and never disable Gatekeeper or SmartScreen system-wide.
 
 ## Contents
 
@@ -56,16 +56,16 @@ Install steps, what to do when Windows SmartScreen or macOS Gatekeeper warns you
 WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ Silero VAD endpointer ─▶ whisper.cpp ─▶ PLaMo 3 Translate (llama.cpp) ─▶ overlay
 ```
 
-- `crates/core` holds engine-independent logic: tier selection, model definitions, PFML3 prompts, utterance segmentation, sessions, sentence-level translation, and SRT export. Run `cargo test -p floatsubs-core`.
+- `crates/core` holds engine-independent logic: tier selection, model definitions, PFML3 prompts, utterance segmentation, sessions, sentence-level translation, and SRT export. Run `cargo test -p overlaysubs-core`.
 - `src-tauri` is the Tauri app: audio capture, whisper.cpp / llama.cpp adapters, model downloads, tray, hotkeys, and settings persistence.
 - `ui` is the settings window and overlay: plain HTML/JS/CSS with no build step; `ui/i18n.js` holds the Japanese and English strings.
 - The ASR and translation engines sit behind the `session::Asr` / `session::Translator` traits and can be swapped.
 - `models.json` defines the models (URL, size, SHA-256, tier). URLs are pinned to Hugging Face commits (using `main` would break the hash when upstream re-uploads). Placing a `models.json` in the config folder overrides the bundled one without an app update.
-- `licenses/` ships the floatsubs Terms of Use and the PLaMo Community License (Japanese and English); `THIRD_PARTY_NOTICES.md` lists the bundled libraries' licenses.
+- `licenses/` ships the OverlaySubs Terms of Use and the PLaMo Community License (Japanese and English); `THIRD_PARTY_NOTICES.md` lists the bundled libraries' licenses.
 
 ## Features
 
-- First run asks you to accept the floatsubs Terms of Use (with the PLaMo Community License as an appendix). Acceptance is stored in `terms-accepted` and not asked again until the terms version changes. "Check this PC" in the settings window detects your hardware and picks a tier (High / Mid / Low / CPU).
+- First run asks you to accept the OverlaySubs Terms of Use (with the PLaMo Community License as an appendix). Acceptance is stored in `terms-accepted` and not asked again until the terms version changes. "Check this PC" in the settings window detects your hardware and picks a tier (High / Mid / Low / CPU).
 - Models download from Hugging Face automatically, resume after interruption, and are verified with SHA-256. No account or token required.
 - You can run the optional speed check (benchmark); if it cannot keep up in real time, it switches to one tier lower.
 - Audio input is Windows WASAPI loopback (system audio) or a microphone. On macOS you pick a loopback input device as the microphone.
@@ -120,14 +120,14 @@ whisper.cpp and llama.cpp both embed ggml, so statically linking both into one p
 The network-free core tests run in CI (`.github/workflows/ci.yml`) on pull requests.
 
 ```bash
-cargo test -p floatsubs-core   # tiers, model registry, PFML3, endpointer, session, SRT
-cargo test -p floatsubs        # src-tauri unit tests
+cargo test -p overlaysubs-core   # tiers, model registry, PFML3, endpointer, session, SRT
+cargo test -p overlaysubs        # src-tauri unit tests
 ```
 
 The end-to-end test with real models is `#[ignore]`d by default (it needs a 16 kHz mono WAV and downloads ~0.7 GB of models).
 
 ```bash
-FLOATSUBS_WAV=path/to/16k-mono.wav cargo test -p floatsubs -- --ignored
+OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
 ```
 
 Pushing a `v*` tag makes the release workflow build the bundles and publish them to GitHub Releases; see [RELEASING.md](RELEASING.md).
@@ -144,7 +144,7 @@ Pushing a `v*` tag makes the release workflow build the bundles and publish them
 ## License
 
 - **The app code is MIT licensed** ([LICENSE](LICENSE)).
-- Use of the app is governed by the [floatsubs Terms of Use](licenses/floatsubs-terms.ja.txt) ([English](licenses/floatsubs-terms.en.txt)). The terms include the [PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license) as an appendix, accepted together on first launch. The full texts ship in [`licenses/`](licenses/) and are also available from "About" in the app.
+- Use of the app is governed by the [OverlaySubs Terms of Use](licenses/overlaysubs-terms.ja.txt) ([English](licenses/overlaysubs-terms.en.txt)). The terms include the [PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license) as an appendix, accepted together on first launch. The full texts ship in [`licenses/`](licenses/) and are also available from "About" in the app.
   - Personal and non-commercial use is free.
   - Commercial use requires prior registration. Business use by you or your affiliates with annual revenue over JPY 1 billion requires a separate agreement with Preferred Networks.
   - If you publish or distribute subtitles or other output, state that it is PLaMo output. Exported text/SRT does not include the credit, so state it yourself when publishing. The subtitle overlay shows `Built with PLaMo` by default (can be turned off in settings).

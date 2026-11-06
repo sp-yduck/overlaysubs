@@ -2,7 +2,7 @@
 //! Windows system audio uses WASAPI loopback (cpal opens an *output* device as input), which
 //! taps the mix without altering playback.
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use floatsubs_core::endpoint::RATE;
+use overlaysubs_core::endpoint::RATE;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;

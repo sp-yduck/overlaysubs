@@ -5,11 +5,11 @@ mod engine;
 mod hw;
 
 use capture::Source;
-use floatsubs_core::endpoint::{EndpointConfig, Endpointer, Event};
-use floatsubs_core::export::{self, Entry};
-use floatsubs_core::registry::{Registry, Selection};
-use floatsubs_core::session::{Asr, Caption, Session, SessionConfig, Translator};
-use floatsubs_core::tier::{self, Hardware, Tier};
+use overlaysubs_core::endpoint::{EndpointConfig, Endpointer, Event};
+use overlaysubs_core::export::{self, Entry};
+use overlaysubs_core::registry::{Registry, Selection};
+use overlaysubs_core::session::{Asr, Caption, Session, SessionConfig, Translator};
+use overlaysubs_core::tier::{self, Hardware, Tier};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -226,7 +226,7 @@ async fn benchmark(app: AppHandle) -> Result<Bench, String> {
         let clip: Vec<f32> = (0..(16_000.0 * secs) as usize).map(|i| (i as f32 * 0.05).sin() * 0.2).collect();
         let t0 = Instant::now();
         e.asr.bench(&clip)?;
-        let req = floatsubs_core::pfml::TranslateRequest {
+        let req = overlaysubs_core::pfml::TranslateRequest {
             text: "The meeting has been moved to next Monday, so please update your calendar.",
             source_lang: Some("en"),
             target_lang: "ja",
@@ -364,13 +364,13 @@ fn export_history(st: State<App>, path: PathBuf, format: String, with_source: bo
     std::fs::write(path, body).map_err(|e| e.to_string())
 }
 
-/// floatsubs terms with the PLaMo Community License attached as an appendix.
+/// OverlaySubs terms with the PLaMo Community License attached as an appendix.
 #[tauri::command]
 fn terms_text(lang: String) -> String {
     let (terms, plamo, head) = if lang == "ja" {
-        (include_str!("../../licenses/floatsubs-terms.ja.txt"), include_str!("../../licenses/PLaMo-Community-License.ja.txt"), "別紙")
+        (include_str!("../../licenses/overlaysubs-terms.ja.txt"), include_str!("../../licenses/PLaMo-Community-License.ja.txt"), "別紙")
     } else {
-        (include_str!("../../licenses/floatsubs-terms.en.txt"), include_str!("../../licenses/PLaMo-Community-License.en.txt"), "Appendix")
+        (include_str!("../../licenses/overlaysubs-terms.en.txt"), include_str!("../../licenses/PLaMo-Community-License.en.txt"), "Appendix")
     };
     format!("{terms}\n\n――――――――――\n{head}\n\n{plamo}")
 }
@@ -416,7 +416,7 @@ fn main() {
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("floatsubs — Built with PLaMo")
+                .tooltip("OverlaySubs — Built with PLaMo")
                 .menu(&Menu::with_items(app, &[&toggle_i, &show_i, &quit_i])?)
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "toggle" => toggle(app),
@@ -444,5 +444,5 @@ fn main() {
             snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through
         ])
         .run(tauri::generate_context!())
-        .expect("error while running floatsubs");
+        .expect("error while running overlaysubs");
 }

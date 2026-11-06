@@ -1,5 +1,5 @@
 //! Resumable, hash-verified downloads. No account or token is ever sent.
-use floatsubs_core::registry::ModelDef;
+use overlaysubs_core::registry::ModelDef;
 use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
@@ -13,7 +13,7 @@ pub fn fetch(m: &ModelDef, dir: &Path, progress: &mut dyn FnMut(u64, u64)) -> Re
     }
     let part = dir.join(format!("{}.part", m.file));
     let have = fs::metadata(&part).map(|x| x.len()).unwrap_or(0);
-    let client = reqwest::blocking::Client::builder().user_agent("floatsubs").timeout(None).build().map_err(|e| e.to_string())?;
+    let client = reqwest::blocking::Client::builder().user_agent("overlaysubs").timeout(None).build().map_err(|e| e.to_string())?;
     let mut req = client.get(&m.url);
     if have > 0 {
         req = req.header("Range", format!("bytes={have}-"));

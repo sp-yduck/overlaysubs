@@ -16,12 +16,12 @@
 
 <!-- 実行したコマンドと結果を書いてください。 -->
 
-- [ ] `cargo test -p floatsubs-core` が通る
-- [ ] `cargo build -p floatsubs`（または `npx --yes @tauri-apps/cli@^2 dev`）で起動を確認した
+- [ ] `cargo test -p overlaysubs-core` が通る
+- [ ] `cargo build -p overlaysubs`（または `npx --yes @tauri-apps/cli@^2 dev`）で起動を確認した
 - [ ] 手動で確認した操作:
 
 ```text
-$ cargo test -p floatsubs-core
+$ cargo test -p overlaysubs-core
 ```
 
 ## UI の変更

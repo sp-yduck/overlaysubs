@@ -363,7 +363,7 @@ printf '==> composing %s\n' "$out" >&2
   cat <<'HEADER'
 # Third-Party Notices
 
-floatsubs is distributed with, and depends on, third-party open-source
+OverlaySubs is distributed with, and depends on, third-party open-source
 software. This file reproduces the license notices and license texts that
 apply to the distributed builds.
 
@@ -377,18 +377,18 @@ apply to the distributed builds.
   by the license texts reproduced in [§4](#4-license-texts).
 - **Where this notice is installed.** The installers bundle this file so that it
   is available on end-user machines: Windows places it in the installation
-  directory next to `floatsubs.exe`; macOS places it at
-  `floatsubs.app/Contents/Resources/THIRD_PARTY_NOTICES.md`.
+  directory next to `overlaysubs.exe`; macOS places it at
+  `OverlaySubs.app/Contents/Resources/THIRD_PARTY_NOTICES.md`.
 - **Downloaded at runtime (not part of the installers).** On first run the app
   downloads model files from Hugging Face: OpenAI Whisper GGML models (MIT),
   Silero VAD (MIT) and PLaMo 3 Translate models. PLaMo is **not** open source;
   it is governed by the PLaMo Community License. The full PLaMo terms and the
-  floatsubs terms of use are bundled in this repository and shipped with the
+  OverlaySubs terms of use are bundled in this repository and shipped with the
   app:
-  - [`licenses/PLaMo-Community-License.ja.txt`](licenses/PLaMo-Community-License.ja.txt)
-  - [`licenses/PLaMo-Community-License.en.txt`](licenses/PLaMo-Community-License.en.txt)
-  - [`licenses/floatsubs-terms.ja.txt`](licenses/floatsubs-terms.ja.txt)
-  - [`licenses/floatsubs-terms.en.txt`](licenses/floatsubs-terms.en.txt)
+  - [`licenses/PLaMo-Community-License.ja.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/PLaMo-Community-License.ja.txt)
+  - [`licenses/PLaMo-Community-License.en.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/PLaMo-Community-License.en.txt)
+  - [`licenses/overlaysubs-terms.ja.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt)
+  - [`licenses/overlaysubs-terms.en.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt)
 
   See [§2](#2-runtime-downloaded-model-assets) for the pinned model revisions.
 
@@ -439,9 +439,9 @@ SECTION1
   cat <<'SECTION2'
 ## 2. Runtime-downloaded model assets
 
-These files are **not** included in the installers. floatsubs downloads them
+These files are **not** included in the installers. OverlaySubs downloads them
 from Hugging Face on first run and verifies each file against the size and
-SHA-256 values declared in [`models.json`](models.json). The MIT license text
+SHA-256 values declared in [`models.json`](https://github.com/sp-yduck/overlaysubs/blob/main/models.json). The MIT license text
 that covers the Whisper and Silero VAD assets is reproduced in [§4
 ("MIT")](#4-license-texts); the PLaMo assets are covered exclusively by the
 PLaMo Community License files linked in the header of this document.
@@ -474,7 +474,7 @@ SECTION2
   printf '## 3. Rust dependency inventory\n\n'
   printf 'Generated from the resolved Cargo dependency graph\n'
   printf '(`cargo metadata --format-version 1`, default features, all target\n'
-  printf 'platforms). The two workspace crates `floatsubs` and `floatsubs-core` are\n'
+  printf 'platforms). The two workspace crates `overlaysubs` and `overlaysubs-core` are\n'
   printf 'excluded. The license column reproduces each package'"'"'s `license` field\n'
   printf 'verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).\n\n'
   printf -- '- Third-party crates: **%s**\n' "$third_party_count"

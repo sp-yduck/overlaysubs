@@ -6,9 +6,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        バグ報告ありがとうございます。記入前に [公式サイトの FAQ](https://sp-yduck.github.io/floatsubs/#faq) と既存の Issue を確認してください。
+        バグ報告ありがとうございます。記入前に [公式サイトの FAQ](https://sp-yduck.github.io/overlaysubs/#faq) と既存の Issue を確認してください。
 
-        **セキュリティ上の問題は公開 Issue に書かず、[SECURITY.md](https://github.com/sp-yduck/floatsubs/blob/main/SECURITY.md) の手順で非公開で報告してください。**
+        **セキュリティ上の問題は公開 Issue に書かず、[SECURITY.md](https://github.com/sp-yduck/overlaysubs/blob/main/SECURITY.md) の手順で非公開で報告してください。**
 
   - type: checkboxes
     id: preflight
@@ -17,13 +17,13 @@ body:
       options:
         - label: 既存の Issue を検索して、同じ問題が報告されていないことを確認しました
           required: true
-        - label: 初回起動時の利用規約（floatsubs 利用規約・PLaMo コミュニティライセンス）に同意しています
+        - label: 初回起動時の利用規約（OverlaySubs 利用規約・PLaMo コミュニティライセンス）に同意しています
           required: true
 
   - type: input
     id: version
     attributes:
-      label: floatsubs のバージョン
+      label: OverlaySubs のバージョン
       description: アプリの「情報」ページ、またはダウンロードしたファイル名から確認できます。
       placeholder: "0.1.0"
     validations:
@@ -76,7 +76,7 @@ body:
       label: 再現手順
       description: 問題が起きるまでの手順を書いてください。
       placeholder: |
-        1. floatsubs を起動
+        1. OverlaySubs を起動
         2. 「...」を選ぶ
         3. ...
     validations:

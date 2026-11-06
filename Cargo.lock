@@ -964,33 +964,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "floatsubs"
-version = "0.1.0"
-dependencies = [
- "cpal",
- "floatsubs-core",
- "llama-cpp-2",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha2",
- "sysinfo",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-global-shortcut",
- "whisper-rs",
-]
-
-[[package]]
-name = "floatsubs-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2542,6 +2515,33 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+
+[[package]]
+name = "overlaysubs"
+version = "0.1.0"
+dependencies = [
+ "cpal",
+ "llama-cpp-2",
+ "overlaysubs-core",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sysinfo",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-global-shortcut",
+ "whisper-rs",
+]
+
+[[package]]
+name = "overlaysubs-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "pango"
