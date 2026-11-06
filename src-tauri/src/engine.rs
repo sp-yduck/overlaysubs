@@ -211,7 +211,7 @@ mod tests {
 
     /// Downloads ~0.7 GB. Run: FLOATSUBS_WAV=path/to/16k-mono.wav cargo test -p floatsubs -- --ignored
     /// Optional: FLOATSUBS_LANG (spoken language, default en), FLOATSUBS_ASR (model id, default whisper-base),
-    /// FLOATSUBS_GLOSSARY ("src=dst;src=dst", empty for none), FLOATSUBS_TOPIC.
+    /// FLOATSUBS_GLOSSARY ("src=dst;src=dst", empty for none), FLOATSUBS_TOPIC, FLOATSUBS_SOURCE_LANG (fixes the spoken language).
     #[test]
     #[ignore]
     fn real_models_transcribe_and_translate() {
@@ -238,7 +238,8 @@ mod tests {
         let lang = env("FLOATSUBS_LANG", "en");
         // Glossary terms reach Whisper as its prompt.
         let glossary = env("FLOATSUBS_GLOSSARY", "Blink=ブリンク;Tracer=トレーサー").split(';').filter_map(|e| e.split_once('=')).map(|(a, b)| (a.into(), b.into())).collect();
-        let mut s = Session::new(SessionConfig { glossary, topic: env("FLOATSUBS_TOPIC", ""), ..Default::default() });
+        let source_lang = std::env::var("FLOATSUBS_SOURCE_LANG").ok();
+        let mut s = Session::new(SessionConfig { glossary, topic: env("FLOATSUBS_TOPIC", ""), source_lang, ..Default::default() });
         let mut finals = vec![];
         for ev in evs.into_iter().filter(|e| matches!(e, Event::Final(_))) {
             let t0 = std::time::Instant::now();
