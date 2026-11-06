@@ -148,6 +148,7 @@ function homePage() {
 
 function overlayPage() {
   return `<h2>${t("overlay")}</h2>
+  <p class="muted small">${t("overlay_preview_note")}</p>
   ${card("", `${field(t("show_source"), "overlay.showSource", "check")}
     ${field(t("click_through"), "overlay.clickThrough", "check")}
     ${field(t("show_credit"), "overlay.showCredit", "check")}
@@ -214,6 +215,20 @@ function render() {
   $("#page").scrollTop = keep;
   drawHistory();
   if (page === "about") loadTerms();
+  syncPreview();
+}
+
+/**
+ * Keep a sample subtitle on the overlay while this page is open and translation is stopped,
+ * so font size, font, background opacity and the other appearance settings can be checked live.
+ * Real subtitles win: the overlay ignores the preview once a caption arrives.
+ */
+let previewOn = false;
+function syncPreview() {
+  const on = !!snap && snap.terms_accepted && page === "overlay" && !snap.running;
+  if (on === previewOn) return;
+  previewOn = on;
+  invoke("set_overlay_preview", { on }).catch(() => {});
 }
 
 async function loadTerms() {

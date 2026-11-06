@@ -85,6 +85,12 @@ struct App {
     overlay_item: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
     /// Bumped on every start; lets a stale session skip hiding a newer one.
     session_seq: AtomicU64,
+    /// True while the appearance settings preview a sample caption in the overlay.
+    overlay_preview: AtomicBool,
+    /// Overlay visibility to restore when the preview ends (running or manually shown).
+    preview_prev_visible: AtomicBool,
+    /// A stopped session is waiting out its grace period before hiding the overlay.
+    overlay_hide_pending: AtomicBool,
 }
 
 fn config_dir(app: &AppHandle) -> PathBuf {
@@ -358,6 +364,7 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
         }
     });
     *st.running.lock().unwrap() = Some(Running { _capture: cap, stop_tx, id: session_id, session: session_thread });
+    st.overlay_hide_pending.store(false, Ordering::SeqCst);
     set_overlay_visible(&app, true);
     app.emit("running", true).map_err(|e| e.to_string())
 }
@@ -367,8 +374,11 @@ fn stop(app: AppHandle, st: State<App>) -> Result<(), String> {
     // Bind first so the `running` mutex guard is released before any window work.
     let running = st.running.lock().unwrap().take();
     let Some(running) = running else {
-        // Not translating: make sure a manually shown overlay does not linger.
-        set_overlay_visible(&app, false);
+        // Not translating: make sure a manually shown overlay does not linger, but keep it
+        // while the appearance settings are previewing a sample caption.
+        if !st.overlay_preview.load(Ordering::SeqCst) {
+            set_overlay_visible(&app, false);
+        }
         return app.emit("running", false).map_err(|e| e.to_string());
     };
     let Running { _capture, stop_tx, id, session } = running;
@@ -376,6 +386,7 @@ fn stop(app: AppHandle, st: State<App>) -> Result<(), String> {
     drop(_capture);
     // The session thread flushes the pending utterance after stop; hide only once it is
     // done (plus a short grace period) so the final subtitle is actually shown.
+    st.overlay_hide_pending.store(true, Ordering::SeqCst);
     let hide_app = app.clone();
     std::thread::spawn(move || {
         let _ = session.join();
@@ -414,6 +425,10 @@ fn toggle_overlay(app: &AppHandle) {
         show
     };
     sync_overlay_check(app);
+    // A manual toggle during the preview decides what stays visible afterwards.
+    if st.overlay_preview.load(Ordering::SeqCst) {
+        st.preview_prev_visible.store(show, Ordering::SeqCst);
+    }
 }
 
 /// Hides the overlay only if `session_id` is still the current session, so a stop that
@@ -423,6 +438,12 @@ fn hide_overlay_if_session(app: &AppHandle, session_id: u64) {
         let st = app.state::<App>();
         let _switch = st.overlay_switch.lock().unwrap();
         if st.session_seq.load(Ordering::SeqCst) != session_id {
+            return;
+        }
+        st.overlay_hide_pending.store(false, Ordering::SeqCst);
+        // Keep the overlay up while the appearance settings preview a sample caption; the
+        // preview restores the visibility when it ends.
+        if st.overlay_preview.load(Ordering::SeqCst) {
             return;
         }
         apply_overlay_visible(app, false);
@@ -516,8 +537,40 @@ fn set_click_through(app: AppHandle, on: bool) -> Result<(), String> {
 
 /// Show or hide the overlay window from the settings UI.
 #[tauri::command]
-fn show_overlay(app: AppHandle, show: bool) {
+fn show_overlay(app: AppHandle, st: State<App>, show: bool) {
     set_overlay_visible(&app, show);
+    // A manual toggle during the preview decides what stays visible afterwards.
+    if st.overlay_preview.load(Ordering::SeqCst) {
+        st.preview_prev_visible.store(show, Ordering::SeqCst);
+    }
+}
+
+/// Show a sample caption in the overlay while the appearance settings are open, so font size,
+/// font, opacity and the like can be checked even when translation is stopped and there is no text.
+/// The overlay window is shown for the preview (it is normally hidden when stopped) and the
+/// previous visibility is restored when the preview ends.
+#[tauri::command]
+fn set_overlay_preview(app: AppHandle, st: State<App>, on: bool) {
+    if on {
+        if !st.overlay_preview.swap(true, Ordering::SeqCst) {
+            // Remember what to restore. A visibility that a just-stopped session would have
+            // hidden after its grace period does not count as manually shown.
+            let visible = st.overlay_visible.load(Ordering::SeqCst);
+            let hiding = st.overlay_hide_pending.load(Ordering::SeqCst);
+            st.preview_prev_visible
+                .store(visible && !hiding, Ordering::SeqCst);
+        }
+        set_overlay_visible(&app, true);
+        let _ = app.emit_to("overlay", "overlay-preview", true);
+    } else {
+        st.overlay_preview.store(false, Ordering::SeqCst);
+        let _ = app.emit_to("overlay", "overlay-preview", false);
+        let running = st.running.lock().unwrap().is_some();
+        if !running && !st.preview_prev_visible.load(Ordering::SeqCst) {
+            st.overlay_hide_pending.store(false, Ordering::SeqCst);
+            set_overlay_visible(&app, false);
+        }
+    }
 }
 
 fn main() {
@@ -583,7 +636,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, open_url, show_overlay
+            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, open_url, show_overlay, set_overlay_preview
         ])
         .run(tauri::generate_context!())
         .expect("error while running overlaysubs");
