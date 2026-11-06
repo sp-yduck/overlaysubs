@@ -3,6 +3,9 @@
     "beforeBundleCommand": "sh \"$(git rev-parse --show-toplevel)/scripts/stage-dylibs.sh\""
   },
   "bundle": {
+    "resources": {
+      "../THIRD_PARTY_NOTICES.md": "./"
+    },
     "macOS": {
       "files": {
         "Frameworks": "../target/frameworks"

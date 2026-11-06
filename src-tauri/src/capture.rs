@@ -49,7 +49,7 @@ pub fn start(src: &Source, tx: Sender<Vec<f32>>) -> Result<Capture, String> {
     let (device, config) = match src {
         Source::System { device } => {
             if !cfg!(windows) {
-                // shortcut: macOS system audio needs ScreenCaptureKit (Phase 3); use a loopback input device until then.
+                // macOS system audio needs ScreenCaptureKit; use a loopback input device until then.
                 return Err("System audio capture is Windows-only for now. On macOS pick a loopback input device under Microphone.".into());
             }
             let d = match device {
@@ -106,7 +106,7 @@ pub fn start(src: &Source, tx: Sender<Vec<f32>>) -> Result<Capture, String> {
     Ok(Capture { stop })
 }
 
-/// Downmix + linear resample. shortcut: linear interpolation aliases slightly; fine for ASR, swap for a polyphase filter if WER suffers.
+/// Downmix + linear resample. Linear interpolation aliases slightly; fine for ASR, swap for a polyphase filter if WER suffers.
 struct Resampler {
     step: f64,
     pos: f64,
