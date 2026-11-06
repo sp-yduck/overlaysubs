@@ -126,7 +126,7 @@ Audio, transcripts, and translations never leave your device. The only network a
 ## How it works
 
 ```
-WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ energy endpointer ─▶ whisper.cpp (+ Silero VAD) ─▶ PLaMo 3 Translate (llama.cpp) ─▶ overlay
+WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ Silero VAD endpointer ─▶ whisper.cpp ─▶ PLaMo 3 Translate (llama.cpp) ─▶ overlay
 ```
 
 - `crates/core` holds engine-independent logic: tier selection, model definitions, PFML3 prompts, utterance segmentation, sessions, and SRT export. Run `cargo test -p floatsubs-core`.
@@ -141,7 +141,7 @@ WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ energy endpointer ─▶ 
 - Models download from Hugging Face automatically, resume after interruption, and are verified with SHA-256. No account or token required.
 - You can run the optional speed check (benchmark) in the settings window; if it cannot keep up in real time, it switches to one tier lower.
 - Source language auto-detect or fixed. You can pick the target language and the "if already in that language" language, so English↔Japanese and Korean↔Japanese work together.
-- The previous three utterances are passed as context. Glossary and Japanese plain/polite style are configurable.
+- Previous utterances are passed as context and translation happens per sentence. Glossary, a free-text topic hint, and Japanese plain/polite style are configurable.
 - Partial results are dimmed; final translations stream in and replace them.
 - Always-on-top, semi-transparent overlay (click-through can be enabled in settings). Original text, font size, font, background opacity, line count, display time, and the "Built with PLaMo" credit are configurable.
 - Export history as text or SRT.
