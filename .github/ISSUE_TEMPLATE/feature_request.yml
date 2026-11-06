@@ -17,7 +17,7 @@ body:
       options:
         - label: 既存の Issue を検索して、同じ提案がないことを確認しました
           required: true
-        - label: この機能が README の「現状の制限」に記載されていないことを確認しました
+        - label: この機能が公式サイトの「現状の制限」に記載されていないことを確認しました
           required: true
 
   - type: textarea

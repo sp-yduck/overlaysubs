@@ -36,6 +36,7 @@ floatsubs の主な変更点を記録します。
 - オーバーレイは透過ウィンドウのまま、背景に淡い色を付けて表示領域がわかるようにしました。
 - 「Built with PLaMo」の表記をサイドバーから削除し、「情報」ページと README に残しました。オーバーレイの表記は既定で表示し、「字幕の表示」からオフにできます。
 - モデルのダウンロード URL を Hugging Face のコミットに固定しました（上流の再アップロードで SHA-256 が変わるのを防ぐため）。
+- 利用者向けのドキュメント（インストール・使い方・FAQ・ライセンス）を公式サイト（GitHub Pages）に移し、README は開発者向けに整理しました。
 
 [Unreleased]: https://github.com/sp-yduck/floatsubs/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/sp-yduck/floatsubs/releases/tag/v0.1.0

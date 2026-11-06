@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>floatsubs — PC の音声をリアルタイムで翻訳する字幕オーバーレイ</title>
-<meta name="description" content="floatsubs は、PC で再生される音声をリアルタイムで文字起こし・翻訳し、字幕としてオーバーレイ表示する無料のデスクトップアプリです。API キー不要、データは端末内で処理。Windows 10/11 (x64) と macOS 13+ (Apple Silicon) に対応。GitHub アカウントは不要です。">
+<meta name="description" content="floatsubs は、PC で再生される音声をリアルタイムで文字起こし・翻訳し、字幕としてオーバーレイ表示する無料のデスクトップアプリです。API キー不要、データは端末内で処理。Windows 10/11 (x64) と macOS 13+ (Apple Silicon) に対応。ダウンロード・インストール・使い方・FAQ・アンインストール方法を掲載。GitHub アカウントは不要です。">
 <meta name="color-scheme" content="light">
 <link rel="canonical" href="https://sp-yduck.github.io/floatsubs/">
 <style>
@@ -399,6 +399,40 @@
     section { padding-top: 42px; }
   }
 
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 10px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    margin: 0 0 14px;
+  }
+  pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    background: var(--brand-soft);
+    color: var(--brand-strong);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .list { margin: 0 0 18px; padding-left: 1.2em; color: var(--muted); font-size: 0.94rem; }
+  .list li { margin: 0 0 8px; }
+  .list li:last-child { margin-bottom: 0; }
+  .list strong { color: var(--ink); }
+  .list.two { columns: 2; column-gap: 44px; }
+  .list.two li { break-inside: avoid; }
+  .card .list { margin: 0; font-size: 0.9rem; }
+  .card h3 + p { margin-top: 0; }
+
+  @media (max-width: 720px) {
+    .list.two { columns: 1; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
     .btn { transition: none; }
@@ -431,8 +465,11 @@
       <nav class="topnav" aria-label="ページ内メニュー">
         <a href="#download">ダウンロード</a>
         <a href="#install">インストール</a>
+        <a href="#usage">使い方</a>
         <a href="#warning">警告が出たとき</a>
         <a href="#requirements">動作環境</a>
+        <a href="#limits">現状の制限</a>
+        <a href="#license">ライセンス</a>
         <a href="#faq">FAQ</a>
       </nav>
     </div>
@@ -507,6 +544,16 @@
         チェックサム（SHA-256）: <a href="https://github.com/sp-yduck/floatsubs/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a>／
         リリース一覧（過去のバージョンを含む）: <a href="https://github.com/sp-yduck/floatsubs/releases">GitHub Releases</a>
       </p>
+
+      <details>
+        <summary>SHA-256 を確認する（任意）</summary>
+        <p>ダウンロードしたファイルが壊れていないか確認できます。表示された値を
+          <a href="https://github.com/sp-yduck/floatsubs/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a> の値と比べてください。</p>
+        <p><strong>Windows（PowerShell）</strong></p>
+        <pre><code>Get-FileHash .\floatsubs-windows-x64-setup.exe -Algorithm SHA256</code></pre>
+        <p><strong>macOS（ターミナル）</strong></p>
+        <pre><code>shasum -a 256 floatsubs-macos-arm64.dmg</code></pre>
+      </details>
     </div>
   </section>
 
@@ -542,7 +589,7 @@
 
       <div class="notice">
         <p><strong>重要:</strong> Gatekeeper（ゲートキーパー）や SmartScreen（スマートスクリーン）を<strong>システム全体で無効にしないでください</strong>。このアプリだけを個別に許可する、下記の手順を使ってください。</p>
-        <p>macOS 15 以降では右クリック →「開く」の回避操作が廃止されているため、システム設定からの操作が必要です。</p>
+        <p>macOS 15 以降では右クリック →「開く」の回避操作が廃止されているため、システム設定からの操作が必要です。環境によっては「開発元を確認できません」と表示されます。</p>
       </div>
 
       <h3>Windows: 「Windows によって PC が保護されました」</h3>
@@ -551,11 +598,98 @@
         <li>表示された <strong>「実行」</strong> ボタンをクリックします。</li>
       </ol>
 
-      <h3>macOS: 「開発元を確認できません」/「開いていません」</h3>
+      <h3>macOS: 「開発元を検証できません」/「…は開いていません」</h3>
       <ol class="steps-inline">
         <li>Finder で floatsubs を<strong>右クリック（または Control キーを押しながらクリック）</strong> → <strong>「開く」</strong> → 確認ダイアログで <strong>「開く」</strong>。</li>
         <li>それでも開かない場合は、<strong>システム設定</strong> → <strong>プライバシーとセキュリティ</strong> を開き、下部に出る「floatsubs は…ブロックされました」の横の <strong>「このまま開く」</strong> をクリックします。</li>
       </ol>
+    </div>
+  </section>
+
+  <section id="usage" aria-labelledby="usage-h">
+    <div class="wrap">
+      <h2 id="usage-h">使い方</h2>
+      <p class="section-lead">初回セットアップが終われば、あとはホットキーで開始・停止するだけです。</p>
+
+      <div class="cards">
+        <div class="card">
+          <h3>初回セットアップ</h3>
+          <p>起動して利用規約（PLaMo コミュニティライセンスを含む）に同意し、「モデルの準備」で「PC の性能を調べる」→「モデルをダウンロード」の順に進めます（数 GB・数分〜十数分）。任意で「速度を測る」を実行できます。</p>
+        </div>
+        <div class="card">
+          <h3>開始と停止</h3>
+          <p><strong>Ctrl+Shift+T</strong>（macOS は <strong>Cmd+Shift+T</strong>）で翻訳を開始・停止します。ホットキーは設定画面で変更できます。</p>
+          <p>音声入力は Windows なら「システム音声」で PC の再生音をそのまま取り込めます。macOS はループバック（仮想オーディオ）デバイスを「マイク」として選んでください（<a href="#limits">現状の制限</a>）。</p>
+        </div>
+        <div class="card">
+          <h3>トレイ常駐と終了</h3>
+          <p>アプリの実行中は、タスクトレイ / メニューバーのアイコンから「Start / Stop」「Settings」「Quit」を選べます。設定画面を閉じるとアプリは終了します。</p>
+        </div>
+      </div>
+
+      <h3>設定できること</h3>
+      <ul class="list two">
+        <li><strong>音声入力</strong>: システム音声 / マイクと、使用するデバイス</li>
+        <li><strong>言語</strong>: 話されている言語（自動判定または固定）、訳す言語、「すでにその言語のとき」の言語</li>
+        <li><strong>翻訳の調整</strong>: 日本語の文体（敬体 / 常体）、用語集（1行に「原語=訳語」）、話題（翻訳のヒント）、直前の発話を文脈として使う</li>
+        <li><strong>字幕の表示</strong>: 原文も表示、文字サイズ、フォント、背景の不透明度、表示行数、表示時間、「Built with PLaMo」表記の有無</li>
+        <li><strong>クリック透過</strong>: 既定はオフ。オンにするとマウス操作が下の画面に通ります（オンの間はオーバーレイ自体は操作できません）</li>
+        <li><strong>履歴</strong>: 最近の字幕をテキスト / SRT で保存</li>
+        <li><strong>表示言語</strong>: 日本語 / English</li>
+        <li><strong>詳細設定</strong>: 翻訳モデルの GPU レイヤー数（0 で CPU）、音声認識に GPU を使うか、モデルの保存先</li>
+      </ul>
+
+      <p class="section-lead">
+        音声・文字起こし・翻訳データは外部に送信されません。通信はモデルのダウンロードだけで、テレメトリはありません。
+        モデルをダウンロードした後はオフラインでも動作します。
+      </p>
+    </div>
+  </section>
+
+  <section id="uninstall" aria-labelledby="uninstall-h">
+    <div class="wrap">
+      <h2 id="uninstall-h">アンインストール</h2>
+      <p class="section-lead">アプリ本体を削除しても、ダウンロード済みのモデルと設定はフォルダに残ります。</p>
+
+      <div class="cards">
+        <div class="card">
+          <span class="os">Windows</span>
+          <h3>Windows</h3>
+          <p>設定 → アプリ → インストールされているアプリ →「floatsubs」→ アンインストール。</p>
+        </div>
+        <div class="card">
+          <span class="os">macOS</span>
+          <h3>macOS</h3>
+          <p>「アプリケーション」フォルダの「floatsubs」をゴミ箱に入れます。</p>
+        </div>
+      </div>
+
+      <h3>残るデータと完全削除</h3>
+      <div class="table-scroll">
+        <table>
+          <caption>アンインストール後に残るフォルダ（アプリの識別子は io.github.floatsubs）</caption>
+          <thead>
+            <tr>
+              <th scope="col">OS</th>
+              <th scope="col">場所</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Windows</th>
+              <td><code>%APPDATA%\io.github.floatsubs</code></td>
+            </tr>
+            <tr>
+              <th scope="row">macOS</th>
+              <td><code>~/Library/Application Support/io.github.floatsubs</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="section-lead">
+        このフォルダには、モデル（<code>models</code>）、設定（<code>settings.json</code>）、利用規約への同意（<code>terms-accepted</code>）が保存されます。
+        再インストール時にモデルを再ダウンロードしたくない場合は残しておき、完全に削除する場合はフォルダごと削除してください。
+      </p>
     </div>
   </section>
 
@@ -664,6 +798,50 @@
     </div>
   </section>
 
+  <section id="limits" aria-labelledby="limits-h">
+    <div class="wrap">
+      <h2 id="limits-h">現状の制限</h2>
+      <p class="section-lead">現在のバージョンで分かっている制約です。今後のリリースで改善する可能性があります。</p>
+      <ul class="list">
+        <li>配布ビルドは<strong>未署名・未公証</strong>です（Windows はコード署名なし、macOS は Developer ID 署名なし・公証なしで <strong>ad-hoc 署名のみ</strong>）。SmartScreen / Gatekeeper の警告が出ます（<a href="#warning">警告が表示されたとき</a>）。</li>
+        <li><strong>Intel Mac 版はありません。</strong>macOS は Apple Silicon（M1 以降）かつ macOS 13 以降のみです。</li>
+        <li>Windows は <strong>Vulkan 対応 GPU と最新ドライバが必須</strong>です。対応していない環境では実用的な速度が出ません。</li>
+        <li>macOS のシステム音声キャプチャ（ScreenCaptureKit）は未実装です。ループバック（仮想オーディオ）デバイスを「マイク」として選ぶ必要があります。</li>
+        <li>特定のアプリだけをキャプチャする機能、システム音声とマイクを同時に処理する機能は未実装です。</li>
+        <li><strong>自動アップデートはありません。</strong>新しいバージョンは <a href="https://github.com/sp-yduck/floatsubs/releases">GitHub Releases</a> から手動でダウンロードしてください（配布は GitHub Releases のみです）。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="license" aria-labelledby="license-h">
+    <div class="wrap">
+      <h2 id="license-h">ライセンスと利用規約</h2>
+      <p class="section-lead">アプリのコードは MIT ライセンスです。翻訳モデル PLaMo には専用の利用条件があります。</p>
+
+      <div class="cards">
+        <div class="card">
+          <h3>アプリのコード</h3>
+          <p><strong>MIT ライセンス</strong>です。全文は <a href="https://github.com/sp-yduck/floatsubs/blob/main/LICENSE">LICENSE</a> にあります。</p>
+          <p>同梱している whisper.cpp / llama.cpp / ggml などのサードパーティライセンスは
+            <a href="https://github.com/sp-yduck/floatsubs/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にまとめています。
+            Whisper モデル（MIT）と Silero VAD（MIT）は、それぞれのライセンスに従います。</p>
+        </div>
+        <div class="card">
+          <h3>利用規約（PLaMo コミュニティライセンスを含む）</h3>
+          <p>初回起動時に同意が必要です。全文は
+            <a href="https://github.com/sp-yduck/floatsubs/blob/main/licenses/floatsubs-terms.ja.txt">floatsubs 利用規約</a>
+            （<a href="https://github.com/sp-yduck/floatsubs/blob/main/licenses/floatsubs-terms.en.txt">English</a>）にあり、アプリの「情報」からも参照できます。</p>
+          <ul class="list">
+            <li>個人・非商用の利用は無償です。</li>
+            <li>商用利用には PFN への事前登録が必要です。年間売上が 10 億円を超える組織（関連会社を含む）の業務利用には、Preferred Networks との別途契約が必要です（<a href="https://plamo.preferredai.jp/info/plamo-community-license">PLaMo コミュニティライセンス</a>）。</li>
+            <li>字幕などの出力を公開・配布する場合は「Built with PLaMo」と明記してください。保存したテキスト / SRT には表記が入らないため、公開時にご自身で明記が必要です。元コンテンツの著作権にも注意してください。</li>
+            <li>字幕オーバーレイには既定で「Built with PLaMo」を表示します（設定でオフにできます）。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="faq" aria-labelledby="faq-h">
     <div class="wrap">
       <h2 id="faq-h">よくある質問</h2>
@@ -685,22 +863,22 @@
 
       <details>
         <summary>起動したのに翻訳を開始できません。</summary>
-        <p>初回セットアップが完了していません。「モデルの準備」で「PC の性能を調べる」→「モデルをダウンロード」まで進めてください。ダウンロードが終わるまで開始ボタンは使えません。</p>
+        <p>初回セットアップが完了していません。「モデルの準備」で「PC の性能を調べる」→「モデルをダウンロード」まで進めてください。ダウンロードが終わるまで開始ボタンは使えません。手順は<a href="#usage">使い方</a>を参照してください。</p>
       </details>
 
       <details>
         <summary>ホットキーが効きません。</summary>
-        <p>ほかのアプリが同じキーを使っている可能性があります。設定画面で既定の <code>Ctrl+Shift+T</code>（macOS は <code>Cmd+Shift+T</code>）を別の組み合わせに変更してください。</p>
+        <p>ほかのアプリが同じキーを使っている可能性があります。設定画面で既定の <code>Ctrl+Shift+T</code>（macOS は <code>Cmd+Shift+T</code>）を別の組み合わせに変更してください（<a href="#usage">使い方</a>）。</p>
       </details>
 
       <details>
         <summary>GPU が使われていない / 動作が遅いです。</summary>
-        <p>Windows では Vulkan 対応の最新 GPU ドライバが必要です。それでも遅い場合は、設定画面で使用するモデル（Whisper / PLaMo）を軽いものに変更するか、「速度を測る」を実行して 1 段下げたモデルに切り替えてください。CPU 向けのモデルでも動作しますが遅くなります。</p>
+        <p>Windows では Vulkan 対応の最新 GPU ドライバが必要です（<a href="#requirements">動作環境</a>）。それでも遅い場合は、設定画面で使用するモデル（Whisper / PLaMo）を軽いものに変更するか、「速度を測る」を実行して 1 段下げたモデルに切り替えてください。CPU 向けのモデルでも動作しますが遅くなります。</p>
       </details>
 
       <details>
         <summary>macOS でシステム音声を取り込めません。</summary>
-        <p>macOS のシステム音声キャプチャ（ScreenCaptureKit）は未実装です。BlackHole などのループバック（仮想オーディオ）デバイスを用意し、入力元を「マイク」にしてそのデバイスを選んでください。</p>
+        <p>macOS のシステム音声キャプチャ（ScreenCaptureKit）は未実装です。BlackHole などのループバック（仮想オーディオ）デバイスを用意し、入力元を「マイク」にしてそのデバイスを選んでください（<a href="#limits">現状の制限</a>）。</p>
       </details>
 
       <details>
@@ -710,12 +888,22 @@
 
       <details>
         <summary>商用利用できますか？</summary>
-        <p>アプリのコードは MIT ライセンスです。翻訳モデル PLaMo は PLaMo コミュニティライセンスに従い、個人・非商用は無償、商用利用には PFN への事前登録が必要です。年間売上が 10 億円を超える組織の業務利用は別途契約が必要です。詳細はアプリ内の利用規約と <a href="https://github.com/sp-yduck/floatsubs/blob/main/licenses/floatsubs-terms.ja.txt">floatsubs 利用規約</a> を参照してください。</p>
+        <p>アプリのコードは MIT ライセンスです。翻訳モデル PLaMo は PLaMo コミュニティライセンスに従い、個人・非商用は無償、商用利用には PFN への事前登録が必要です。年間売上が 10 億円を超える組織の業務利用は別途契約が必要です。詳細は<a href="#license">ライセンスと利用規約</a>を参照してください。</p>
       </details>
 
       <details>
         <summary>アンインストール方法を教えてください。</summary>
-        <p>Windows は 設定 → アプリ → インストールされているアプリ →「floatsubs」→ アンインストール。macOS は「アプリケーション」フォルダの floatsubs をゴミ箱に入れます。ダウンロード済みモデルと設定は <code>%APPDATA%\io.github.floatsubs</code>（macOS は <code>~/Library/Application Support/io.github.floatsubs</code>）に残るため、完全に削除する場合は手動で削除してください。</p>
+        <p>Windows は 設定 → アプリ → インストールされているアプリ →「floatsubs」→ アンインストール。macOS は「アプリケーション」フォルダの floatsubs をゴミ箱に入れます。モデルと設定はフォルダに残るため、完全に削除する場合は手動で削除してください。詳しくは<a href="#uninstall">アンインストール</a>を参照してください。</p>
+      </details>
+
+      <details>
+        <summary>クリック透過をオンにしたらオーバーレイを操作できなくなりました。</summary>
+        <p>クリック透過がオンの間は、マウス操作が下の画面に通るためオーバーレイ自体は操作できません。設定画面の「字幕の表示」でクリック透過をオフに戻してください（<a href="#usage">使い方</a>）。</p>
+      </details>
+
+      <details>
+        <summary>新しいバージョンに更新するには？</summary>
+        <p>自動アップデートはありません。このページのダウンロードリンク、または <a href="https://github.com/sp-yduck/floatsubs/releases">GitHub Releases</a> から最新版をダウンロードしてインストールしてください。設定とモデルはそのまま引き継がれます（<a href="#limits">現状の制限</a>）。</p>
       </details>
     </div>
   </section>
@@ -740,8 +928,16 @@
         <p>
           First launch downloads 0.7–6.9 GB of models depending on your tier, so keep 10 GB free on high-end machines
           and 2–5 GB otherwise. All downloads are SHA-256 verified and resumable. The app is MIT licensed; the PLaMo
-          translation model follows the PLaMo Community License. See the
-          <a href="https://github.com/sp-yduck/floatsubs#readme">README</a> for details.
+          translation model follows the PLaMo Community License.
+        </p>
+        <p>
+          Jump to: <a href="#download">Download</a> / <a href="#install">Install</a> / <a href="#warning">If Gatekeeper or SmartScreen warns you</a> /
+          <a href="#usage">Usage</a> / <a href="#uninstall">Uninstall</a> / <a href="#limits">Known limitations</a> /
+          <a href="#license">License</a> / <a href="#faq">FAQ</a>.
+        </p>
+        <p>
+          Build instructions, tests, and code layout are in the developer-facing
+          <a href="https://github.com/sp-yduck/floatsubs/blob/main/README.en.md">README.en.md</a>.
         </p>
       </div>
     </div>

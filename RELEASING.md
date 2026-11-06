@@ -4,7 +4,7 @@ floatsubs の配布経路は **GitHub Releases のみ** です。`v*` タグを 
 （[`.github/workflows/release.yml`](.github/workflows/release.yml)）が Windows / macOS の
 インストーラをビルドし、固定名のアセットとして Release に添付します。
 
-このドキュメントはリポジトリ管理者向けです。利用者向けの説明は [README.md](README.md) を参照してください。
+このドキュメントはリポジトリ管理者向けです。利用者向けのドキュメントは公式サイト（[docs/index.html](docs/index.html) / <https://sp-yduck.github.io/floatsubs/>）にあります。README は開発者向けです。
 
 ---
 
@@ -246,7 +246,7 @@ git push origin vX.Y.Z
 ## 5. コード署名を追加する場合
 
 現在の配布ビルドは **Windows のコード署名なし / macOS は ad-hoc 署名のみ（公証なし）** のため、
-SmartScreen と Gatekeeper の警告が出ます（[README の警告の節](README.md#警告が表示されたとき未署名未公証のビルド)）。
+SmartScreen と Gatekeeper の警告が出ます（[公式サイトの「警告が表示されたとき」](https://sp-yduck.github.io/floatsubs/#warning)）。
 警告を無くしたい場合は次の secret を設定すると、ワークフローを変更せずに署名へ切り替わります。
 
 ### macOS（Apple Developer Program が必要）
@@ -263,4 +263,4 @@ SmartScreen と Gatekeeper の警告が出ます（[README の警告の節](READ
 コード署名証明書（OV / EV）を用意し、`src-tauri/tauri.conf.json` の
 `bundle.windows.certificateThumbprint` などを設定します。
 
-署名を入れるまでは、README の手順（警告が出たときの許可操作）を案内してください。
+署名を入れるまでは、公式サイトの「警告が表示されたとき」（<https://sp-yduck.github.io/floatsubs/#warning>）を案内してください。

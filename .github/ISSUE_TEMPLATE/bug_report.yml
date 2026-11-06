@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        バグ報告ありがとうございます。記入前に [README の FAQ](https://github.com/sp-yduck/floatsubs#トラブルシューティングfaq) と既存の Issue を確認してください。
+        バグ報告ありがとうございます。記入前に [公式サイトの FAQ](https://sp-yduck.github.io/floatsubs/#faq) と既存の Issue を確認してください。
 
         **セキュリティ上の問題は公開 Issue に書かず、[SECURITY.md](https://github.com/sp-yduck/floatsubs/blob/main/SECURITY.md) の手順で非公開で報告してください。**
 

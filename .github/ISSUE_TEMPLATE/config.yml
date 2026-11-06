@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 使い方・トラブルシューティング（README の FAQ）
-    url: https://github.com/sp-yduck/floatsubs#トラブルシューティングfaq
-    about: インストール方法、初回セットアップ、SmartScreen / Gatekeeper の警告が出たときの手順は README にまとまっています。
+  - name: 使い方・トラブルシューティング（公式サイト）
+    url: https://sp-yduck.github.io/floatsubs/
+    about: インストール方法、初回セットアップ、使い方、SmartScreen / Gatekeeper の警告が出たときの手順は公式サイトにまとまっています。
   - name: セキュリティ上の問題（非公開で報告）
     url: https://github.com/sp-yduck/floatsubs/security/policy
     about: 脆弱性は公開 Issue に書かず、SECURITY.md の手順に従って非公開で報告してください。
