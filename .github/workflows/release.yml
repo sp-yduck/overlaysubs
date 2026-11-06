@@ -162,6 +162,36 @@ jobs:
           "VULKAN_SDK=C:\VulkanSDK\$v" >> $env:GITHUB_ENV
           "C:\VulkanSDK\$v\Bin" >> $env:GITHUB_PATH
 
+      # llama.cpp's Vulkan backend builds its shader generator through CMake's
+      # ExternalProject_Add. MSBuild in parallel mode schedules that project's install step
+      # before its configure step has produced cmake_install.cmake, which fails the Windows
+      # build with:
+      #   CMake error : Not a file: .../vulkan-shaders-gen-build/cmake_install.cmake
+      #   error MSB8066: Custom build for '...vulkan-shaders-gen-install.rule' exited with code 1
+      # Ninja expresses those inter-target dependencies correctly (and builds faster), so use it
+      # on Windows. Ninja invokes cl.exe / link.exe directly, so export the MSVC environment first.
+      - name: Set up MSVC environment and Ninja generator
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          if (!(Test-Path $vswhere)) { throw "vswhere.exe not found: $vswhere" }
+          $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsPath) { throw "Visual Studio with the MSVC C++ tools was not found" }
+          $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvars64.bat"
+          if (!(Test-Path $vcvars)) { throw "vcvars64.bat not found: $vcvars" }
+          # Export INCLUDE/LIB/LIBPATH/PATH so the Ninja build can call cl.exe and link.exe.
+          cmd /c "`"$vcvars`" >NUL && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') {
+              "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            }
+          }
+          $ninja = Get-Command ninja -ErrorAction SilentlyContinue
+          if (-not $ninja) { throw "ninja was not found on PATH (expected on the windows-latest image)" }
+          "CMAKE_GENERATOR=Ninja" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          cmake --version | Select-Object -First 1
+          ninja --version
+
       # --- Windows: short target dir + placeholder DLLs, exactly as in the previous ci.yml bundle job ---
       - name: Build Windows binary with staged DLLs
         if: runner.os == 'Windows'
