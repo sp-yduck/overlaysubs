@@ -1,0 +1,129 @@
+{
+  "models": [
+    {
+      "id": "whisper-large-v3-turbo",
+      "kind": "asr",
+      "label": "Whisper large-v3-turbo",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
+      "file": "ggml-large-v3-turbo.bin",
+      "size": 1624555275,
+      "sha256": "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69",
+      "default_for": [
+        "high"
+      ]
+    },
+    {
+      "id": "whisper-large-v3-turbo-q5_0",
+      "kind": "asr",
+      "label": "Whisper large-v3-turbo (Q5_0)",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin",
+      "file": "ggml-large-v3-turbo-q5_0.bin",
+      "size": 574041195,
+      "sha256": "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
+      "default_for": [
+        "mid"
+      ]
+    },
+    {
+      "id": "whisper-medium-q5_0",
+      "kind": "asr",
+      "label": "Whisper medium (Q5_0)",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin",
+      "file": "ggml-medium-q5_0.bin",
+      "size": 539212467,
+      "sha256": "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f",
+      "default_for": []
+    },
+    {
+      "id": "whisper-small",
+      "kind": "asr",
+      "label": "Whisper small",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+      "file": "ggml-small.bin",
+      "size": 487601967,
+      "sha256": "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b",
+      "default_for": [
+        "low"
+      ]
+    },
+    {
+      "id": "whisper-base",
+      "kind": "asr",
+      "label": "Whisper base",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+      "file": "ggml-base.bin",
+      "size": 147951465,
+      "sha256": "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe",
+      "default_for": [
+        "cpu"
+      ]
+    },
+    {
+      "id": "plamo-3-translate-31b-q4_k_m",
+      "kind": "translator",
+      "label": "PLaMo 3 Translate 31B (Q4_K_M)",
+      "url": "https://huggingface.co/pfnet/plamo-3-translate-31b-GGUF/resolve/main/plamo-3-translate-31b-Q4_K_M.gguf",
+      "file": "plamo-3-translate-31b-Q4_K_M.gguf",
+      "size": 19526583392,
+      "sha256": "d1ed08149f888ef7a0da38e26bf394a13d0f079b592229c8778f5f1a91cf6457",
+      "default_for": []
+    },
+    {
+      "id": "plamo-3-translate-8b-q4_k_m",
+      "kind": "translator",
+      "label": "PLaMo 3 Translate 8B (Q4_K_M)",
+      "url": "https://huggingface.co/pfnet/plamo-3-translate-8b-GGUF/resolve/main/plamo-3-translate-8b-Q4_K_M.gguf",
+      "file": "plamo-3-translate-8b-Q4_K_M.gguf",
+      "size": 5280435168,
+      "sha256": "6b429549113ce0a61281ac72be195697241f89266f4247efec4893e4f580cf10",
+      "default_for": [
+        "high"
+      ]
+    },
+    {
+      "id": "plamo-3-translate-8b-q3_k_m",
+      "kind": "translator",
+      "label": "PLaMo 3 Translate 8B (Q3_K_M)",
+      "url": "https://huggingface.co/pfnet/plamo-3-translate-8b-GGUF/resolve/main/plamo-3-translate-8b-Q3_K_M.gguf",
+      "file": "plamo-3-translate-8b-Q3_K_M.gguf",
+      "size": 4310207456,
+      "sha256": "2413a3065f8666303d13b39161936786f2d8db9c4f1de4c2d2fcf80a72652fdc",
+      "default_for": []
+    },
+    {
+      "id": "plamo-3-translate-2b-q4_k_m",
+      "kind": "translator",
+      "label": "PLaMo 3 Translate 2B (Q4_K_M)",
+      "url": "https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf",
+      "file": "plamo-3-translate-2b-Q4_K_M.gguf",
+      "size": 1807192480,
+      "sha256": "2c288ecc7ebfe60c3561726580da3583767f3c41ca3ef5c6825bf6c4cc060787",
+      "default_for": [
+        "mid",
+        "low"
+      ]
+    },
+    {
+      "id": "plamo-3-translate-0.8b-q4_k_m",
+      "kind": "translator",
+      "label": "PLaMo 3 Translate 0.8B (Q4_K_M)",
+      "url": "https://huggingface.co/pfnet/plamo-3-translate-0.8b-GGUF/resolve/main/plamo-3-translate-0.8b-Q4_K_M.gguf",
+      "file": "plamo-3-translate-0.8b-Q4_K_M.gguf",
+      "size": 573116288,
+      "sha256": "3dbb09295bfd3350231ba0dba92bc72cb14111ef1b034e37dad39d581bd86b9c",
+      "default_for": [
+        "cpu"
+      ]
+    },
+    {
+      "id": "silero-vad-v6.2.0",
+      "kind": "vad",
+      "label": "Silero VAD v6.2.0",
+      "url": "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin",
+      "file": "ggml-silero-v6.2.0.bin",
+      "size": 885098,
+      "sha256": "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987",
+      "default_for": []
+    }
+  ]
+}

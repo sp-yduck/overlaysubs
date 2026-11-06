@@ -1,0 +1,68 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test -p floatsubs-core
+  bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            features: vulkan
+          - os: macos-15
+            features: metal
+    runs-on: ${{ matrix.os }}
+    env:
+      # libgit2 hits MAX_PATH on llama.cpp's submodule; the git CLI honours core.longpaths.
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+    steps:
+      - run: git config --global core.longpaths true
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - if: matrix.features == 'vulkan'
+        shell: pwsh
+        run: |
+          $v = "1.4.313.2"
+          curl.exe -fL -o vk.exe "https://sdk.lunarg.com/sdk/download/$v/windows/vulkansdk-windows-X64-$v.exe"
+          ./vk.exe --accept-licenses --default-answer --confirm-command install | Out-Null
+          if (!(Test-Path "C:\VulkanSDK\$v\Include\vulkan\vulkan.h")) { throw "Vulkan SDK install failed" }
+          "VULKAN_SDK=C:\VulkanSDK\$v" >> $env:GITHUB_ENV
+          "C:\VulkanSDK\$v\Bin" >> $env:GITHUB_PATH
+      - run: cargo install tauri-cli --version "^2" --locked
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        # MSBuild caps paths at 260 chars; whisper.cpp's Vulkan shader build nests deep, so use a short target dir.
+        # The DLLs must exist before tauri-build resolves bundle.resources.
+        run: |
+          "CARGO_TARGET_DIR=C:\t" >> $env:GITHUB_ENV
+          $env:CARGO_TARGET_DIR = "C:\t"
+          New-Item -ItemType Directory -Force src-tauri/libs | Out-Null
+          # tauri-build checks the glob during this build too; a placeholder satisfies it until the real DLLs exist.
+          New-Item -ItemType File -Force src-tauri/libs/placeholder.dll | Out-Null
+          cargo build --release -p floatsubs --features ${{ matrix.features }}
+          Remove-Item src-tauri/libs/placeholder.dll
+          Copy-Item C:\t\release\build\llama-cpp-sys-2-*\out\bin\*.dll src-tauri/libs/
+          if (!(Test-Path src-tauri/libs/llama.dll)) { throw "llama.dll was not staged" }
+          Get-ChildItem src-tauri/libs
+      - run: cargo tauri build --features ${{ matrix.features }}
+        working-directory: src-tauri
+      - if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: floatsubs-windows
+          path: |
+            C:/t/release/bundle/msi/*.msi
+            C:/t/release/bundle/nsis/*.exe
+      - if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: floatsubs-macos
+          path: target/release/bundle/dmg/*.dmg
