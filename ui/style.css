@@ -95,6 +95,7 @@ pre.license { max-height: 240px; overflow: auto; white-space: pre-wrap; backgrou
 #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 10; pointer-events: none; }
 .toast { padding: 9px 14px; border-radius: 8px; background: var(--fg); color: var(--bg); box-shadow: 0 4px 14px rgba(0,0,0,.2); max-width: 420px; animation: in .18s ease-out; }
 .toast.error { background: var(--err); color: #fff; }
+.toast.warn { background: var(--warn); color: #fff; }
 @keyframes in { from { opacity: 0; transform: translateY(6px); } }
 
 @media (max-width: 640px) {

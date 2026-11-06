@@ -29,9 +29,6 @@ pub fn to_txt(entries: &[Entry]) -> String {
     entries.iter().map(|e| format!("[{}] {}\n    {}\n", &ts(e.start_ms)[..8], e.source, e.translation)).collect()
 }
 
-/// Shown at the top of exports: PLaMo license requires marking published output.
-pub const ATTRIBUTION: &str = "Translated with PLaMo 3 Translate (Built with PLaMo)";
-
 #[cfg(test)]
 mod tests {
     use super::*;

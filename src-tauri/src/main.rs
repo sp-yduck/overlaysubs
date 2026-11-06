@@ -332,7 +332,7 @@ fn export_history(st: State<App>, path: PathBuf, format: String, with_source: bo
     let h = st.history.lock().unwrap();
     let body = match format.as_str() {
         "srt" => export::to_srt(&h, with_source),
-        _ => format!("{}\n\n{}", export::ATTRIBUTION, export::to_txt(&h)),
+        _ => export::to_txt(&h),
     };
     std::fs::write(path, body).map_err(|e| e.to_string())
 }

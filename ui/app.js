@@ -147,6 +147,8 @@ function overlayPage() {
   return `<h2>${t("overlay")}</h2>
   ${card("", `${field(t("show_source"), "overlay.showSource", "check")}
     ${field(t("click_through"), "overlay.clickThrough", "check")}
+    ${field(t("show_credit"), "overlay.showCredit", "check")}
+    ${snap.settings.overlay.showCredit ? "" : `<p class="muted small">${t("credit_off_note")}</p>`}
     ${field(t("font_size"), "overlay.fontSize", "number", 'min="12" max="96"')}
     ${field(t("font"), "overlay.font")}
     ${field(t("bg"), "overlay.bg", "number", 'min="0" max="1" step="0.05"')}
@@ -187,7 +189,7 @@ function render() {
   $("#app").className = "";
   $("#app").innerHTML = `
   <aside>
-    <div class="brand">floatsubs<small>Built with PLaMo</small></div>
+    <div class="brand">floatsubs</div>
     <nav>${Object.keys(PAGES).map((p) => `<button data-act="nav" data-id="${p}" class="${p === page ? "on" : ""}">${t("nav_" + p)}${p === "models" && !ready ? ' <span class="dot warn"></span>' : ""}</button>`).join("")}</nav>
     <div class="spacer"></div>
     ${btn("toggle", snap.running ? t("stop") : t("start"), { cls: `start ${snap.running ? "running" : "primary"}`, disabled: !ready })}
@@ -276,7 +278,7 @@ async function act(name, id, el) {
   if (name === "export-txt" || name === "export-srt") {
     const format = name.slice(7);
     const path = await saveDialog({ defaultPath: `floatsubs.${format}`, filters: [{ name: format, extensions: [format] }] });
-    if (path) { await invoke("export_history", { path, format, withSource: snap.settings.overlay.showSource }); toast(t("exported")); }
+    if (path) { await invoke("export_history", { path, format, withSource: snap.settings.overlay.showSource }); toast(t("exported")); toast(t("output_note"), "warn"); }
   }
   await refresh();
 }
