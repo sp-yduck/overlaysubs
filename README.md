@@ -12,6 +12,17 @@ A desktop app that transcribes and translates any audio playing on your PC in re
 
 **Built with PLaMo.** Translation uses Preferred Networks' [PLaMo 3 Translate](https://huggingface.co/pfnet/plamo-3-translate-0.8b-GGUF).
 
+## Screenshots
+
+**Settings** — translation options, languages and recent subtitles.
+![Settings screen](docs/images/ui-settings-en.png)
+
+**Model setup** — on first run the app detects your hardware, picks a tier and downloads the matching models.
+![Model setup screen](docs/images/ui-model-setup-en.png)
+
+**Subtitle overlay** — drawn on top of other apps; click-through is available in the settings (background is illustrative).
+![Subtitle overlay](docs/images/overlay.jpg)
+
 ## For users (download and install)
 
 **You do not need a GitHub account.** If you just want to use the app, follow the instructions on the official site.
@@ -29,6 +40,7 @@ Install steps, what to do when Windows SmartScreen or macOS Gatekeeper warns you
 
 ## Contents
 
+- [Screenshots](#screenshots)
 - [Requirements](#requirements)
 - [Architecture](#architecture)
 - [Features](#features)
