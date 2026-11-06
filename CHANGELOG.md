@@ -8,6 +8,10 @@ OverlaySubs の主な変更点を記録します。
 
 次のリリースに向けた変更点をここに追記します。
 
+## [0.2.1] - 2026-11-07
+
+待機中にオーバーレイを隠せるようになり、字幕の見た目を設定画面で確認でき、起動時に新しいバージョンを通知するようになりました。あわせて、一部の CPU で翻訳開始時に落ちるビルドの問題を修正しました。
+
 ### Added
 
 - 字幕オーバーレイの表示・非表示を切り替えられるようにしました。翻訳の開始で表示、停止時は最後の字幕を少し表示してから自動的に非表示になり、トレイメニューの「Show subtitles」または翻訳開始ボタンの上にあるトグルから手動で切り替えることもできます。待機中はオーバーレイ自体を隠すため、表示中は位置がわかるように薄いグレーの背景を表示します。
@@ -55,5 +59,6 @@ OverlaySubs の主な変更点を記録します。
 - プロジェクト名を OverlaySubs に変更しました（旧名: floatsubs。リポジトリ名・配布ファイル名は overlaysubs）。
 - 利用者向けのドキュメント（インストール・使い方・FAQ・ライセンス）を公式サイト（GitHub Pages）に移し、README は開発者向けに整理しました。
 
-[Unreleased]: https://github.com/sp-yduck/overlaysubs/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/sp-yduck/overlaysubs/releases/tag/v0.2.1
 [0.1.0]: https://github.com/sp-yduck/overlaysubs/releases/tag/v0.1.0
