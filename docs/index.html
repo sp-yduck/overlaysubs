@@ -12,16 +12,17 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
 <style>
   :root {
-    --screen: #0b1620;
-    --screen-2: #142330;
+    --screen: #14171d;
+    --screen-2: #1d222b;
     --screen-line: rgba(255, 255, 255, 0.14);
-    --ink: #101820;
-    --ink-2: #4a5560;
+    --ink: #1b1f27;
+    --ink-2: #5b6270;
     --paper: #ffffff;
-    --panel: #eef1f3;
-    --rule: #d4dadf;
-    --yellow: #f5c445;
-    --alert: #c2410c;
+    --panel: #f6f7f9;
+    --rule: #dde1e7;
+    --accent: #4a90ea;
+    --accent-btn: #1f67c4;
+    --alert: #d98b0b;
     --body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
     --display: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -43,9 +44,9 @@
   a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
   a:hover { text-decoration-thickness: 2px; }
   :focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
-  .dark :focus-visible { outline-color: var(--yellow); }
+  .dark :focus-visible { outline-color: var(--accent); }
 
-  .skip { position: absolute; left: -9999px; top: 0; background: var(--yellow); color: var(--ink); padding: 10px 16px; z-index: 10; font-weight: 700; }
+  .skip { position: absolute; left: -9999px; top: 0; background: var(--accent); color: var(--ink); padding: 10px 16px; z-index: 10; font-weight: 700; }
   .skip:focus { left: 12px; top: 12px; }
 
   .wrap { width: min(1100px, calc(100% - 32px)); margin: 0 auto; }
@@ -61,15 +62,15 @@
 
   /* ---------- dark areas ---------- */
   .dark { background: var(--screen); color: #fff; }
-  .dark a { color: var(--yellow); }
+  .dark a { color: var(--accent); }
   .dark code { background: rgba(255, 255, 255, 0.1); color: #fff; }
 
   .top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px 32px; flex-wrap: wrap; padding: 22px 0 18px; }
   .brand { font-family: var(--display); font-weight: 900; font-size: 1.25rem; letter-spacing: 0.01em; text-decoration: none; color: #fff; }
-  .brand:hover { color: var(--yellow); text-decoration: none; }
+  .brand:hover { color: var(--accent); text-decoration: none; }
   .nav { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0; padding: 0; list-style: none; font-size: 0.9rem; }
   .nav a { color: #fff; text-decoration: none; }
-  .nav a:hover { color: var(--yellow); text-decoration: underline; }
+  .nav a:hover { color: var(--accent); text-decoration: underline; }
 
   /* The screen: a stand-in for any app window, with the overlay's caption on top */
   .screen {
@@ -78,7 +79,7 @@
     min-height: 300px;
     border: 1px solid var(--screen-line);
     background:
-      radial-gradient(70% 90% at 15% 10%, #1b3240 0%, transparent 70%),
+      radial-gradient(70% 90% at 15% 10%, #1c2a3c 0%, transparent 70%),
       var(--screen-2);
     overflow: hidden;
   }
@@ -116,24 +117,24 @@
     font-weight: 400;
     font-size: 0.42em;
     letter-spacing: 0;
-    color: #e6e9ec;
+    color: #e8eaee;
     margin-bottom: 0.2em;
   }
   .screen h1 .seg { display: inline-block; }
-  .screen .plamo { position: absolute; right: 14px; bottom: 10px; font-size: 0.72rem; color: #c3cad1; }
+  .screen .plamo { position: absolute; right: 14px; bottom: 10px; font-size: 0.72rem; color: #9aa3b2; }
 
   .hero-foot { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px 56px; align-items: start; padding: 32px 0 48px; }
   .lead { font-size: 1.05rem; max-width: 44em; margin: 0 0 10px; }
-  .facts { margin: 0; padding: 0; list-style: none; font-size: 0.9rem; color: #c3cad1; }
+  .facts { margin: 0; padding: 0; list-style: none; font-size: 0.9rem; color: #9aa3b2; }
   .facts li { display: inline; }
-  .facts li + li::before { content: "／"; margin: 0 0.4em; color: #6f7b86; }
+  .facts li + li::before { content: "／"; margin: 0 0.4em; color: #6b7280; }
   .dl { display: flex; flex-direction: column; gap: 10px; }
   .btn {
     display: inline-flex;
     flex-direction: column;
     text-decoration: none;
     padding: 12px 20px 11px;
-    border: 2px solid var(--yellow);
+    border: 2px solid var(--accent);
     border-radius: 4px;
     font-family: var(--display);
     font-weight: 700;
@@ -143,17 +144,17 @@
   }
   .btn:hover { text-decoration: none; }
   .btn small { font-family: var(--mono); font-weight: 400; font-size: 0.74rem; opacity: 0.85; margin-top: 3px; }
-  .dl .btn { background: var(--yellow); color: var(--ink); }
-  .dl .btn:hover { background: #ffd75e; }
+  .dl .btn { background: var(--accent-btn); border-color: var(--accent-btn); color: #fff; }
+  .dl .btn:hover { background: #1a5aab; border-color: #1a5aab; }
   .dl .btn.alt { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.5); }
   .dl .btn.alt:hover { border-color: #fff; }
-  .fine { font-size: 0.85rem; color: #c3cad1; margin: 0; }
+  .fine { font-size: 0.85rem; color: #9aa3b2; margin: 0; }
 
   /* ---------- body sections ---------- */
   section { border-top: 1px solid var(--rule); padding: 44px 0 36px; }
   .sec { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px 56px; }
   .sec > h2 { position: sticky; top: 24px; align-self: start; }
-  .sec > h2::after { content: ""; display: block; width: 36px; height: 5px; background: var(--yellow); margin-top: 12px; }
+  .sec > h2::after { content: ""; display: block; width: 36px; height: 5px; background: var(--accent); margin-top: 12px; }
   .sec-body > :last-child { margin-bottom: 0; }
   .intro { max-width: 46em; }
   .muted { color: var(--ink-2); font-size: 0.92rem; }
@@ -166,7 +167,7 @@
   .releases p { margin: 0; font-size: 0.92rem; }
   .releases .file { font-family: var(--mono); font-size: 0.8rem; color: var(--ink-2); }
   .btn.solid { background: var(--ink); color: #fff; border-color: var(--ink); font-size: 0.95rem; padding: 10px 18px; white-space: nowrap; }
-  .btn.solid:hover { background: #2a3744; border-color: #2a3744; }
+  .btn.solid:hover { background: #2c333f; border-color: #2c333f; }
   .btn.quiet { background: transparent; color: var(--ink); border-color: var(--ink); font-size: 0.95rem; padding: 10px 18px; white-space: nowrap; }
   .btn.quiet:hover { background: var(--panel); }
 
@@ -197,7 +198,7 @@
   figcaption { font-size: 0.82rem; color: var(--ink-2); margin-top: 8px; }
   .settings { margin: 0 0 20px; padding: 0; list-style: none; columns: 2; column-gap: 40px; font-size: 0.92rem; }
   .settings li { break-inside: avoid; margin: 0 0 8px; padding-left: 14px; position: relative; }
-  .settings li::before { content: ""; position: absolute; left: 0; top: 0.72em; width: 6px; height: 6px; background: var(--yellow); }
+  .settings li::before { content: ""; position: absolute; left: 0; top: 0.72em; width: 6px; height: 6px; background: var(--accent); }
   .settings strong { font-weight: 700; }
 
   /* tables */
@@ -230,7 +231,7 @@
   .english h2 { font-size: 1.6rem; margin-bottom: 16px; }
   .english p { max-width: 70ch; font-size: 0.97rem; line-height: 1.7; }
   .english p:last-child { margin: 0; }
-  footer { padding: 28px 0 40px; border-top: 1px solid var(--screen-line); font-size: 0.86rem; color: #c3cad1; }
+  footer { padding: 28px 0 40px; border-top: 1px solid var(--screen-line); font-size: 0.86rem; color: #9aa3b2; }
   .foot-links { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 0 0 20px; padding: 0; list-style: none; }
   .foot-links a { color: #fff; }
   footer p { margin: 0 0 8px; max-width: 80ch; }
