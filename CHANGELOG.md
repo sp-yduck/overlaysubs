@@ -8,6 +8,10 @@ OverlaySubs の主な変更点を記録します。
 
 次のリリースに向けた変更点をここに追記します。
 
+## [0.2.2] - 2026-11-08
+
+v0.2.1 の Windows 版として配布していたインストーラーが古いテストビルドだった問題を修正した、Windows 版の再配布です。v0.2.1 の Windows 版を使っている場合は、このバージョンに更新してください（macOS 版は v0.2.1 と同じ内容です）。
+
 ### Fixed
 
 - v0.2.1 として公開した Windows 版のインストーラー（`overlaysubs-windows-x64-setup.exe` / `.msi`）が、実際には以前のテストビルド（バージョン 0.1.0）だった問題を修正しました。リリース用のビルドがキャッシュから復元した古いインストーラーを、新しくビルドしたものの代わりに配布物として選んでいました。ビルド前に古いインストーラーを消し、ビルドしているバージョンのインストーラーがちょうど 1 つあることを確かめてから配布物にするようにしました。
@@ -63,6 +67,7 @@ OverlaySubs の主な変更点を記録します。
 - プロジェクト名を OverlaySubs に変更しました（旧名: floatsubs。リポジトリ名・配布ファイル名は overlaysubs）。
 - 利用者向けのドキュメント（インストール・使い方・FAQ・ライセンス）を公式サイト（GitHub Pages）に移し、README は開発者向けに整理しました。
 
-[Unreleased]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/sp-yduck/overlaysubs/releases/tag/v0.2.1
 [0.1.0]: https://github.com/sp-yduck/overlaysubs/releases/tag/v0.1.0
