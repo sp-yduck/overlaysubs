@@ -68,7 +68,7 @@ struct Running {
     stop_tx: mpsc::Sender<()>,
     /// Identifies this session so a delayed hide cannot hide a newer session's overlay.
     id: u64,
-    /// Joined after stop so the overlay is hidden only once the last utterance is flushed.
+    /// Joined after stop so the overlay is hidden only once the last utterance is shown.
     session: std::thread::JoinHandle<()>,
 }
 
@@ -328,7 +328,6 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     let session_thread = std::thread::spawn(move || {
         let mut session = Session::new(s.session);
         let mut seen = 0;
-        let mut last_event = Instant::now();
         let mut emit = |c: Caption| {
             let _ = emit_app.emit("caption", &c);
         };
@@ -336,24 +335,11 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
             let stopping = stop_rx.try_recv().is_ok();
             let next = if stopping { None } else { ev_rx.recv_timeout(std::time::Duration::from_millis(200)).ok() };
             let Some(first) = next else {
-                // The speaker paused mid-sentence, or capture stopped: stop waiting for the rest.
-                if stopping || last_event.elapsed() > std::time::Duration::from_secs(2) {
-                    let mut g = engines.lock().unwrap();
-                    let Some(e) = g.as_mut() else { return };
-                    let n = session.entries.len();
-                    if let Err(err) = session.flush(&mut e.mt, &mut emit) {
-                        let _ = emit_app.emit("error", err);
-                    }
-                    if session.entries.len() != n {
-                        *history.lock().unwrap() = session.entries.clone();
-                    }
-                }
                 if stopping {
                     return;
                 }
                 continue;
             };
-            last_event = Instant::now();
             // Under load, skip stale partials: keep every final and only the newest partial.
             let batch: Vec<_> = std::iter::once(first).chain(ev_rx.try_iter()).collect();
             let n = batch.len();
@@ -392,7 +378,7 @@ fn stop(app: AppHandle, st: State<App>) -> Result<(), String> {
     let Running { _capture, stop_tx, id, session } = running;
     let _ = stop_tx.send(());
     drop(_capture);
-    // The session thread flushes the pending utterance after stop; hide only once it is
+    // The session thread may still be translating the last utterance after stop; hide only once it is
     // done (plus a short grace period) so the final subtitle is actually shown.
     st.overlay_hide_pending.store(true, Ordering::SeqCst);
     let hide_app = app.clone();
