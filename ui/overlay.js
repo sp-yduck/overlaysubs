@@ -44,8 +44,20 @@ function draw() {
       : "";
 }
 
+/**
+ * Keeps the previous translation while the new one would only take text off the screen:
+ * an empty translation, or a finalized translation still streaming in that is shorter than the draft.
+ * A final caption always replaces it.
+ */
+function merge(prev, next) {
+  if (!prev || next.stage === "final") return next;
+  const keep = !next.translation || (next.stage === "streaming" && next.translation.length < prev.translation.length);
+  return keep ? { ...next, translation: prev.translation } : next;
+}
+
 listen("caption", (e) => {
-  caps.set(e.payload.id, { caption: e.payload, at: Date.now() });
+  const prev = caps.get(e.payload.id)?.caption;
+  caps.set(e.payload.id, { caption: merge(prev, e.payload), at: Date.now() });
   draw();
 });
 listen("settings", (e) => apply(e.payload));

@@ -153,11 +153,10 @@ impl Session {
         if fin {
             self.pending = Some(Pending { text: text.clone(), lang: t.lang.clone(), start_ms });
         }
-        // Not final yet: show the source, then a draft translation under the same id.
-        let mut cap = Caption { id: self.next_id, stage: Stage::Partial, lang: t.lang, source: text, translation: String::new() };
-        emit(cap.clone());
-        cap.translation = self.translate(&cap.source, &cap.lang, mt, &mut |_| {})?;
-        emit(cap);
+        // Not final yet: show a draft translation under the same id. The source is sent together with it,
+        // because a caption without a translation would blank the previous draft in the overlay.
+        let translation = self.translate(&text, &t.lang, mt, &mut |_| {})?;
+        emit(Caption { id: self.next_id, stage: Stage::Partial, lang: t.lang, source: text, translation });
         Ok(())
     }
 
@@ -252,12 +251,12 @@ mod tests {
     }
 
     #[test]
-    fn partial_emits_source_then_translation_without_recording() {
+    fn partial_emits_one_translated_draft_without_recording() {
         let mut s = Session::new(SessionConfig::default());
         let mut caps = vec![];
         s.handle(Event::Partial(vec![0.0; SEC]), &mut asr(vec!["Hello"]), &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        assert_eq!(caps.len(), 2);
-        assert!(caps[0].translation.is_empty() && caps[1].translation == "訳文" && caps[1].stage == Stage::Partial);
+        assert_eq!(caps.len(), 1, "no caption with an empty translation, which would blank the previous draft");
+        assert!(caps[0].source == "Hello" && caps[0].translation == "訳文" && caps[0].stage == Stage::Partial);
         assert!(s.entries.is_empty());
     }
 
