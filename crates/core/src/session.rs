@@ -78,6 +78,11 @@ const MAX_HOLD_CHARS: usize = 150;
 /// shortcut: char cap approximating whisper's ~224-token prompt limit; count tokens if long prompts get cut.
 const MAX_PROMPT_CHARS: usize = 150;
 
+/// False for text made only of punctuation and spaces, such as "…" or "".
+pub fn has_words(text: &str) -> bool {
+    text.chars().any(char::is_alphanumeric)
+}
+
 pub fn ends_sentence(text: &str) -> bool {
     text.trim_end().trim_end_matches(['"', '\'', '」', '』', ')', '）', '”', '’']).ends_with(['.', '?', '!', '。', '？', '！', '…'])
 }
@@ -153,11 +158,13 @@ impl Session {
         if fin {
             self.pending = Some(Pending { text: text.clone(), lang: t.lang.clone(), start_ms });
         }
-        // Not final yet: show the source, then a draft translation under the same id.
-        let mut cap = Caption { id: self.next_id, stage: Stage::Partial, lang: t.lang, source: text, translation: String::new() };
-        emit(cap.clone());
-        cap.translation = self.translate(&cap.source, &cap.lang, mt, &mut |_| {})?;
-        emit(cap);
+        // Not final yet: show a draft translation under the same id. The source is sent together with it,
+        // because a caption without a translation would blank the previous draft in the overlay.
+        // A draft of an unfinished fragment can come back empty or as just "…"; showing it would replace a readable one.
+        let translation = self.translate(&text, &t.lang, mt, &mut |_| {})?;
+        if has_words(&translation) {
+            emit(Caption { id: self.next_id, stage: Stage::Partial, lang: t.lang, source: text, translation });
+        }
         Ok(())
     }
 
@@ -252,13 +259,34 @@ mod tests {
     }
 
     #[test]
-    fn partial_emits_source_then_translation_without_recording() {
+    fn partial_emits_one_translated_draft_without_recording() {
         let mut s = Session::new(SessionConfig::default());
         let mut caps = vec![];
         s.handle(Event::Partial(vec![0.0; SEC]), &mut asr(vec!["Hello"]), &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        assert_eq!(caps.len(), 2);
-        assert!(caps[0].translation.is_empty() && caps[1].translation == "訳文" && caps[1].stage == Stage::Partial);
+        assert_eq!(caps.len(), 1, "no caption with an empty translation, which would blank the previous draft");
+        assert!(caps[0].source == "Hello" && caps[0].translation == "訳文" && caps[0].stage == Stage::Partial);
         assert!(s.entries.is_empty());
+    }
+
+    /// Returns scripted translations in one piece.
+    struct ScriptMt(Vec<&'static str>);
+    impl Translator for ScriptMt {
+        fn translate(&mut self, _: &TranslateRequest, on: &mut dyn FnMut(&str)) -> Result<String, String> {
+            let out = self.0.remove(0);
+            on(out);
+            Ok(out.into())
+        }
+    }
+
+    #[test]
+    fn partial_without_words_in_the_translation_is_not_shown() {
+        let mut s = Session::new(SessionConfig::default());
+        let (mut a, mut mt, mut caps) = (asr(vec!["So when", "So when you", "So when you blink"]), ScriptMt(vec!["それで", "…", ""]), vec![]);
+        for _ in 0..3 {
+            s.handle(Event::Partial(vec![0.0; SEC]), &mut a, &mut mt, &mut |c| caps.push(c)).unwrap();
+        }
+        let shown: Vec<_> = caps.iter().map(|c| c.translation.as_str()).collect();
+        assert_eq!(shown, ["それで"], "a draft of only \"…\" or nothing would replace the readable one");
     }
 
     #[test]
@@ -333,6 +361,9 @@ mod tests {
         }
         for t in ["So when", "그래서", "1,000"] {
             assert!(!ends_sentence(t), "{t}");
+        }
+        for (t, words) in [("…", false), ("...", false), ("", false), (" 。", false), ("でも…", true), ("그래서", true), ("1", true)] {
+            assert_eq!(has_words(t), words, "{t:?}");
         }
     }
 
