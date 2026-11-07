@@ -7,6 +7,8 @@ let uiLang = "ja";
 let preview = false;
 const caps = new Map(); // id -> {caption, at}
 const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+/** False for text made only of punctuation and spaces, such as "…" or "". */
+const hasWords = (s) => /[\p{L}\p{N}]/u.test(s || "");
 const t = (k) => (I18N[uiLang] || I18N.ja)[k] || k;
 
 function apply(settings) {
@@ -22,7 +24,7 @@ function apply(settings) {
 }
 
 const captionHtml = (c) =>
-  `<div class="cap ${c.stage}">${cfg.showSource ? `<span class="src">${esc(c.source)}</span>` : ""}<span class="tr">${esc(c.translation || "…")}</span></div>`;
+  `<div class="cap ${c.stage}">${cfg.showSource ? `<span class="src">${esc(c.source)}</span>` : ""}<span class="tr">${esc(c.translation)}</span></div>`;
 
 /** Two sample captions so the "lines" setting is previewed too (real captions take priority). */
 function previewHtml() {
@@ -36,7 +38,8 @@ function previewHtml() {
 function draw() {
   const now = Date.now();
   for (const [id, c] of caps) if (c.caption.stage === "final" && now - c.at > cfg.linger * 1000) caps.delete(id);
-  const shown = [...caps.values()].slice(-cfg.lines);
+  // A caption with no readable translation yet is left out rather than drawn as "…" over the previous lines.
+  const shown = [...caps.values()].filter(({ caption: c }) => hasWords(c.translation)).slice(-cfg.lines);
   document.getElementById("lines").innerHTML = shown.length
     ? shown.map(({ caption: c }) => captionHtml(c)).join("")
     : preview
@@ -46,12 +49,12 @@ function draw() {
 
 /**
  * Keeps the previous translation while the new one would only take text off the screen:
- * an empty translation, or a finalized translation still streaming in that is shorter than the draft.
- * A final caption always replaces it.
+ * one without words (empty or just "…"), or a finalized translation still streaming in
+ * that is shorter than the draft. Otherwise the new caption replaces it.
  */
 function merge(prev, next) {
-  if (!prev || next.stage === "final") return next;
-  const keep = !next.translation || (next.stage === "streaming" && next.translation.length < prev.translation.length);
+  if (!prev || !hasWords(prev.translation)) return next;
+  const keep = !hasWords(next.translation) || (next.stage === "streaming" && next.translation.length < prev.translation.length);
   return keep ? { ...next, translation: prev.translation } : next;
 }
 
