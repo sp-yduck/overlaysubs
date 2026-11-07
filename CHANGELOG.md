@@ -8,6 +8,10 @@ OverlaySubs の主な変更点を記録します。
 
 次のリリースに向けた変更点をここに追記します。
 
+## [0.2.3] - 2026-11-08
+
+文が確定するまでのあいだ、字幕の訳が更新のたびに「…」に変わって読めなくなる問題を修正しました。
+
 ### Fixed
 
 - 文が確定するまでの途中経過の更新（約 1 秒ごと）のたびに、字幕の訳が一瞬「…」に変わって読めなくなる問題を修正しました。途中経過は訳ができてから原文と一緒に送るようにし、オーバーレイも新しい訳が空のあいだ、および確定した訳を流し込んでいる途中で直前の下書きより短いあいだは、直前の訳を表示し続けるようにしました。翻訳モデルが文の途中の断片を訳した結果が空や「…」だけになった場合も、表示中の訳を置き換えないようにしました。
@@ -71,7 +75,8 @@ v0.2.1 の Windows 版として配布していたインストーラーが古い�
 - プロジェクト名を OverlaySubs に変更しました（旧名: floatsubs。リポジトリ名・配布ファイル名は overlaysubs）。
 - 利用者向けのドキュメント（インストール・使い方・FAQ・ライセンス）を公式サイト（GitHub Pages）に移し、README は開発者向けに整理しました。
 
-[Unreleased]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/sp-yduck/overlaysubs/releases/tag/v0.2.1
 [0.1.0]: https://github.com/sp-yduck/overlaysubs/releases/tag/v0.1.0
