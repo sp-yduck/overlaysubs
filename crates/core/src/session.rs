@@ -73,10 +73,10 @@ pub fn is_hallucination(text: &str) -> bool {
 }
 
 const HISTORY: usize = 3;
-/// A fragment without sentence-ending punctuation is held and merged with the next one, up to this length.
-const MAX_HOLD_CHARS: usize = 150;
 /// shortcut: char cap approximating whisper's ~224-token prompt limit; count tokens if long prompts get cut.
 const MAX_PROMPT_CHARS: usize = 150;
+/// A sentence shorter than this stays with the next one instead of becoming its own caption.
+const MIN_SENTENCE_CHARS: usize = 10;
 
 /// False for text made only of punctuation and spaces, such as "…" or "".
 pub fn has_words(text: &str) -> bool {
@@ -87,33 +87,62 @@ pub fn ends_sentence(text: &str) -> bool {
     text.trim_end().trim_end_matches(['"', '\'', '」', '』', ')', '）', '”', '’']).ends_with(['.', '?', '!', '。', '？', '！', '…'])
 }
 
-fn join(a: &str, b: &str, lang: &str) -> String {
-    match (a.is_empty(), lang) {
-        (true, _) => b.to_string(),
-        (false, "ja" | "zh") => format!("{a}{b}"),
-        _ => format!("{a} {b}"),
+/// Ends `text` with a full stop unless it already ends a sentence.
+/// The caption becomes Whisper's prompt for the next utterance, and Whisper copies the prompt's style:
+/// a prompt without punctuation makes it stop punctuating (measured on Korean speech).
+pub fn punctuate(text: &str, lang: &str) -> String {
+    match (ends_sentence(text), lang) {
+        (true, _) => text.to_string(),
+        (false, "ja" | "zh") => format!("{text}。"),
+        _ => format!("{text}."),
     }
 }
 
-/// An unfinished sentence waiting for its continuation.
-struct Pending {
-    text: String,
-    lang: String,
-    start_ms: u64,
+/// Splits after sentence-ending punctuation (followed by a space, or full-width), so a long utterance is
+/// shown and translated one sentence at a time. Sentences under `MIN_SENTENCE_CHARS` join the next one.
+pub fn split_sentences(text: &str) -> Vec<String> {
+    let closers = ['"', '\'', '」', '』', ')', '）', '”', '’'];
+    let chars: Vec<char> = text.chars().collect();
+    let (mut out, mut cur) = (Vec::new(), String::new());
+    for (i, &c) in chars.iter().enumerate() {
+        cur.push(c);
+        let next = chars.get(i + 1).copied();
+        let boundary = match c {
+            '。' | '？' | '！' => !next.is_some_and(|n| closers.contains(&n) || matches!(n, '。' | '？' | '！')),
+            '.' | '?' | '!' | '…' => next.is_some_and(char::is_whitespace),
+            // A quote is part of the sentence when the text goes on right after it (「いいね！」と言った).
+            c if closers.contains(&c) => cur.trim_end_matches(closers).ends_with(['.', '?', '!', '。', '？', '！', '…']) && next.is_some_and(char::is_whitespace),
+            _ => false,
+        };
+        if boundary && cur.trim().chars().count() >= MIN_SENTENCE_CHARS {
+            out.push(cur.trim().to_string());
+            cur.clear();
+        }
+    }
+    match (cur.trim(), out.last_mut()) {
+        ("", _) => {}
+        // A short tail would be a caption of its own; keep it with the sentence before it.
+        (t, Some(last)) if t.chars().count() < MIN_SENTENCE_CHARS => {
+            let sep = if last.ends_with(['。', '？', '！']) { "" } else { " " };
+            last.push_str(sep);
+            last.push_str(t);
+        }
+        (t, _) => out.push(t.to_string()),
+    }
+    out
 }
 
 pub struct Session {
     pub cfg: SessionConfig,
     pub entries: Vec<Entry>,
     history: Vec<(String, String)>,
-    pending: Option<Pending>,
     next_id: u64,
     pos_ms: u64,
 }
 
 impl Session {
     pub fn new(cfg: SessionConfig) -> Self {
-        Self { cfg, entries: vec![], history: vec![], pending: None, next_id: 0, pos_ms: 0 }
+        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0 }
     }
 
     /// Advance the wall clock used for history timestamps (call with every captured chunk).
@@ -124,11 +153,9 @@ impl Session {
     /// Glossary source terms, then the previous sentence; the front is cut first when too long.
     pub fn asr_prompt(&self) -> String {
         let terms: Vec<&str> = self.cfg.glossary.iter().map(|(s, _)| s.as_str()).collect();
-        let prev = match (&self.pending, self.history.last()) {
-            _ if !self.cfg.use_context => "",
-            (Some(p), _) => &p.text,
-            (None, Some((src, _))) => src,
-            (None, None) => "",
+        let prev = match self.history.last() {
+            Some((src, _)) if self.cfg.use_context => src.as_str(),
+            _ => "",
         };
         // Whisper mimics the prompt's style, so the term list ends with a period to keep punctuation on.
         let p = match (terms.is_empty(), prev.is_empty()) {
@@ -140,6 +167,9 @@ impl Session {
         p.chars().skip(n.saturating_sub(MAX_PROMPT_CHARS)).collect()
     }
 
+    /// A final (the endpointer heard a pause) is committed right away, even without sentence-ending punctuation.
+    /// Holding it for the rest of the sentence made captions pile up to 150+ chars and 20+ s whenever Whisper
+    /// left out punctuation, which it usually does for Korean.
     pub fn handle(&mut self, ev: Event, asr: &mut dyn Asr, mt: &mut dyn Translator, emit: &mut dyn FnMut(Caption)) -> Result<(), String> {
         let (pcm, fin) = match ev {
             Event::Partial(p) => (p, false),
@@ -149,31 +179,18 @@ impl Session {
         if is_hallucination(&t.text) {
             return Ok(());
         }
-        let start_ms = self.pending.as_ref().map_or(self.pos_ms.saturating_sub((pcm.len() * 1000 / RATE) as u64), |p| p.start_ms);
-        let text = join(self.pending.as_ref().map_or("", |p| &p.text), &t.text, &t.lang);
-        if fin && (ends_sentence(&text) || text.chars().count() >= MAX_HOLD_CHARS) {
-            self.pending = None;
-            return self.finalize(text, t.lang, start_ms, mt, emit);
-        }
         if fin {
-            self.pending = Some(Pending { text: text.clone(), lang: t.lang.clone(), start_ms });
+            let start_ms = self.pos_ms.saturating_sub((pcm.len() * 1000 / RATE) as u64);
+            return self.finalize(t.text, t.lang, start_ms, mt, emit);
         }
         // Not final yet: show a draft translation under the same id. The source is sent together with it,
         // because a caption without a translation would blank the previous draft in the overlay.
         // A draft of an unfinished fragment can come back empty or as just "…"; showing it would replace a readable one.
-        let translation = self.translate(&text, &t.lang, mt, &mut |_| {})?;
+        let translation = self.translate(&t.text, &t.lang, mt, &mut |_| {})?;
         if has_words(&translation) {
-            emit(Caption { id: self.next_id, stage: Stage::Partial, lang: t.lang, source: text, translation });
+            emit(Caption { id: self.next_id, stage: Stage::Partial, lang: t.lang, source: t.text, translation });
         }
         Ok(())
-    }
-
-    /// Finalize a held fragment, e.g. after the speaker has been quiet for a while.
-    pub fn flush(&mut self, mt: &mut dyn Translator, emit: &mut dyn FnMut(Caption)) -> Result<(), String> {
-        match self.pending.take() {
-            Some(p) => self.finalize(p.text, p.lang, p.start_ms, mt, emit),
-            None => Ok(()),
-        }
     }
 
     fn translate(&self, text: &str, lang: &str, mt: &mut dyn Translator, on_piece: &mut dyn FnMut(&str)) -> Result<String, String> {
@@ -192,20 +209,31 @@ impl Session {
         Ok(mt.translate(&req, on_piece)?.trim().to_string())
     }
 
+    /// One caption per sentence: the first replaces the draft (same id), the rest follow with new ids.
+    /// History timestamps are spread over the utterance by sentence length.
     fn finalize(&mut self, text: String, lang: String, start_ms: u64, mt: &mut dyn Translator, emit: &mut dyn FnMut(Caption)) -> Result<(), String> {
-        let mut cap = Caption { id: self.next_id, stage: Stage::Streaming, lang, source: text, translation: String::new() };
-        let mut acc = String::new();
-        cap.translation = self.translate(&cap.source, &cap.lang, mt, &mut |piece| {
-            acc.push_str(piece);
-            emit(Caption { translation: acc.clone(), ..cap.clone() });
-        })?;
-        cap.stage = Stage::Final;
-        emit(cap.clone());
-        self.next_id += 1;
-        self.entries.push(Entry { start_ms, end_ms: self.pos_ms, lang: cap.lang, source: cap.source.clone(), translation: cap.translation.clone() });
-        self.history.push((cap.source, cap.translation));
-        if self.history.len() > HISTORY {
-            self.history.remove(0);
+        let sentences = split_sentences(&punctuate(&text, &lang));
+        let total: usize = sentences.iter().map(|s| s.chars().count()).sum::<usize>().max(1);
+        let span = self.pos_ms.saturating_sub(start_ms);
+        let mut done = 0;
+        for source in sentences {
+            let from = start_ms + span * done as u64 / total as u64;
+            done += source.chars().count();
+            let to = start_ms + span * done as u64 / total as u64;
+            let mut cap = Caption { id: self.next_id, stage: Stage::Streaming, lang: lang.clone(), source, translation: String::new() };
+            let mut acc = String::new();
+            cap.translation = self.translate(&cap.source, &cap.lang, mt, &mut |piece| {
+                acc.push_str(piece);
+                emit(Caption { translation: acc.clone(), ..cap.clone() });
+            })?;
+            cap.stage = Stage::Final;
+            emit(cap.clone());
+            self.next_id += 1;
+            self.entries.push(Entry { start_ms: from, end_ms: to, lang: cap.lang, source: cap.source.clone(), translation: cap.translation.clone() });
+            self.history.push((cap.source, cap.translation));
+            if self.history.len() > HISTORY {
+                self.history.remove(0);
+            }
         }
         Ok(())
     }
@@ -290,41 +318,49 @@ mod tests {
     }
 
     #[test]
-    fn unfinished_sentence_is_held_and_merged_with_the_next_final() {
+    fn final_without_punctuation_is_committed_with_a_full_stop_that_reaches_the_next_prompt() {
         let mut s = Session::new(SessionConfig::default());
-        let (mut a, mut mt, mut caps) = (asr(vec!["So when you blink", "you should already be behind them."]), FakeMt(vec![]), vec![]);
-        s.tick(SEC);
-        fin(&mut s, &mut a, &mut mt, &mut caps);
-        assert!(s.entries.is_empty() && caps.iter().all(|c| c.stage == Stage::Partial && c.id == 0), "held fragment shows as a draft");
-        s.tick(2 * SEC);
-        fin(&mut s, &mut a, &mut mt, &mut caps);
-        assert_eq!(s.entries.len(), 1);
-        let e = &s.entries[0];
-        assert_eq!(e.source, "So when you blink you should already be behind them.");
-        assert_eq!((e.start_ms, e.end_ms), (0, 3000), "entry spans both fragments");
-        assert_eq!(caps.last().unwrap().id, 0, "the merged final replaces the draft");
+        let (mut a, mut mt, mut caps) = (asr(vec!["So when you blink", "you should already be behind them", "この設定を変えるのが早すぎます"]), FakeMt(vec![]), vec![]);
+        for _ in 0..3 {
+            fin(&mut s, &mut a, &mut mt, &mut caps);
+        }
+        let sources: Vec<_> = s.entries.iter().map(|e| e.source.as_str()).collect();
+        assert_eq!(sources, ["So when you blink.", "you should already be behind them.", "この設定を変えるのが早すぎます。"]);
+        assert_eq!(a.1[1], "So when you blink.", "Whisper sees a punctuated prompt and keeps punctuating");
+        assert!(caps.iter().all(|c| c.stage != Stage::Partial), "a final is not shown as a held draft");
     }
 
     #[test]
-    fn japanese_fragments_join_without_space_and_flush_finalizes() {
+    fn long_utterance_becomes_one_caption_per_sentence() {
         let mut s = Session::new(SessionConfig::default());
-        let (mut a, mut mt, mut caps) = (asr(vec!["この設定を変えるのが", "早すぎます"]), FakeMt(vec![]), vec![]);
+        let (mut a, mut mt, mut caps) = (asr(vec!["The tank is already in there. Get ready to go in here. Same way? Then go around with the tank"]), FakeMt(vec![]), vec![]);
+        s.tick(10 * SEC);
         fin(&mut s, &mut a, &mut mt, &mut caps);
-        fin(&mut s, &mut a, &mut mt, &mut caps);
-        assert!(s.entries.is_empty());
-        s.flush(&mut mt, &mut |c| caps.push(c)).unwrap();
-        assert_eq!(s.entries[0].source, "この設定を変えるのが早すぎます");
-        s.flush(&mut mt, &mut |c| caps.push(c)).unwrap();
-        assert_eq!(s.entries.len(), 1, "second flush is a no-op");
+        let sources: Vec<_> = s.entries.iter().map(|e| e.source.as_str()).collect();
+        assert_eq!(sources, ["The tank is already in there.", "Get ready to go in here.", "Same way? Then go around with the tank."], "a short sentence joins the next one");
+        let finals: Vec<_> = caps.iter().filter(|c| c.stage == Stage::Final).map(|c| c.id).collect();
+        assert_eq!(finals, [0, 1, 2], "the first sentence replaces the draft, the rest get their own captions");
+        assert_eq!(mt.0.len(), 3, "each sentence is translated on its own");
+        assert!(mt.0[1].contains(" h1 ") && mt.0[2].contains(" h2 "), "earlier sentences are context: {:?}", mt.0);
+        let spans: Vec<_> = s.entries.iter().map(|e| (e.start_ms, e.end_ms)).collect();
+        assert_eq!((spans[0].0, spans[2].1), (9000, 10000), "the utterance's span is shared out");
+        assert!(spans.windows(2).all(|w| w[0].1 == w[1].0 && w[0].0 < w[0].1), "{spans:?}");
     }
 
     #[test]
-    fn long_held_text_is_finalized_anyway() {
-        let mut s = Session::new(SessionConfig::default());
-        let long: &'static str = Box::leak("word ".repeat(40).into_boxed_str());
-        let (mut a, mut mt, mut caps) = (asr(vec![long]), FakeMt(vec![]), vec![]);
-        fin(&mut s, &mut a, &mut mt, &mut caps);
-        assert_eq!(s.entries.len(), 1);
+    fn sentence_splitting() {
+        let cases: [(&str, &[&str]); 7] = [
+            ("오늘 날씨가 정말 좋아서 산책하고 싶어. 그럼 같이 공원에 가 볼까?", &["오늘 날씨가 정말 좋아서 산책하고 싶어.", "그럼 같이 공원에 가 볼까?"]),
+            ("今日はいい天気ですね。明日は雨が降るそうですよ。", &["今日はいい天気ですね。", "明日は雨が降るそうですよ。"]),
+            ("彼は「本当にいいね！」と言ってくれました。", &["彼は「本当にいいね！」と言ってくれました。"]),
+            ("He said \"we should go now.\" Then he left the room.", &["He said \"we should go now.\"", "Then he left the room."]),
+            ("It costs 1.5 dollars per item today.", &["It costs 1.5 dollars per item today."]),
+            ("그게.. 다시 설명해 줄게.", &["그게.. 다시 설명해 줄게."]),
+            ("I think we should go now. Okay.", &["I think we should go now. Okay."]),
+        ];
+        for (text, want) in cases {
+            assert_eq!(split_sentences(text), want, "{text}");
+        }
     }
 
     #[test]
@@ -361,6 +397,9 @@ mod tests {
         }
         for t in ["So when", "그래서", "1,000"] {
             assert!(!ends_sentence(t), "{t}");
+        }
+        for (t, lang, want) in [("그래서", "ko", "그래서."), ("Hi!", "en", "Hi!"), ("そうです", "ja", "そうです。"), ("本当？", "ja", "本当？")] {
+            assert_eq!(punctuate(t, lang), want);
         }
         for (t, words) in [("…", false), ("...", false), ("", false), (" 。", false), ("でも…", true), ("그래서", true), ("1", true)] {
             assert_eq!(has_words(t), words, "{t:?}");

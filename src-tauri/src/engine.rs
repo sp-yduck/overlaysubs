@@ -246,7 +246,6 @@ mod tests {
             s.handle(ev, &mut asr, &mut mt, &mut |c| if c.stage == Stage::Final { finals.push(c) }).unwrap();
             eprintln!("utterance took {:?}", t0.elapsed());
         }
-        s.flush(&mut mt, &mut |c| if c.stage == Stage::Final { finals.push(c) }).unwrap();
         for c in &finals {
             eprintln!("[{}] {}\n  → {}", c.lang, c.source, c.translation);
         }
