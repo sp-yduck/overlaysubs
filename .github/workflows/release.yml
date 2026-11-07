@@ -167,6 +167,22 @@ jobs:
           # GGML_NATIVE=OFF build below.
           key: ${{ matrix.features }}-native-off
 
+      # The cached target dir also holds the installers of the run that saved the cache
+      # (target/release/bundle, C:\t\release\bundle on Windows). They are named after the app
+      # version, so an older one sat next to the new build and the staging step's
+      # `Select-Object -First 1` picked it: v0.2.1's Windows assets were the 0.1.0 installers from
+      # an earlier dry run. Start every build from an empty bundle dir.
+      - name: Remove installers restored from the cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir=${{ runner.os == 'Windows' && '/c/t/release/bundle' || 'target/release/bundle' }}
+          if [ -d "$dir" ]; then
+            echo "Removing restored bundles:"
+            find "$dir" -maxdepth 2 -type f -print
+            rm -rf "$dir"
+          fi
+
       # --- Windows: Vulkan SDK (same pin as the previous ci.yml bundle job) ---
       - name: Install Vulkan SDK
         if: matrix.features == 'vulkan'
@@ -240,10 +256,19 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $nsis = Get-ChildItem "C:\t\release\bundle\nsis\*.exe" -File | Select-Object -First 1
-          $msi = Get-ChildItem "C:\t\release\bundle\msi\*.msi" -File | Select-Object -First 1
-          if (-not $nsis) { throw "NSIS installer not found under C:\t\release\bundle\nsis" }
-          if (-not $msi) { throw "MSI installer not found under C:\t\release\bundle\msi" }
+          # Exactly one installer of each kind: the bundle dir is emptied before the build, so a
+          # second file would be a leftover that must not be published by picking "the first".
+          $nsisAll = @(Get-ChildItem "C:\t\release\bundle\nsis\*.exe" -File)
+          $msiAll = @(Get-ChildItem "C:\t\release\bundle\msi\*.msi" -File)
+          if ($nsisAll.Count -ne 1) { throw "Expected exactly one NSIS installer under C:\t\release\bundle\nsis, found: $($nsisAll.Name -join ', ')" }
+          if ($msiAll.Count -ne 1) { throw "Expected exactly one MSI installer under C:\t\release\bundle\msi, found: $($msiAll.Name -join ', ')" }
+          $nsis = $nsisAll[0]
+          $msi = $msiAll[0]
+          # The installers carry the app version in their names; it must be the version being built.
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          foreach ($f in @($nsis, $msi)) {
+            if ($f.Name -notlike "*_${version}_*") { throw "$($f.Name) is not an installer for version $version" }
+          }
           if ($nsis.Name -notlike "*-setup.exe") { throw "Unexpected NSIS installer name: $($nsis.Name)" }
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item $nsis.FullName "dist\overlaysubs-windows-x64-setup.exe" -Force
@@ -424,11 +449,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          dmg=$(find . -type f -name '*.dmg' -path '*/release/bundle/dmg/*' -print -quit)
-          if [ -z "$dmg" ]; then
-            echo "::error::no .dmg under */release/bundle/dmg/"
+          # Exactly one dmg, for the version being built (see "Remove installers restored from the cache").
+          dmgs=$(find . -type f -name '*.dmg' -path '*/release/bundle/dmg/*')
+          if [ "$(printf '%s' "$dmgs" | grep -c .)" -ne 1 ]; then
+            echo "::error::expected exactly one .dmg under */release/bundle/dmg/, found: ${dmgs:-none}"
             exit 1
           fi
+          dmg=$dmgs
+          version=$(jq -r .version src-tauri/tauri.conf.json)
+          case "$(basename "$dmg")" in
+            *"_${version}_"*) ;;
+            *) echo "::error::$dmg is not a dmg for version $version"; exit 1 ;;
+          esac
           mkdir -p dist
           cp "$dmg" dist/overlaysubs-macos-arm64.dmg
           bytes=$(stat -f%z dist/overlaysubs-macos-arm64.dmg)
