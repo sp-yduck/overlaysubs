@@ -147,6 +147,16 @@ jobs:
       # llama.cpp already forces GGML_NATIVE=OFF unless target-cpu=native; do the same for
       # whisper.cpp so release binaries run on every supported CPU.
       GGML_NATIVE: "OFF"
+      # llama-cpp-sys-2 forwards every CMAKE_* environment variable to llama.cpp's CMake as a
+      # cache entry. llama.cpp defaults LLAMA_OPENSSL=ON, and vendor/cpp-httplib then links
+      # whatever find_package(OpenSSL) discovers into libllama-common. On the macOS runner that
+      # is Homebrew's keg-only openssl@4, so the dylib gets a hard-coded install name such as
+      # /opt/homebrew/opt/openssl@4/lib/libssl.4.dylib (issue #35). Those dylibs are not
+      # bundled, so the app aborts before showing a window on Macs without that Homebrew keg
+      # ("Library not loaded: /opt/homebrew/.../libssl.4.dylib"). HTTPS support in cpp-httplib
+      # is unused by this app, so skip find_package(OpenSSL) entirely. Changing this variable
+      # requires bumping the rust-cache key below (build scripts are not re-run otherwise).
+      CMAKE_DISABLE_FIND_PACKAGE_OpenSSL: "ON"
     steps:
       - run: git config --global core.longpaths true
       - uses: actions/checkout@v7
@@ -162,10 +172,11 @@ jobs:
           workspaces: "."
           cache-directories: ${{ runner.os == 'Windows' && 'C:\t' || '' }}
           # Bump the suffix whenever the C/C++ build flags change: cargo does not rerun
-          # whisper-rs-sys/llama-cpp-sys build scripts for a changed GGML_* environment, so a
-          # restored target dir would keep the old (native) objects. "native-off" is the
-          # GGML_NATIVE=OFF build below.
-          key: ${{ matrix.features }}-native-off
+          # whisper-rs-sys/llama-cpp-sys build scripts for a changed GGML_*/CMAKE_* environment,
+          # so a restored target dir would keep the old objects. "native-off" is the
+          # GGML_NATIVE=OFF build below; "no-openssl" is CMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON
+          # (without the bump, cached llama dylibs still link Homebrew's openssl@4).
+          key: ${{ matrix.features }}-native-off-no-openssl
 
       # The cached target dir also holds the installers of the run that saved the cache
       # (target/release/bundle, C:\t\release\bundle on Windows). They are named after the app
@@ -412,31 +423,143 @@ jobs:
 
           codesign --verify --strict "$app"
 
-          # Every @rpath dependency of the main binary must be bundled inside the .app, otherwise
-          # the installed app cannot start even though signing succeeded.
+          # Every Mach-O file inside the .app must only depend on macOS system libraries or on
+          # files that ship in the same bundle. Checking just the main executable's @rpath
+          # entries is not enough: v0.2.4 passed that check while Contents/Frameworks/
+          # libllama-common.0.dylib still loaded Homebrew's /opt/homebrew/opt/openssl@4/lib/
+          # libssl.4.dylib, so the app died before showing a window on Macs without that keg
+          # (issue #35). Walk all Mach-O files, including the nested Frameworks dylibs.
           frameworks="$app/Contents/Frameworks"
           if [ ! -d "$frameworks" ]; then
             echo "::error::no Contents/Frameworks directory in the app bundle"
             exit 1
           fi
-          missing=0
-          checked=0
-          for lib in $(otool -L "$app/Contents/MacOS/$executable_name" | awk '/@rpath\// {print $1}' | sort -u); do
-            name=${lib#@rpath/}
-            checked=$((checked + 1))
-            if [ ! -e "$frameworks/$name" ]; then
-              echo "::error::$lib is referenced by the binary but missing from Contents/Frameworks"
-              missing=1
-            elif ! codesign --verify --strict "$frameworks/$name" > /dev/null 2>&1; then
-              echo "::warning::$frameworks/$name has no valid code signature (ad-hoc linker signature expected)"
+          for lib in "$frameworks"/*; do
+            [ -e "$lib" ] || continue
+            if ! codesign --verify --strict "$lib" > /dev/null 2>&1; then
+              echo "::warning::$lib has no valid code signature (ad-hoc linker signature expected)"
             fi
           done
-          [ "$missing" -eq 0 ] || exit 1
-          if [ "$checked" -eq 0 ]; then
-            echo "::warning::the main executable has no @rpath dependencies; the Contents/Frameworks check was vacuous"
-          else
-            echo "all $checked @rpath dependencies are present in Contents/Frameworks"
-          fi
+          python3 - "$app" <<'PY'
+          import os
+          import struct
+          import sys
+
+          MH_MAGIC_64 = 0xFEEDFACF
+          FAT_MAGIC = 0xCAFEBABE
+          FAT_MAGIC_64 = 0xCAFEBABF
+          LC_LOAD_DYLIB = 0xC
+          LC_LOAD_WEAK_DYLIB = 0x80000018
+          LC_REEXPORT_DYLIB = 0x8000001F
+          LC_LOAD_UPWARD_DYLIB = 0x80000023
+          DYLIB_COMMANDS = {
+              LC_LOAD_DYLIB,
+              LC_LOAD_WEAK_DYLIB,
+              LC_REEXPORT_DYLIB,
+              LC_LOAD_UPWARD_DYLIB,
+          }
+          # Provided by macOS itself; anything else has to ship inside the .app.
+          SYSTEM_PREFIXES = ("/usr/lib/", "/System/Library/", "/Library/Apple/")
+
+          app = os.path.abspath(sys.argv[1])
+          contents = os.path.join(app, "Contents")
+          macos_dir = os.path.join(contents, "MacOS")
+          frameworks_dir = os.path.join(contents, "Frameworks")
+
+
+          def _string(data, offset):
+              end = data.index(b"\0", offset)
+              return data[offset:end].decode("utf-8", "replace")
+
+
+          def _parse_thin(data, offset, dependencies):
+              """Collect the dylib load commands of one thin Mach-O image."""
+              if struct.unpack_from("<I", data, offset)[0] != MH_MAGIC_64:
+                  return  # 32-bit images are not expected in an arm64 bundle
+              command_count = struct.unpack_from("<I", data, offset + 16)[0]
+              position = offset + 32
+              for _ in range(command_count):
+                  command, size = struct.unpack_from("<II", data, position)
+                  if command in DYLIB_COMMANDS:
+                      name_offset = struct.unpack_from("<I", data, position + 8)[0]
+                      dependencies.append(_string(data, position + name_offset))
+                  position += size
+
+
+          def dependencies_of(path):
+              """Return the dylib dependencies of path, or None when it is not Mach-O."""
+              with open(path, "rb") as handle:
+                  data = handle.read()
+              if len(data) < 8:
+                  return None
+              if struct.unpack_from("<I", data, 0)[0] == MH_MAGIC_64:
+                  dependencies = []
+                  _parse_thin(data, 0, dependencies)
+                  return dependencies
+              magic = struct.unpack_from(">I", data, 0)[0]
+              if magic not in (FAT_MAGIC, FAT_MAGIC_64):
+                  return None
+              dependencies = []
+              for index in range(struct.unpack_from(">I", data, 4)[0]):
+                  if magic == FAT_MAGIC:
+                      offset = struct.unpack_from(">I", data, 8 + index * 20 + 8)[0]
+                  else:
+                      offset = struct.unpack_from(">Q", data, 8 + index * 32 + 8)[0]
+                  _parse_thin(data, offset, dependencies)
+              return dependencies
+
+
+          def unbundled_dependency(dependency, owner):
+              """Return why dependency cannot load on a Mac without Homebrew, or None."""
+              if dependency.startswith("/"):
+                  if dependency.startswith(SYSTEM_PREFIXES):
+                      return None
+                  return f"depends on {dependency}, an absolute path outside the macOS system libraries"
+              if dependency.startswith("@rpath/"):
+                  name = dependency[len("@rpath/"):]
+                  if os.path.exists(os.path.join(frameworks_dir, name)):
+                      return None
+                  return f"depends on {dependency}, which is missing from Contents/Frameworks"
+              if dependency.startswith("@loader_path/"):
+                  relative = dependency[len("@loader_path/"):]
+                  if os.path.exists(os.path.normpath(os.path.join(os.path.dirname(owner), relative))):
+                      return None
+                  return f"depends on {dependency}, which does not resolve next to {os.path.basename(owner)}"
+              if dependency.startswith("@executable_path/"):
+                  relative = dependency[len("@executable_path/"):]
+                  if os.path.exists(os.path.normpath(os.path.join(macos_dir, relative))):
+                      return None
+                  return f"depends on {dependency}, which does not resolve inside Contents/MacOS"
+              return f"depends on {dependency}, which uses an unsupported install name"
+
+
+          inspected = 0
+          problems = 0
+          for directory, _, names in os.walk(contents):
+              for name in sorted(names):
+                  path = os.path.join(directory, name)
+                  try:
+                      dependencies = dependencies_of(path)
+                  except (OSError, ValueError, struct.error) as error:
+                      print(f"::warning::could not inspect {os.path.relpath(path, app)}: {error}")
+                      continue
+                  if dependencies is None:
+                      continue
+                  inspected += 1
+                  for dependency in dependencies:
+                      problem = unbundled_dependency(dependency, path)
+                      if problem is not None:
+                          print(f"::error::{os.path.relpath(path, app)} {problem}")
+                          problems += 1
+
+          if problems:
+              print(f"{problems} unbundled dependency(ies) found; the app would fail to launch on a Mac without Homebrew")
+              sys.exit(1)
+          if inspected == 0:
+              print("::error::no Mach-O files were found inside the app bundle")
+              sys.exit(1)
+          print(f"checked {inspected} Mach-O files; every dependency is a macOS system library or bundled")
+          PY
 
           # Nested Frameworks: arm64 linker output is already ad-hoc signed, so this normally
           # passes; keep it non-fatal so a bundler-level detail cannot block a release.

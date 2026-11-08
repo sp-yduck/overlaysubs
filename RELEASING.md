@@ -255,8 +255,23 @@ whisper.cpp / ggml は `GGML_NATIVE` が既定で ON のため、明示的に OF
 最適化されます（llama.cpp は既定で OFF、whisper.cpp は `release.yml` の build ジョブで
 `GGML_NATIVE=OFF` を渡しています）。
 
-`GGML_*` の設定を変えたときは、rust-cache の `key` の接尾辞（現在は `-native-off`）も更新してください。
-キャッシュが復元されると C/C++ のオブジェクトが再利用され、設定変更が反映されません。
+`GGML_*` / `CMAKE_*` の設定を変えたときは、rust-cache の `key` の接尾辞（現在は
+`-native-off-no-openssl`）も更新してください。キャッシュが復元されると C/C++ のオブジェクトが再利用され、
+設定変更が反映されません。
+
+### macOS 版が起動直後に落ちる（`Library not loaded: /opt/homebrew/...`）
+
+配布した macOS 版が、Homebrew を入れていない Mac で「問題が起きたため OverlaySubs を開けません」と
+表示されて終了する場合、同梱した llama の dylib がビルドマシン（GitHub ランナー）の
+Homebrew の OpenSSL を絶対パスで参照しています。llama.cpp の `LLAMA_OPENSSL` は既定で ON で、
+`vendor/cpp-httplib` が `find_package(OpenSSL)` で見つけた OpenSSL を `libllama-common` にリンクするため
+（v0.2.4 で発生: issue #35）、Homebrew の無い Mac では `libssl.4.dylib` を読み込めずに dyld が
+`Library missing` で終了します。
+
+`release.yml` の build ジョブは `CMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON` を渡して検出そのものを止め、
+`Verify macOS bundle is signed` ステップで **バンドル内の全 Mach-O** の依存を検査して、macOS の
+システムライブラリ以外の絶対パスや、未同梱の `@rpath` があれば失敗するようにしています。
+この設定を変えたときも rust-cache の `key` の接尾辞を更新してください。
 
 ### 同じバージョンで作り直したい
 
