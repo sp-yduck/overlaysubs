@@ -8,6 +8,10 @@ OverlaySubs の主な変更点を記録します。
 
 次のリリースに向けた変更点をここに追記します。
 
+## [0.2.4] - 2026-11-08
+
+句読点の付かない音声（韓国語など）で字幕が長くつながり、確定まで待たされて読めなくなる問題を修正しました。字幕は話の切れ目ごとに、文ごとに分けて表示されます。
+
 ### Fixed
 
 - 句読点の付かない音声（韓国語など）で字幕が 150 文字近くまでつながり、確定まで 20 秒以上かかって読めなくなる問題を修正しました。話の切れ目（無音）ごとに字幕を確定し、文末に句点がなければ付けるようにしました（次の発話の認識でも句点が付きやすくなります）。1 つの切れ目に複数の文が含まれる場合は、文ごとに別の字幕として翻訳・表示します。
@@ -79,7 +83,8 @@ v0.2.1 の Windows 版として配布していたインストーラーが古い�
 - プロジェクト名を OverlaySubs に変更しました（旧名: floatsubs。リポジトリ名・配布ファイル名は overlaysubs）。
 - 利用者向けのドキュメント（インストール・使い方・FAQ・ライセンス）を公式サイト（GitHub Pages）に移し、README は開発者向けに整理しました。
 
-[Unreleased]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/sp-yduck/overlaysubs/releases/tag/v0.2.1
