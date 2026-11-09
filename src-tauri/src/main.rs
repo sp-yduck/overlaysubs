@@ -93,8 +93,8 @@ struct App {
     preview_prev_visible: AtomicBool,
     /// A stopped session is waiting out its grace period before hiding the overlay.
     overlay_hide_pending: AtomicBool,
-    /// Where tauri.conf.json put the overlay at launch, before a saved position was applied.
-    overlay_default_position: Mutex<Option<tauri::PhysicalPosition<i32>>>,
+    /// Where tauri.conf.json put the overlay at launch (desktop units), before a saved position was applied.
+    overlay_default_position: Mutex<Option<(f64, f64)>>,
 }
 
 fn config_dir(app: &AppHandle) -> PathBuf {
@@ -536,40 +536,160 @@ fn set_click_through(app: AppHandle, on: bool) -> Result<(), String> {
     w.set_ignore_cursor_events(on).map_err(|e| e.to_string())
 }
 
-/// Where the overlay was last dragged. Kept out of settings.json, which the settings window rewrites whole.
+/// Where the overlay was last moved, in desktop units `{"x": .., "y": ..}` (see `DESKTOP_IN_POINTS`). Kept out of
+/// settings.json, which the settings window rewrites whole.
 const OVERLAY_POSITION: &str = "overlay-position.json";
 
-fn save_overlay_position(app: &AppHandle, p: tauri::PhysicalPosition<i32>) {
-    let dir = config_dir(app);
-    let res = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join(OVERLAY_POSITION), format!("[{}, {}]", p.x, p.y)));
-    if let Err(e) = res {
+/// The unit of the global desktop coordinates, which all overlay placement uses. macOS lays the desktop out in points,
+/// so a physical value is divided by the scale of the display it is on. Windows (and X11) lay it out in physical
+/// pixels across displays with different scales, and there tao converts a logical position with the scale of the
+/// display the window is on now, so a logical position would land on the wrong display.
+const DESKTOP_IN_POINTS: bool = cfg!(target_os = "macos");
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum SavedPosition {
+    Desktop { x: f64, y: f64 },
+    /// Physical pixels `[x, y]`, written by #42 before this format.
+    Physical(i32, i32),
+}
+
+/// A display's bounds or work area, or the overlay's bounds, in desktop units: x, y, width, height.
+type Rect = (f64, f64, f64, f64);
+
+/// A connected display: its whole bounds and its work area (without the menu bar and Dock or taskbar).
+struct Display {
+    bounds: Rect,
+    work_area: Rect,
+    /// Turns the overlay's logical size into desktop units on this display: its scale where the desktop is in
+    /// physical pixels (the window is rescaled when it moves there), 1 where the desktop is in points.
+    size_scale: f64,
+}
+
+/// Physical pixels to desktop units, for a value on a display (or window) with `scale`.
+fn to_desktop(v: f64, scale: f64, in_points: bool) -> f64 {
+    if in_points { v / scale } else { v }
+}
+
+fn desktop_position((x, y): (f64, f64)) -> tauri::Position {
+    if DESKTOP_IN_POINTS {
+        tauri::LogicalPosition::new(x, y).into()
+    } else {
+        tauri::PhysicalPosition::new(x.round() as i32, y.round() as i32).into()
+    }
+}
+
+fn save_overlay_position(w: &tauri::Window, p: tauri::PhysicalPosition<i32>) {
+    let Ok(scale) = w.scale_factor() else { return };
+    let at = |v: i32| to_desktop(v as f64, scale, DESKTOP_IN_POINTS);
+    let json = serde_json::to_string(&SavedPosition::Desktop { x: at(p.x), y: at(p.y) }).unwrap();
+    let dir = config_dir(w.app_handle());
+    if let Err(e) = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join(OVERLAY_POSITION), json)) {
         eprintln!("{OVERLAY_POSITION}: {e}");
     }
 }
 
-/// Back to where the overlay starts on first launch. The move is saved like a drag.
+/// Back to where the overlay started at launch, kept fully on a display; centered on the primary display when that
+/// spot is on no display any more (the display it was on was unplugged, say). The move is saved like a drag.
 /// `center()` is not used: it put the overlay higher than the launch position (measured on macOS).
 #[tauri::command]
 fn reset_overlay_position(app: AppHandle, st: State<App>) -> Result<(), String> {
     let w = app.get_webview_window("overlay").ok_or("no overlay")?;
-    let p = st.overlay_default_position.lock().unwrap().ok_or("no default overlay position")?;
-    w.set_position(p).map_err(|e| e.to_string())
+    let size = overlay_size(&w).ok_or("no overlay size")?;
+    let launch = *st.overlay_default_position.lock().unwrap();
+    let p = launch
+        .and_then(|p| fit_on_screen(p, size, &displays(&w)))
+        .or_else(|| w.primary_monitor().ok().flatten().map(|m| centered(size, &display(&m))))
+        .ok_or("no display for the overlay")?;
+    w.set_position(desktop_position(p)).map_err(|e| e.to_string())
 }
 
-/// Skipped when the saved spot is on no connected display (an external monitor was unplugged, say),
-/// since the overlay would then sit out of sight.
+/// Applies the saved position, moved so the whole overlay is on a display. Left at the launch position when the saved
+/// spot overlaps no display (an external display was unplugged, say), since the overlay would then sit out of sight.
 fn restore_overlay_position(app: &AppHandle) {
     let Some(w) = app.get_webview_window("overlay") else { return };
-    *app.state::<App>().overlay_default_position.lock().unwrap() = w.outer_position().ok();
-    let Ok(j) = std::fs::read_to_string(config_dir(app).join(OVERLAY_POSITION)) else { return };
-    let Ok((x, y)) = serde_json::from_str::<(i32, i32)>(&j) else { return };
-    let on_screen = w.available_monitors().unwrap_or_default().iter().any(|m| {
-        let (o, s) = (m.position(), m.size());
-        x >= o.x && y >= o.y && x < o.x + s.width as i32 && y < o.y + s.height as i32
-    });
-    if on_screen {
-        let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
+    if let (Ok(p), Ok(scale)) = (w.outer_position(), w.scale_factor()) {
+        let at = |v: i32| to_desktop(v as f64, scale, DESKTOP_IN_POINTS);
+        *app.state::<App>().overlay_default_position.lock().unwrap() = Some((at(p.x), at(p.y)));
     }
+    let Ok(j) = std::fs::read_to_string(config_dir(app).join(OVERLAY_POSITION)) else { return };
+    let saved = match serde_json::from_str::<SavedPosition>(&j) {
+        Ok(SavedPosition::Desktop { x, y }) => (x, y),
+        Ok(SavedPosition::Physical(x, y)) => legacy_to_desktop(&w, x, y),
+        Err(_) => return,
+    };
+    let Some(size) = overlay_size(&w) else { return };
+    if let Some(p) = fit_on_screen(saved, size, &displays(&w)) {
+        let _ = w.set_position(desktop_position(p));
+    }
+}
+
+/// On macOS, converts with the scale of the display that holds the point (falling back to the overlay's own).
+/// Elsewhere physical pixels already are desktop units.
+fn legacy_to_desktop(w: &tauri::WebviewWindow, x: i32, y: i32) -> (f64, f64) {
+    let scale = w
+        .available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .find(|m| {
+            let (o, s) = (m.position(), m.size());
+            x >= o.x && y >= o.y && x < o.x + s.width as i32 && y < o.y + s.height as i32
+        })
+        .map(|m| m.scale_factor())
+        .or_else(|| w.scale_factor().ok())
+        .unwrap_or(1.0);
+    (to_desktop(x as f64, scale, DESKTOP_IN_POINTS), to_desktop(y as f64, scale, DESKTOP_IN_POINTS))
+}
+
+/// The logical size, which stays the same on every display (the physical size changes with the display's scale).
+fn overlay_size(w: &tauri::WebviewWindow) -> Option<(f64, f64)> {
+    let s = w.outer_size().ok()?.to_logical::<f64>(w.scale_factor().ok()?);
+    Some((s.width, s.height))
+}
+
+fn displays(w: &tauri::WebviewWindow) -> Vec<Display> {
+    w.available_monitors().unwrap_or_default().iter().map(display).collect()
+}
+
+fn display(m: &tauri::Monitor) -> Display {
+    let (a, wa) = (m.position(), m.work_area());
+    let px = |p: &tauri::PhysicalPosition<i32>, s: &tauri::PhysicalSize<u32>| (p.x as f64, p.y as f64, s.width as f64, s.height as f64);
+    display_in_desktop(px(a, m.size()), px(&wa.position, &wa.size), m.scale_factor(), DESKTOP_IN_POINTS)
+}
+
+/// A display from its physical bounds and work area.
+fn display_in_desktop(bounds: Rect, work_area: Rect, scale: f64, in_points: bool) -> Display {
+    let r = |(x, y, w, h): Rect| (to_desktop(x, scale, in_points), to_desktop(y, scale, in_points), to_desktop(w, scale, in_points), to_desktop(h, scale, in_points));
+    Display { bounds: r(bounds), work_area: r(work_area), size_scale: if in_points { 1.0 } else { scale } }
+}
+
+/// Where the overlay at `(x, y)` with logical `size` goes so all of it shows. It stays put when it is fully inside the
+/// work area of the display that holds its top-left corner, measured with its size on that display. Otherwise it moves
+/// into the work area of the display it overlaps most (its top-left corner when it is larger than the area), measured
+/// with its size there. Overlaps are compared with one rectangle in desktop units: the overlay at the scale of the
+/// display that holds its top-left corner (the logical size when no display does). Sizes scaled per display would make
+/// a larger-scale neighbour look like it holds more of the overlay, and the bare logical size is too small where the
+/// desktop is in physical pixels. A spot over the Dock or menu bar still counts as on that display. None when it
+/// overlaps no display.
+fn fit_on_screen((x, y): (f64, f64), size: (f64, f64), displays: &[Display]) -> Option<(f64, f64)> {
+    let on = |d: &Display| (size.0 * d.size_scale, size.1 * d.size_scale);
+    let inside = |a: Rect, (w, h): (f64, f64)| x >= a.0 && y >= a.1 && x + w <= a.0 + a.2 && y + h <= a.1 + a.3;
+    let holds_corner = |a: Rect| x >= a.0 && y >= a.1 && x < a.0 + a.2 && y < a.1 + a.3;
+    let corner = displays.iter().find(|d| holds_corner(d.bounds));
+    if corner.is_some_and(|d| inside(d.work_area, on(d))) {
+        return Some((x, y));
+    }
+    let (w, h) = corner.map_or(size, on);
+    let overlap = |a: &Rect| ((x + w).min(a.0 + a.2) - x.max(a.0)).max(0.0) * ((y + h).min(a.1 + a.3) - y.max(a.1)).max(0.0);
+    let d = displays.iter().filter(|d| overlap(&d.bounds) > 0.0).max_by(|a, b| overlap(&a.bounds).total_cmp(&overlap(&b.bounds)))?;
+    let ((w, h), a) = (on(d), d.work_area);
+    Some((x.min(a.0 + a.2 - w).max(a.0), y.min(a.1 + a.3 - h).max(a.1)))
+}
+
+/// The overlay with logical `size` centered in the work area of `d`.
+fn centered(size: (f64, f64), d: &Display) -> (f64, f64) {
+    let (w, h, a) = (size.0 * d.size_scale, size.1 * d.size_scale, d.work_area);
+    (a.0 + (a.2 - w) / 2.0, a.1 + (a.3 - h) / 2.0)
 }
 
 /// Show or hide the overlay window from the settings UI.
@@ -669,7 +789,7 @@ fn main() {
             // Closing settings quits the app so the overlay does not linger.
             match e {
                 tauri::WindowEvent::CloseRequested { .. } if w.label() == "main" => w.app_handle().exit(0),
-                tauri::WindowEvent::Moved(p) if w.label() == "overlay" => save_overlay_position(w.app_handle(), *p),
+                tauri::WindowEvent::Moved(p) if w.label() == "overlay" => save_overlay_position(w, *p),
                 _ => {}
             }
         })
@@ -685,4 +805,135 @@ fn main() {
                 app.state::<App>().engines.lock().unwrap().take();
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A display whose work area is all of it.
+    const fn whole(r: Rect) -> Display {
+        Display { bounds: r, work_area: r, size_scale: 1.0 }
+    }
+    const HD: Display = whole((0.0, 0.0, 1920.0, 1080.0));
+    const OVERLAY: (f64, f64) = (1100.0, 220.0);
+
+    fn fit(x: f64, y: f64, displays: &[Display]) -> Option<(f64, f64)> {
+        fit_on_screen((x, y), OVERLAY, displays)
+    }
+
+    #[test]
+    fn overlay_inside_a_display_stays_put() {
+        assert_eq!(fit(400.0, 600.0, &[HD]), Some((400.0, 600.0)));
+    }
+
+    #[test]
+    fn overlay_past_an_edge_is_pulled_fully_on_screen() {
+        assert_eq!(fit(400.0, 1070.0, &[HD]), Some((400.0, 860.0)), "top-left on screen but the subtitles below the bottom edge");
+        assert_eq!(fit(1800.0, 300.0, &[HD]), Some((820.0, 300.0)), "right edge");
+        assert_eq!(fit(-500.0, -100.0, &[HD]), Some((0.0, 0.0)), "left and top edges");
+    }
+
+    #[test]
+    fn overlay_goes_to_the_display_it_overlaps_most() {
+        let displays = [HD, whole((1920.0, 0.0, 1440.0, 900.0))];
+        assert_eq!(fit(1800.0, 100.0, &displays), Some((1920.0, 100.0)));
+        assert_eq!(fit(1000.0, 100.0, &displays), Some((820.0, 100.0)));
+    }
+
+    #[test]
+    fn overlay_over_the_dock_is_pulled_into_the_work_area() {
+        // 1728x1117 MacBook display: menu bar above y = 33, Dock below y = 1036.
+        let mac = Display { bounds: (0.0, 0.0, 1728.0, 1117.0), work_area: (0.0, 33.0, 1728.0, 1003.0), size_scale: 1.0 };
+        assert_eq!(fit_on_screen((200.0, 1100.0), (1100.0, 221.0), &[mac]), Some((200.0, 815.0)));
+    }
+
+    /// 1x primary display and a 2x display to its right, as tao reports them (physical pixels).
+    fn mixed_scale(in_points: bool) -> [Display; 2] {
+        [
+            display_in_desktop((0.0, 0.0, 1920.0, 1080.0), (0.0, 0.0, 1920.0, 1040.0), 1.0, in_points),
+            display_in_desktop((1920.0, 0.0, 3840.0, 2160.0), (1920.0, 0.0, 3840.0, 2120.0), 2.0, in_points),
+        ]
+    }
+
+    #[test]
+    fn mixed_scale_displays_in_physical_desktop_units_do_not_overlap() {
+        // Windows: a spot saved on the 2x display stays there, wherever the overlay starts.
+        let d = mixed_scale(false);
+        assert_eq!((d[1].bounds.0, d[1].bounds.2), (1920.0, 3840.0));
+        assert_eq!(fit_on_screen((2400.0, 200.0), OVERLAY, &d), Some((2400.0, 200.0)));
+        // Divided by each display's own scale, the 2x display would start at 960 and overlap the 1x one.
+        assert_eq!(mixed_scale(true)[1].bounds.0, 960.0);
+    }
+
+    /// A 200% primary display and a 100% display to its right, in physical pixels.
+    fn primary_200_secondary_100() -> [Display; 2] {
+        [
+            display_in_desktop((0.0, 0.0, 3840.0, 2160.0), (0.0, 0.0, 3840.0, 2080.0), 2.0, false),
+            display_in_desktop((3840.0, 0.0, 1920.0, 1080.0), (3840.0, 0.0, 1920.0, 1040.0), 1.0, false),
+        ]
+    }
+
+    #[test]
+    fn overlay_fully_on_a_display_stays_next_to_a_larger_scale_one() {
+        // At 2200x440, the 2x neighbour would cover more of the overlay than the 1x display that really holds it.
+        assert_eq!(fit_on_screen((800.0, 200.0), OVERLAY, &mixed_scale(false)), Some((800.0, 200.0)));
+    }
+
+    #[test]
+    fn overlay_across_two_2x_displays_goes_to_the_one_that_holds_more_of_it() {
+        // Side by side at 200%: at (3100, 200) the overlay is 2200 pixels wide, 740 on the left display and 1460 on
+        // the right one. With the bare logical width (1100) the right display would seem to hold only 360.
+        let d = [
+            display_in_desktop((0.0, 0.0, 3840.0, 2160.0), (0.0, 0.0, 3840.0, 2080.0), 2.0, false),
+            display_in_desktop((3840.0, 0.0, 3840.0, 2160.0), (3840.0, 0.0, 3840.0, 2080.0), 2.0, false),
+        ];
+        assert_eq!(fit_on_screen((3100.0, 200.0), OVERLAY, &d), Some((3840.0, 200.0)));
+    }
+
+    #[test]
+    fn overlay_is_measured_at_the_scale_of_the_display_it_goes_to() {
+        let d = primary_200_secondary_100();
+        // Saved on the 100% display, restored while the overlay starts on the 200% one (2200x440 there).
+        // At 100% it is 1100x220, so the spot is valid and must not move.
+        assert_eq!(fit_on_screen((4500.0, 700.0), OVERLAY, &d), Some((4500.0, 700.0)));
+        // The other way round: on the 200% display the overlay is 2200x440, so it is pulled up to fit.
+        assert_eq!(fit_on_screen((1000.0, 1800.0), OVERLAY, &d), Some((1000.0, 1640.0)));
+    }
+
+    #[test]
+    fn reset_centers_with_the_size_on_the_primary_display() {
+        let d = primary_200_secondary_100();
+        assert_eq!(centered(OVERLAY, &d[0]), (820.0, 820.0));
+        assert_eq!(centered(OVERLAY, &d[1]), (4250.0, 410.0));
+    }
+
+    #[test]
+    fn macos_displays_are_in_points() {
+        let mac = display_in_desktop((0.0, 0.0, 3456.0, 2234.0), (0.0, 66.0, 3456.0, 2006.0), 2.0, true);
+        assert_eq!((mac.bounds, mac.work_area), ((0.0, 0.0, 1728.0, 1117.0), (0.0, 33.0, 1728.0, 1003.0)));
+    }
+
+    #[test]
+    fn overlay_on_no_display_is_not_placed() {
+        assert_eq!(fit(-50000.0, -50000.0, &[HD]), None);
+        assert_eq!(fit(2500.0, 100.0, &[HD]), None, "the display it was on was unplugged");
+    }
+
+    #[test]
+    fn overlay_larger_than_the_work_area_keeps_its_top_left_on_screen() {
+        assert_eq!(fit(100.0, 100.0, &[whole((0.0, 0.0, 800.0, 600.0))]), Some((0.0, 100.0)));
+    }
+
+    #[test]
+    fn centered_on_a_work_area() {
+        assert_eq!(centered(OVERLAY, &whole((0.0, 25.0, 1920.0, 1055.0))), (410.0, 442.5));
+    }
+
+    #[test]
+    fn saved_position_reads_desktop_and_earlier_physical_files() {
+        assert!(matches!(serde_json::from_str::<SavedPosition>(r#"{"x":200.5,"y":600}"#), Ok(SavedPosition::Desktop { x, y }) if x == 200.5 && y == 600.0));
+        assert!(matches!(serde_json::from_str::<SavedPosition>("[400, 1200]"), Ok(SavedPosition::Physical(400, 1200))));
+        assert!(serde_json::from_str::<SavedPosition>("garbage").is_err());
+    }
 }
