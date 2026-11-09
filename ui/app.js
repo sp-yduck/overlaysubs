@@ -392,6 +392,9 @@ listen("download", (e) => {
   const p = e.payload;
   const first = !progress[p.id];
   progress[p.id] = p;
+  // Progress is shown only on the models page. Re-rendering other pages on every chunk replaces the nav
+  // buttons between mousedown and mouseup, so clicks are lost until the download ends.
+  if (page !== "models") return;
   // Patch in place: a full render on every chunk would steal focus from inputs.
   const bar = document.querySelector(`[data-prog="${CSS.escape(p.id)}"]`);
   if (first || !bar) return render();
