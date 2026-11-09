@@ -106,7 +106,7 @@ npx --yes @tauri-apps/cli@^2 build --features metal    # macOS
 | `models.json` | モデル定義（URL・サイズ・SHA-256・ティア）。 |
 | `licenses/` | OverlaySubs 利用規約（日英）。PLaMo 3 のライセンスは本文を同梱せず、公式ページへのリンクのみを掲載します。 |
 | `scripts/` | リリース・バンドル用の補助スクリプト（`version.sh` は版の表示、`set-version.sh` は版の更新）。 |
-| `docs/` | 利用者向けドキュメント（GitHub Pages のソース。日本語 `docs/index.html`、英語 `docs/en/index.html`、共通 CSS `docs/style.css`）。インストール・使い方・FAQ・ライセンスをここに集約します。外部 CDN やフォントは使わず、単体で完結させてください。 |
+| `docs/` | 利用者向けドキュメント（GitHub Pages のソース。英語 `docs/index.html`、日本語 `docs/ja/index.html`、共通 CSS `docs/style.css`。`docs/en/index.html` は旧リンク用のリダイレクトです）。インストール・使い方・FAQ・ライセンスをここに集約します。英語ページは外部 CDN・フォントなしで完結させ、日本語ページのみ Google Fonts を読み込みます。 |
 
 ## モデル定義を変更するとき
 
@@ -115,7 +115,7 @@ npx --yes @tauri-apps/cli@^2 build --features metal    # macOS
 - URL は Hugging Face の**コミットに固定**してください。`/resolve/main/` は使わないでください（上流の再アップロードでハッシュが合わなくなります）。このルールは `crates/core` のテストで検証されています。
 - `size` と `sha256` は実ファイルと一致させてください。ダウンロードはハッシュ検証に失敗すると一時ファイルを削除します。
 - 各ティアにデフォルトの ASR と翻訳モデルが必要です（VAD は全ティア共通）。`Registry::parse` が起動時に検証します。
-- サイズを変更した場合は、docs/index.html と docs/en/index.html（利用者向けのダウンロード量の表）と README のティア表も更新してください。
+- サイズを変更した場合は、docs/index.html と docs/ja/index.html（利用者向けのダウンロード量の表）と README のティア表も更新してください。
 
 ## UI と言語
 
@@ -167,7 +167,7 @@ PR を出す前に、次を確認してください。
 - `cargo test -p overlaysubs-core` が通る。
 - 秘密情報（API キー、トークン、個人情報、ローカルのパス）を含めていない。
 - UI の文言を変更した場合、`ui/i18n.js` の英語と日本語の両方を更新した。
-- 動作やインストール手順が変わる場合、docs/index.html / docs/en/index.html（利用者向け）と README.md（英語）/ README.ja.md（日本語）（開発者向け）を更新した。
+- 動作やインストール手順が変わる場合、docs/index.html / docs/ja/index.html（利用者向け）と README.md（英語）/ README.ja.md（日本語）（開発者向け）を更新した。
 - ライセンスや利用規約（`licenses/`、PLaMo 3 のライセンスへのリンク）に関わる変更は、その理由を PR に書いた。
 - `CHANGELOG.md` への追記は不要（リリースノートは PR タイトルから自動生成されます）。
 

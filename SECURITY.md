@@ -44,7 +44,7 @@ The following are generally out of scope. If they affect this app, we still welc
 
 - Model quality, translation errors, and hallucination. Report them to the upstream projects (whisper.cpp / Silero VAD / PLaMo) or the model providers.
 - Vulnerabilities in upstream dependencies (Tauri, cpal, whisper-rs, llama-cpp-2, and so on) themselves. Report them upstream (reports about their impact on this app are welcome).
-- **SmartScreen / Gatekeeper warnings.** This is expected behaviour because the distributed builds are unsigned and not notarized, and it is not a security defect. Instructions are in [Warnings on the official site](https://sp-yduck.github.io/overlaysubs/en/#warning).
+- **SmartScreen / Gatekeeper warnings.** This is expected behaviour because the distributed builds are unsigned and not notarized, and it is not a security defect. Instructions are in [Warnings on the official site](https://sp-yduck.github.io/overlaysubs/#warning).
 - Problems with third-party loopback (virtual audio) devices or drivers.
 - Phishing, social engineering, and physical access.
 - Denial of service (DoS) or attacks that require unrealistic resource consumption.
@@ -62,4 +62,4 @@ The following are generally out of scope. If they affect this app, we still welc
 
 ## Contact
 
-The GitHub Security Advisories above are the **only** channel. We do not publish the developer's personal email address. For general questions that are not security-related, check the [FAQ on the official site](https://sp-yduck.github.io/overlaysubs/en/#faq) and then open an issue.
+The GitHub Security Advisories above are the **only** channel. We do not publish the developer's personal email address. For general questions that are not security-related, check the [FAQ on the official site](https://sp-yduck.github.io/overlaysubs/#faq) and then open an issue.

@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug. Before you start, check the [FAQ on the official site](https://sp-yduck.github.io/overlaysubs/en/#faq) and the existing issues.
+        Thanks for reporting a bug. Before you start, check the [FAQ on the official site](https://sp-yduck.github.io/overlaysubs/#faq) and the existing issues.
 
         **Do not report security issues as public issues. Report them privately following [SECURITY.md](https://github.com/sp-yduck/overlaysubs/blob/main/SECURITY.md).**
 

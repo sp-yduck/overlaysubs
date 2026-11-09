@@ -15,10 +15,10 @@ PC 上で再生されるあらゆる音声をリアルタイムで文字起こ�
 ## スクリーンショット
 
 **設定画面（翻訳）** — 言語・翻訳の調整・最近の字幕。
-[![設定画面](docs/images/ui-settings.png)](docs/images/ui-settings.png)
+[![設定画面](docs/images/ui-settings-ja.png)](docs/images/ui-settings-ja.png)
 
 **モデルの準備** — 初回起動時にハードウェアを判定し、ティアに合ったモデルをダウンロードします。
-[![モデルの準備画面](docs/images/ui-model-setup.png)](docs/images/ui-model-setup.png)
+[![モデルの準備画面](docs/images/ui-model-setup-ja.png)](docs/images/ui-model-setup-ja.png)
 
 **字幕オーバーレイ** — 他のアプリの上に重ねて表示されます。クリック透過は設定でオンにできます（背景はイメージ）。
 [![字幕オーバーレイ](docs/images/overlay.jpg)](docs/images/overlay.jpg)
@@ -27,16 +27,16 @@ PC 上で再生されるあらゆる音声をリアルタイムで文字起こ�
 
 **GitHub アカウントは不要です。** アプリを使うだけなら、公式サイトの手順に従ってダウンロードして実行してください。
 
-- 公式サイト（ダウンロード・インストール・使い方・FAQ・アンインストール・ライセンス）: <https://sp-yduck.github.io/overlaysubs/>
+- 公式サイト（ダウンロード・インストール・使い方・FAQ・アンインストール・ライセンス）: <https://sp-yduck.github.io/overlaysubs/ja/>
 - Windows 10 / 11（x64）: [overlaysubs-windows-x64-setup.exe](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe)（通常はこちら）
 - Windows（MSI）: [overlaysubs-windows-x64.msi](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64.msi)（管理者権限でインストールされます。通常は `.exe` を推奨）
 - macOS 13 以降（Apple Silicon）: [overlaysubs-macos-arm64.dmg](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg)（Intel Mac 版はありません）
 - チェックサム: [SHA256SUMS.txt](https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt) / リリース一覧: <https://github.com/sp-yduck/overlaysubs/releases/latest>
 
 インストール手順・警告が出たときの操作・SHA-256 の確認・使い方・FAQ・アンインストールは、すべて公式サイトにまとめています。
-[インストール](https://sp-yduck.github.io/overlaysubs/#install) / [警告が表示されたとき](https://sp-yduck.github.io/overlaysubs/#warning) / [使い方](https://sp-yduck.github.io/overlaysubs/#usage) / [FAQ](https://sp-yduck.github.io/overlaysubs/#faq) / [アンインストール](https://sp-yduck.github.io/overlaysubs/#uninstall) / [ライセンスと利用規約](https://sp-yduck.github.io/overlaysubs/#license)
+[インストール](https://sp-yduck.github.io/overlaysubs/ja/#install) / [警告が表示されたとき](https://sp-yduck.github.io/overlaysubs/ja/#warning) / [使い方](https://sp-yduck.github.io/overlaysubs/ja/#usage) / [FAQ](https://sp-yduck.github.io/overlaysubs/ja/#faq) / [アンインストール](https://sp-yduck.github.io/overlaysubs/ja/#uninstall) / [ライセンスと利用規約](https://sp-yduck.github.io/overlaysubs/ja/#license)
 
-> 配布ビルドは**未署名・未公証**です（Windows はコード署名なし、macOS は Developer ID 署名・公証なしの **ad-hoc 署名のみ**）。初回起動時に SmartScreen / Gatekeeper の警告が表示されますが、アプリ自体に問題があるという意味ではありません。回避手順は公式サイトの[警告が表示されたとき](https://sp-yduck.github.io/overlaysubs/#warning)を参照してください（Gatekeeper / SmartScreen をシステム全体で無効にしないでください）。
+> 配布ビルドは**未署名・未公証**です（Windows はコード署名なし、macOS は Developer ID 署名・公証なしの **ad-hoc 署名のみ**）。初回起動時に SmartScreen / Gatekeeper の警告が表示されますが、アプリ自体に問題があるという意味ではありません。回避手順は公式サイトの[警告が表示されたとき](https://sp-yduck.github.io/overlaysubs/ja/#warning)を参照してください（Gatekeeper / SmartScreen をシステム全体で無効にしないでください）。
 
 ## 目次
 
@@ -88,7 +88,7 @@ WASAPI loopback（Windows）/ ScreenCaptureKit のシステム音声（macOS）/
 - 暫定結果は薄く表示し、確定訳はストリーミングで上書きします。
 - 最前面・半透明のオーバーレイ（クリック透過は設定でオンにできます）。原文併記、文字サイズ、フォント、背景透過度、行数、表示時間、「Built with PLaMo」表記の有無を変更できます。翻訳中だけ表示され、停止すると隠れます。トレイメニューの「Show subtitles」または翻訳開始ボタンの上にあるトグルで手動で表示・非表示を切り替えることもできます。翻訳を停止中に「字幕の表示」を開くと、オーバーレイを表示してサンプル字幕を出し、見た目を確認しながら調整できます。
 - 履歴をテキスト／SRT で保存できます。
-- トレイ常駐、グローバルホットキー（既定 `CmdOrCtrl+Shift+T`。Windows は `Ctrl+Shift+T`、macOS は `Cmd+Shift+T`）で開始・停止。UI は日本語・英語・中国語（繁体字・簡体字）で、初回起動時に OS の言語設定から選びます（どれにも当てはまらなければ英語）。利用規約は日本語と英語のみで、中国語の UI では英語版を表示します。
+- トレイ常駐、グローバルホットキー（既定 `CmdOrCtrl+Shift+T`。Windows は `Ctrl+Shift+T`、macOS は `Cmd+Shift+T`）で開始・停止。UI は英語・日本語・中国語（繁体字・簡体字）で、初回起動時に OS の言語設定から選びます（どれにも当てはまらなければ英語）。利用規約は日本語と英語のみで、中国語の UI では英語版を表示します。
 - 起動時に GitHub Releases を一度だけ匿名で確認し、新しいバージョンがあれば設定画面に通知バナーを表示します。最新バージョンと現在のバージョンに加えて、「リリースページを開く」と「後で」のボタンが表示されます。ダウンロード・インストールは自動では行わず、オフラインや API エラーなどで確認できない場合は何も表示しません。「後で」で閉じると、次回起動時までは再表示されません。
 - 音声・文字起こし・翻訳データは外部に送信しません。テレメトリはありません。通信はモデルのダウンロードと、起動時に新しいリリースがあるかを確認する GitHub API への匿名のリクエスト 1 回だけです（アカウント・トークン・個人データは送信しません。失敗しても何も起きません）。モデルをダウンロードした後はオフラインでも動作します。
 
@@ -153,7 +153,7 @@ OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
 - [CONTRIBUTING.ja.md](CONTRIBUTING.ja.md) — 開発環境、テスト、PR の流れ
 - [SECURITY.md](SECURITY.md) — 脆弱性の報告方法（非公開で受け付けます）
 - [RELEASING.md](RELEASING.md) — リリース手順（管理者向け）
-- [docs/index.html](docs/index.html) — 利用者向けドキュメント（GitHub Pages のソース。外部 CDN・フォント・JS は使わず単体で完結）
+- [docs/index.html](docs/index.html) — 利用者向けドキュメント（GitHub Pages のソース。英語 docs/index.html / 日本語 docs/ja/index.html、共通 CSS。英語ページは外部 CDN・フォント・JS なしで完結）
 - Issue テンプレート: [バグ報告](.github/ISSUE_TEMPLATE/bug_report.yml) / [機能要望](.github/ISSUE_TEMPLATE/feature_request.yml)
 
 ## ライセンス

@@ -2,18 +2,19 @@ const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
 let cfg = { ...OVERLAY_DEFAULTS };
-let uiLang = "ja";
+let uiLang = "en";
 // Set while the appearance settings are open, so changes can be checked with translation stopped.
 let preview = false;
 const caps = new Map(); // id -> {caption, at}
 const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
 /** False for text made only of punctuation and spaces, such as "…" or "". */
 const hasWords = (s) => /[\p{L}\p{N}]/u.test(s || "");
-const t = (k) => (I18N[uiLang] || I18N.ja)[k] || k;
+const t = (k) => (I18N[uiLang] || I18N.en)[k] || k;
 
 function apply(settings) {
   cfg = { ...OVERLAY_DEFAULTS, ...settings.overlay };
   uiLang = settings.ui_lang || detectUiLang(navigator.languages);
+  document.documentElement.lang = uiLang || "en";
   showGrip();
   const r = document.documentElement.style;
   r.setProperty("--size", cfg.fontSize + "px");

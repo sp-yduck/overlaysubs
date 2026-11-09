@@ -24,7 +24,7 @@ pub struct SessionConfig {
     pub source_lang: Option<String>,
     #[serde(deserialize_with = "target_code")]
     pub target_lang: String,
-    /// Used when the speech is already in `target_lang` (e.g. ja speech while target is ja → en).
+    /// Used when the speech is already in `target_lang` (e.g. en speech while target is en → ja).
     #[serde(deserialize_with = "target_code")]
     pub alt_target_lang: String,
     pub form: Option<Form>,
@@ -42,7 +42,7 @@ fn target_code<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Erro
 
 impl Default for SessionConfig {
     fn default() -> Self {
-        Self { source_lang: None, target_lang: "ja".into(), alt_target_lang: "en".into(), form: None, use_context: true, glossary: vec![], topic: String::new() }
+        Self { source_lang: None, target_lang: "en".into(), alt_target_lang: "ja".into(), form: None, use_context: true, glossary: vec![], topic: String::new() }
     }
 }
 
@@ -286,7 +286,9 @@ mod tests {
 
     #[test]
     fn final_streams_then_records_history_and_routes_language() {
-        let mut s = Session::new(SessionConfig::default());
+        let cfg = SessionConfig::default();
+        assert_eq!((cfg.target_lang.as_str(), cfg.alt_target_lang.as_str()), ("en", "ja"), "English is the default target, Japanese the fallback when the speech is already English");
+        let mut s = Session::new(cfg);
         let (mut a, mut mt, mut caps) = (asr(vec!["Hello there.", "Thank you for watching!", "こんにちは。"]), FakeMt(vec![]), vec![]);
         for _ in 0..3 {
             fin(&mut s, &mut a, &mut mt, &mut caps);
@@ -294,7 +296,7 @@ mod tests {
         let stages: Vec<_> = caps.iter().map(|c| c.stage).collect();
         assert_eq!(stages, [Stage::Streaming, Stage::Streaming, Stage::Final, Stage::Streaming, Stage::Streaming, Stage::Final]);
         assert_eq!(caps[1].translation, "訳文");
-        assert!(mt.0[0].starts_with("en>ja h0") && mt.0[1].starts_with("ja>en h1"), "hallucination dropped, ja speech goes to alt target with context: {:?}", mt.0);
+        assert!(mt.0[0].starts_with("en>ja h0") && mt.0[1].starts_with("ja>en h1"), "hallucination dropped; English speech is already the target so it goes to the alternate language, Japanese speech to the target, with context: {:?}", mt.0);
         assert_eq!(s.entries.len(), 2);
     }
 
