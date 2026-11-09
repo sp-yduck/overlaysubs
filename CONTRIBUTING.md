@@ -101,7 +101,7 @@ You can also `cargo install tauri-cli --version "^2" --locked` and use `cargo ta
 | `src-tauri/capabilities/` | Tauri permissions. Update this when you use a new API. |
 | `ui/` | Settings window and overlay: plain HTML/JS/CSS with no build step. The strings live in `ui/i18n.js` (Japanese and English). |
 | `models.json` | Model definitions (URL, size, SHA-256, tier). |
-| `licenses/` | OverlaySubs Terms of Use (Japanese and English). The PLaMo 3 license is linked, not bundled. |
+| `licenses/` | OverlaySubs Terms of Use (Japanese and English). The PLaMo Community License (revised November 9, 2026) is linked, not bundled. |
 | `scripts/` | Helper scripts for releases and bundling (`version.sh` prints the version, `set-version.sh` updates it). |
 | `docs/` | End-user documentation (the GitHub Pages source: English `docs/index.html`, Japanese `docs/ja/index.html`, shared CSS `docs/style.css`; `docs/en/index.html` is a redirect stub for old links). Installation, usage, FAQ, and licenses are collected here. Keep the English page self-contained; the Japanese page currently loads Google Fonts. |
 
@@ -118,7 +118,7 @@ You can also `cargo install tauri-cli --version "^2" --locked` and use `cargo ta
 
 - `ui/i18n.js` contains English (`en`) and Japanese (`ja`). When you add or change UI text, update **both**.
 - When you add a setting, update the matching page in `ui/app.js` and, if needed, `Settings` in `src-tauri/src/main.rs`.
-- Do not remove the overlay credit (`Built with PLaMo`), the terms of use, or the link to the PLaMo 3 license; they have licensing significance.
+- Do not remove the terms of use or the link to the PLaMo Community License; they have licensing significance. The overlay itself no longer shows a credit; the project credits PFN as "Built with PLaMo" on the About screen, in the README and on the site, so keep those mentions.
 
 ## Commit messages
 
@@ -159,7 +159,7 @@ Before opening a pull request, check the following.
 - No secrets (API keys, tokens, personal information, local paths) are included.
 - If you changed UI text, you updated both English and Japanese in `ui/i18n.js`.
 - If behaviour or installation steps change, you updated the end-user docs (`docs/index.html` / `docs/ja/index.html`) and `README.md` (English) / `README.ja.md` (Japanese) (for developers).
-- If your change affects licenses or the terms of use (`licenses/`, the link to the PLaMo 3 license), you explained why in the pull request.
+- If your change affects licenses or the terms of use (`licenses/`, the link to the PLaMo Community License), you explained why in the pull request.
 - There is no changelog file to update: the release notes are generated from the pull request titles.
 
 ### Formatting

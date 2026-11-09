@@ -114,7 +114,7 @@ fn registry(app: &AppHandle) -> Result<Registry, String> {
 }
 
 /// Bump when the terms text changes; users are asked to accept again.
-const TERMS_VERSION: &str = "3";
+const TERMS_VERSION: &str = "4";
 
 /// Kept outside settings.json so a settings reset or schema change never re-asks for consent.
 fn terms_accepted(app: &AppHandle) -> bool {
@@ -499,7 +499,7 @@ fn export_history(st: State<App>, path: PathBuf, format: String, with_source: bo
     std::fs::write(path, body).map_err(|e| e.to_string())
 }
 
-/// OverlaySubs terms. The PLaMo 3 license is linked from the terms, not bundled.
+/// OverlaySubs terms. The PLaMo Community License is linked from the terms, not bundled.
 #[tauri::command]
 fn terms_text(lang: String) -> String {
     if lang == "ja" {

@@ -75,7 +75,7 @@ WASAPI loopback (Windows) / ScreenCaptureKit system audio (macOS) / microphone â
 - `ui` is the settings window and overlay: plain HTML/JS/CSS with no build step; `ui/i18n.js` holds the Japanese, English and Chinese (Traditional and Simplified) strings.
 - The ASR and translation engines sit behind the `session::Asr` / `session::Translator` traits and can be swapped.
 - `models.json` defines the models (URL, size, SHA-256, tier). URLs are pinned to Hugging Face commits (using `main` would break the hash when upstream re-uploads). Placing a `models.json` in the config folder overrides the bundled one without an app update.
-- `licenses/` ships the OverlaySubs Terms of Use (English and Japanese); `THIRD_PARTY_NOTICES.md` lists the bundled libraries' licenses. The PLaMo 3 license is not bundled; the app and docs link to the official page instead.
+- `licenses/` ships the OverlaySubs Terms of Use (English and Japanese); `THIRD_PARTY_NOTICES.md` lists the bundled libraries' licenses. The PLaMo Community License (revised November 9, 2026) is not bundled; the app and docs link to the official page instead.
 
 ## Features
 
@@ -86,7 +86,7 @@ WASAPI loopback (Windows) / ScreenCaptureKit system audio (macOS) / microphone â
 - Source language auto-detect or fixed. You can pick the target language and the "if already in that language" language, so Englishâ†”Japanese and Koreanâ†”Japanese work together.
 - Previous utterances are passed as context and translation happens per sentence. Glossary, a free-text topic hint, and Japanese plain/polite style are configurable.
 - Partial results are dimmed; final translations stream in and replace them.
-- Always-on-top, semi-transparent overlay (click-through can be enabled in settings). Original text, font size, font, background opacity, line count, display time, and the "Built with PLaMo" credit are configurable. The overlay appears while translating and hides when translation stops; you can also toggle it from "Show subtitles" in the tray menu or with the switch above the Start button. While translation is stopped, opening "Subtitles" shows the overlay with a sample caption so you can tune the appearance live.
+- Always-on-top, semi-transparent overlay (click-through can be enabled in settings). Original text, font size, font, background opacity, line count, and display time are configurable. The overlay appears while translating and hides when translation stops; you can also toggle it from "Show subtitles" in the tray menu or with the switch above the Start button. While translation is stopped, opening "Subtitles" shows the overlay with a sample caption so you can tune the appearance live.
 - Export history as text or SRT.
 - Tray/menu-bar resident, global hotkey (default `CmdOrCtrl+Shift+T`; `Ctrl+Shift+T` on Windows, `Cmd+Shift+T` on macOS) to start/stop. UI in English, Japanese and Chinese (Traditional and Simplified); the first launch picks one from the OS language settings, and falls back to English. The Terms of Use exist only in Japanese and English, so the Chinese UI shows the English version.
 - At startup the app makes one anonymous request to the GitHub Releases API to check for a newer version; if there is one, a dismissible banner in the settings window shows the latest and current version with "Open release page" and "Later" buttons. Nothing is downloaded or installed automatically, and if the check fails (offline, API error) nothing is shown. Dismissing the banner lasts until the app restarts.
@@ -160,7 +160,9 @@ Pushing a `v*` tag makes the release workflow build the bundles and publish them
 
 - **The app code is MIT licensed** ([LICENSE](LICENSE)).
 - Use of the app is governed by the [OverlaySubs Terms of Use](licenses/overlaysubs-terms.en.txt) ([Japanese](licenses/overlaysubs-terms.ja.txt)). You accept them on first launch, and they are also available from "About" in the app.
-- Use of the PLaMo 3 Translate translation model is governed by the [PLaMo 3 license](https://plamo.preferredai.jp/info/plamo-community-license-en).
+- Use of the PLaMo 3 Translate translation model is governed by the [PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license-en), revised by Preferred Networks on November 9, 2026. The license is not bundled; the app and docs link to the official text.
+- Personal and academic use of the model is free. Commercial use, including use inside a company or other organization, requires prior registration with Preferred Networks; it is free while your or your affiliates' most recent fiscal year revenue or sales is 1 billion yen or less, and a separate license agreement is required above that.
+- The revised license does not require attribution when you publish translated subtitles. For books, papers and similar long-form publications, state that PLaMo was used for translation; if you distribute subtitle data (for example as a dataset), state that the license applies to any model trained on it.
 - If you publish subtitles for streams or videos, mind the copyright of the source content.
 - Whisper models (MIT) and Silero VAD (MIT) follow their own licenses.
 - Third-party licenses for the bundled whisper.cpp / llama.cpp / ggml are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

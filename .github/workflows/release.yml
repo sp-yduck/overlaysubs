@@ -846,7 +846,7 @@ jobs:
           - [README (English: how it works and how to build)](https://github.com/sp-yduck/overlaysubs#readme)
           - [README (Japanese)](https://github.com/sp-yduck/overlaysubs/blob/main/README.ja.md)
           - [OverlaySubs Terms of Use (English)](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt) / [Japanese](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt)
-          - [PLaMo 3 license](https://plamo.preferredai.jp/info/plamo-community-license-en)
+          - [PLaMo Community License (revised November 9, 2026)](https://plamo.preferredai.jp/info/plamo-community-license-en)
           - [All releases](https://github.com/sp-yduck/overlaysubs/releases)
 
           The app code is MIT licensed. Translation uses Preferred Networks' PLaMo 3 Translate (**Built with PLaMo**).

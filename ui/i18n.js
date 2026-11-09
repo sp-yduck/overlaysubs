@@ -1,3 +1,5 @@
+// PLaMo Community License, revised November 9, 2026. The app links to the live
+// official text instead of bundling it, so a later revision is picked up as is.
 const PLAMO_LICENSE_URLS = {
   ja: "https://plamo.preferredai.jp/info/plamo-community-license-ja",
   en: "https://plamo.preferredai.jp/info/plamo-community-license-en",
@@ -7,7 +9,7 @@ const I18N = {
   ja: {
     terms_title: "OverlaySubs 利用規約",
     terms_intro: "OverlaySubsを使うには利用規約への同意が必要です。",
-    about_plamo_license: `翻訳モデル PLaMo 3 Translate の利用条件は <a href="${PLAMO_LICENSE_URLS.ja}" data-external>PLaMo 3 のライセンス</a> に従います。`,
+    about_plamo_license: `翻訳モデル PLaMo 3 Translate の利用条件は <a href="${PLAMO_LICENSE_URLS.ja}" data-external>PLaMo コミュニティライセンス</a>（2026年11月9日改定）に従います。`,
     terms_agree: "利用規約に同意する", accept: "同意して始める",
     nav_home: "翻訳", nav_models: "モデルの準備", nav_overlay: "字幕の表示", nav_history: "履歴", nav_about: "情報",
     home: "翻訳", need_setup: "先にモデルを準備してください", need_setup_long: "翻訳を始める前に、モデルの準備（約3分〜）が必要です。", goto_models: "モデルの準備へ",
@@ -28,15 +30,14 @@ const I18N = {
     asr: "音声認識", translator: "翻訳", vad: "VAD", models_dir: "保存先", change: "変更", delete: "削除", deleted: "削除しました", downloaded: "取得済み", missing: "未取得",
     advanced: "詳細設定", gpu_layers: "翻訳モデルのGPUレイヤー数（0でCPU）", whisper_gpu: "音声認識にGPUを使う",
     overlay: "字幕の表示", overlay_toggle: "オーバーレイ", show_overlay: "表示する", hide_overlay: "隠す",
-    show_source: "原文も表示", font_size: "文字サイズ", font: "フォント", bg: "背景の不透明度", lines: "表示行数", linger: "表示時間（秒）", click_through: "クリック透過", show_credit: "「Built with PLaMo」を表示",
+    show_source: "原文も表示", font_size: "文字サイズ", font: "フォント", bg: "背景の不透明度", lines: "表示行数", linger: "表示時間（秒）", click_through: "クリック透過",
     overlay_preview_note: "翻訳を停止しているあいだ、この画面を開くとオーバーレイを表示してサンプル字幕を出します。文字サイズ・フォント・背景の不透明度などの変更を、その場で確認できます。",
     drag_hint: "ここをドラッグして字幕を移動できます（位置は次回も保たれます）",
     reset_position: "字幕の位置を元に戻す", position_reset: "字幕を既定の位置に戻しました",
     preview_src_1: "This is a preview of the subtitles.", preview_tr_1: "字幕はこのように表示されます。",
     preview_src_2: "Changes apply instantly.", preview_tr_2: "設定の変更はすぐに反映されます。",
-    credit_off_note: "オフにすると、配信・録画に「Built with PLaMo」は表示されません。公開・配布する場合は PLaMo 3 のライセンスに従ってください。",
     history: "履歴", export_txt: "テキストで保存", export_srt: "SRTで保存", exported: "保存しました",
-    output_note: "公開・配布する場合は PLaMo 3 のライセンスに従ってください。元コンテンツの著作権にもご注意ください。",
+    output_note: "公開・配布する場合は PLaMo コミュニティライセンス（2026年11月9日改定）に従ってください。字幕データをデータセット等として配布する場合は、そのデータで学習したモデルに本ライセンスが適用される旨を明示してください。元コンテンツの著作権にもご注意ください。",
     ui_lang: "表示言語", about: "情報", saved: "保存しました", invalid_number: "数値を入力してください",
     rtf: "リアルタイム係数", downgrade: "リアルタイムに間に合わないため1段下げました",
     update_title: "新しいバージョンがあります",
@@ -50,7 +51,7 @@ const I18N = {
   en: {
     terms_title: "OverlaySubs Terms of Use",
     terms_intro: "You must accept the Terms to use OverlaySubs.",
-    about_plamo_license: `The PLaMo 3 Translate translation model is governed by the <a href="${PLAMO_LICENSE_URLS.en}" data-external>PLaMo 3 license</a>.`,
+    about_plamo_license: `The PLaMo 3 Translate translation model is governed by the <a href="${PLAMO_LICENSE_URLS.en}" data-external>PLaMo Community License</a> (revised November 9, 2026).`,
     terms_agree: "I accept the Terms of Use", accept: "Accept and start",
     nav_home: "Translate", nav_models: "Set up models", nav_overlay: "Subtitles", nav_history: "History", nav_about: "About",
     home: "Translate", need_setup: "Set up models first", need_setup_long: "Set up the models before you start translating (takes a few minutes).", goto_models: "Set up models",
@@ -71,15 +72,14 @@ const I18N = {
     asr: "Speech recognition", translator: "Translation", vad: "VAD", models_dir: "Folder", change: "Change", delete: "Delete", deleted: "Deleted", downloaded: "downloaded", missing: "not downloaded",
     advanced: "Advanced", gpu_layers: "Translator GPU layers (0 = CPU)", whisper_gpu: "Use GPU for speech recognition",
     overlay: "Subtitles", overlay_toggle: "Overlay", show_overlay: "Show", hide_overlay: "Hide",
-    show_source: "Show original text", font_size: "Font size", font: "Font", bg: "Background opacity", lines: "Lines", linger: "Display time (s)", click_through: "Click-through", show_credit: "Show \"Built with PLaMo\"",
+    show_source: "Show original text", font_size: "Font size", font: "Font", bg: "Background opacity", lines: "Lines", linger: "Display time (s)", click_through: "Click-through",
     overlay_preview_note: "While translation is stopped, opening this page shows the overlay with a sample subtitle, so you can check font size, font, background opacity and the like as you change them.",
     drag_hint: "Drag here to move the subtitles (the position is kept next time)",
     reset_position: "Reset subtitle position", position_reset: "Subtitles moved back to the default position",
     preview_src_1: "字幕のプレビューです", preview_tr_1: "This is how your subtitles will look.",
     preview_src_2: "設定の変更はすぐに反映されます", preview_tr_2: "Changes apply to the overlay instantly.",
-    credit_off_note: "If you turn this off, \"Built with PLaMo\" won't appear in a stream or recording. If you publish or distribute subtitles, follow the PLaMo 3 license.",
     history: "History", export_txt: "Save as text", export_srt: "Save as SRT", exported: "Saved",
-    output_note: "If you publish or distribute this, follow the PLaMo 3 license. Mind the copyright of the source content too.",
+    output_note: "If you publish or distribute this, follow the PLaMo Community License (revised November 9, 2026). If you distribute subtitle data (for example as a dataset), state that the license applies to any model trained on it. Mind the copyright of the source content too.",
     ui_lang: "UI language", about: "About", saved: "Saved", invalid_number: "Enter a number",
     rtf: "Real-time factor", downgrade: "Too slow for real time; dropped one tier",
     update_title: "Update available",
@@ -90,11 +90,11 @@ const I18N = {
     err_macos_no_display: "No display is available for system audio capture.",
     err_macos_audio: "Could not start system audio capture",
   },
-  // The terms and the PLaMo 3 license exist only in Japanese and English; Chinese UIs show the English ones.
+  // The terms and the PLaMo Community License exist only in Japanese and English; Chinese UIs show the English ones.
   "zh-hant": {
     terms_title: "OverlaySubs 使用條款",
     terms_intro: "使用 OverlaySubs 前，需要先同意使用條款。條款只有日文版與英文版。",
-    about_plamo_license: `翻譯模型 PLaMo 3 Translate 的使用條件依照 <a href="${PLAMO_LICENSE_URLS.en}" data-external>PLaMo 3 授權條款</a>（英文）。`,
+    about_plamo_license: `翻譯模型 PLaMo 3 Translate 的使用條件依照 <a href="${PLAMO_LICENSE_URLS.en}" data-external>PLaMo Community License</a>（2026 年 11 月 9 日修訂，英文）。`,
     terms_agree: "我同意使用條款", accept: "同意並開始",
     nav_home: "翻譯", nav_models: "準備模型", nav_overlay: "字幕顯示", nav_history: "紀錄", nav_about: "關於",
     home: "翻譯", need_setup: "請先準備模型", need_setup_long: "開始翻譯前，需要先準備模型（約需 3 分鐘以上）。", goto_models: "前往準備模型",
@@ -115,13 +115,12 @@ const I18N = {
     asr: "語音辨識", translator: "翻譯", vad: "VAD", models_dir: "儲存位置", change: "更改", delete: "刪除", deleted: "已刪除", downloaded: "已下載", missing: "未下載",
     advanced: "進階設定", gpu_layers: "翻譯模型的 GPU 層數（0 表示使用 CPU）", whisper_gpu: "語音辨識使用 GPU",
     overlay: "字幕顯示", overlay_toggle: "疊加字幕", show_overlay: "顯示", hide_overlay: "隱藏",
-    show_source: "同時顯示原文", font_size: "文字大小", font: "字型", bg: "背景不透明度", lines: "顯示行數", linger: "顯示時間（秒）", click_through: "滑鼠點擊穿透", show_credit: "顯示「Built with PLaMo」",
+    show_source: "同時顯示原文", font_size: "文字大小", font: "字型", bg: "背景不透明度", lines: "顯示行數", linger: "顯示時間（秒）", click_through: "滑鼠點擊穿透",
     overlay_preview_note: "停止翻譯時打開這一頁，會顯示疊加字幕與範例字幕。調整文字大小、字型、背景不透明度等設定時，可以當場確認效果。",
     preview_src_1: "This is a preview of the subtitles.", preview_tr_1: "字幕會像這樣顯示。",
     preview_src_2: "Changes apply instantly.", preview_tr_2: "設定的變更會立即套用。",
-    credit_off_note: "關閉後，直播或錄影畫面上不會出現「Built with PLaMo」。公開或散布字幕時，請遵守 PLaMo 3 的授權條款。",
     history: "紀錄", export_txt: "存成文字檔", export_srt: "存成 SRT", exported: "已儲存",
-    output_note: "公開或散布時，請遵守 PLaMo 3 的授權條款，也請留意原始內容的著作權。",
+    output_note: "公開或散布時，請遵守 PLaMo Community License（2026 年 11 月 9 日修訂）。散布字幕資料集時，請註明該授權條款適用於以該資料訓練的模型。也請留意原始內容的著作權。",
     ui_lang: "介面語言", about: "關於", saved: "已儲存", invalid_number: "請輸入數字",
     rtf: "即時係數", downgrade: "速度跟不上即時翻譯，已降低一個等級",
     update_title: "有新版本",
@@ -135,7 +134,7 @@ const I18N = {
   "zh-hans": {
     terms_title: "OverlaySubs 使用条款",
     terms_intro: "使用 OverlaySubs 前，需要先同意使用条款。条款仅提供日文版和英文版。",
-    about_plamo_license: `翻译模型 PLaMo 3 Translate 的使用条件遵循 <a href="${PLAMO_LICENSE_URLS.en}" data-external>PLaMo 3 许可证</a>（英文）。`,
+    about_plamo_license: `翻译模型 PLaMo 3 Translate 的使用条件遵循 <a href="${PLAMO_LICENSE_URLS.en}" data-external>PLaMo Community License</a>（2026 年 11 月 9 日修订，英文）。`,
     terms_agree: "我同意使用条款", accept: "同意并开始",
     nav_home: "翻译", nav_models: "准备模型", nav_overlay: "字幕显示", nav_history: "历史记录", nav_about: "关于",
     home: "翻译", need_setup: "请先准备模型", need_setup_long: "开始翻译前，需要先准备模型（约需 3 分钟以上）。", goto_models: "前往准备模型",
@@ -156,13 +155,12 @@ const I18N = {
     asr: "语音识别", translator: "翻译", vad: "VAD", models_dir: "保存位置", change: "更改", delete: "删除", deleted: "已删除", downloaded: "已下载", missing: "未下载",
     advanced: "高级设置", gpu_layers: "翻译模型的 GPU 层数（0 表示使用 CPU）", whisper_gpu: "语音识别使用 GPU",
     overlay: "字幕显示", overlay_toggle: "悬浮字幕", show_overlay: "显示", hide_overlay: "隐藏",
-    show_source: "同时显示原文", font_size: "字号", font: "字体", bg: "背景不透明度", lines: "显示行数", linger: "显示时长（秒）", click_through: "鼠标点击穿透", show_credit: "显示“Built with PLaMo”",
+    show_source: "同时显示原文", font_size: "字号", font: "字体", bg: "背景不透明度", lines: "显示行数", linger: "显示时长（秒）", click_through: "鼠标点击穿透",
     overlay_preview_note: "停止翻译时打开此页面，会显示悬浮字幕和示例字幕。调整字号、字体、背景不透明度等设置时，可以实时查看效果。",
     preview_src_1: "This is a preview of the subtitles.", preview_tr_1: "字幕会像这样显示。",
     preview_src_2: "Changes apply instantly.", preview_tr_2: "设置的更改会立即生效。",
-    credit_off_note: "关闭后，直播或录屏画面中不会出现“Built with PLaMo”。公开或分发字幕时，请遵守 PLaMo 3 许可证。",
     history: "历史记录", export_txt: "保存为文本", export_srt: "保存为 SRT", exported: "已保存",
-    output_note: "公开或分发时，请遵守 PLaMo 3 许可证，并注意原始内容的版权。",
+    output_note: "公开或分发时，请遵守 PLaMo Community License（2026 年 11 月 9 日修订）。分发字幕数据集时，请注明该许可证适用于以该数据训练的模型，并注意原始内容的版权。",
     ui_lang: "界面语言", about: "关于", saved: "已保存", invalid_number: "请输入数字",
     rtf: "实时系数", downgrade: "速度跟不上实时翻译，已降低一个档位",
     update_title: "有新版本",
@@ -188,4 +186,4 @@ const LANGS = { en: "English", ja: "日本語", ko: "한국어", zh: "中文", e
 // PLaMo 3 Translate has no plain "zh" target, only Simplified ("zh-hans") and Traditional ("zh-hant").
 // The input-language list keeps "zh" because Whisper only knows that code.
 const TARGET_LANGS = Object.fromEntries(Object.entries(LANGS).flatMap(([k, v]) => (k === "zh" ? [["zh-hant", "中文（繁體）"], ["zh-hans", "中文（简体）"]] : [[k, v]])));
-const OVERLAY_DEFAULTS = { showSource: true, fontSize: 28, font: "system-ui, sans-serif", bg: 0.55, lines: 2, linger: 8, clickThrough: false, showCredit: true };
+const OVERLAY_DEFAULTS = { showSource: true, fontSize: 28, font: "system-ui, sans-serif", bg: 0.55, lines: 2, linger: 8, clickThrough: false };

@@ -185,8 +185,6 @@ function overlayPage() {
   <div class="row">${btn("overlay-reset", t("reset_position"))}</div>
   ${card("", `${field(t("show_source"), "overlay.showSource", "check")}
     ${field(t("click_through"), "overlay.clickThrough", "check")}
-    ${field(t("show_credit"), "overlay.showCredit", "check")}
-    ${snap.settings.overlay.showCredit ? "" : `<p class="muted small">${t("credit_off_note")}</p>`}
     ${field(t("font_size"), "overlay.fontSize", "number", 'min="12" max="96"')}
     ${field(t("font"), "overlay.font")}
     ${field(t("bg"), "overlay.bg", "number", 'min="0" max="1" step="0.05"')}
