@@ -181,6 +181,19 @@ window.addEventListener(
 );
 
 /**
+ * The scrollbar can also move the view (drag, track click or keyboard). Keep the live/frozen
+ * state in step with where it was left, so new captions do not yank the view back to the bottom.
+ */
+linesEl.addEventListener("scroll", () => {
+  if (linesEl.scrollHeight - linesEl.scrollTop - linesEl.clientHeight > 1) {
+    if (follow) {
+      follow = false;
+      if (!preview && !frozen && shownIds.length) frozen = [...shownIds];
+    }
+  } else if (!follow || frozen) unfreeze();
+});
+
+/**
  * Keeps the previous translation while the new one would only take text off the screen:
  * one without words (empty or just "…"), or a finalized translation still streaming in
  * that is shorter than the draft. Otherwise the new caption replaces it.
