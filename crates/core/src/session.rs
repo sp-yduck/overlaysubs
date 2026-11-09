@@ -22,14 +22,22 @@ pub trait Translator: Send {
 #[serde(default)]
 pub struct SessionConfig {
     pub source_lang: Option<String>,
+    #[serde(deserialize_with = "target_code")]
     pub target_lang: String,
     /// Used when the speech is already in `target_lang` (e.g. ja speech while target is ja → en).
+    #[serde(deserialize_with = "target_code")]
     pub alt_target_lang: String,
     pub form: Option<Form>,
     pub use_context: bool,
     pub glossary: Vec<(String, String)>,
     /// Free-text hint for the translator, e.g. "Stanford commencement speech".
     pub topic: String,
+}
+
+/// Settings saved before the Chinese target split hold "zh", which PLaMo does not know; they become Traditional.
+fn target_code<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let code = String::deserialize(d)?;
+    Ok(if code == "zh" { "zh-hant".into() } else { code })
 }
 
 impl Default for SessionConfig {
@@ -194,12 +202,15 @@ impl Session {
     }
 
     fn translate(&self, text: &str, lang: &str, mt: &mut dyn Translator, on_piece: &mut dyn FnMut(&str)) -> Result<String, String> {
-        let target = if lang == self.cfg.target_lang { &self.cfg.alt_target_lang } else { &self.cfg.target_lang };
+        // Whisper reports "zh" while PLaMo's target codes are "zh-hans" / "zh-hant", so compare the base language.
+        let base = |code: &str| code.split('-').next().unwrap_or(code).to_string();
+        let target = if base(lang) == base(&self.cfg.target_lang) { &self.cfg.alt_target_lang } else { &self.cfg.target_lang };
         // Only matching entries, so a long glossary neither bloats the prompt nor leaks unrelated terms.
         let glossary: Vec<_> = self.cfg.glossary.iter().filter(|(s, _)| text.contains(s.as_str())).cloned().collect();
         let req = TranslateRequest {
             text,
-            source_lang: Some(lang),
+            // PLaMo has no plain "zh" code, and Whisper cannot tell Simplified from Traditional; let PLaMo detect it.
+            source_lang: (lang != "zh").then_some(lang),
             target_lang: target,
             form: if target == "ja" { self.cfg.form } else { None },
             context: Some(&self.cfg.topic),
@@ -249,7 +260,8 @@ mod tests {
         fn transcribe(&mut self, _: &[f32], _: Option<&str>, prompt: &str) -> Result<Transcript, String> {
             self.1.push(prompt.to_string());
             let text = self.0.remove(0).to_string();
-            let lang = if text.is_ascii() { "en" } else { "ja" }.to_string();
+            let kana = text.chars().any(|c| ('\u{3040}'..='\u{30ff}').contains(&c));
+            let lang = if text.is_ascii() { "en" } else if kana { "ja" } else { "zh" }.to_string();
             Ok(Transcript { text, lang })
         }
     }
@@ -261,7 +273,7 @@ mod tests {
     impl Translator for FakeMt {
         fn translate(&mut self, r: &TranslateRequest, on: &mut dyn FnMut(&str)) -> Result<String, String> {
             let g: Vec<_> = r.glossary.iter().map(|(s, _)| s.as_str()).collect();
-            self.0.push(format!("{}>{} h{} {} {:?} {:?}", r.source_lang.unwrap(), r.target_lang, r.history.len(), r.text, g, r.context.unwrap_or("")));
+            self.0.push(format!("{}>{} h{} {} {:?} {:?}", r.source_lang.unwrap_or("auto"), r.target_lang, r.history.len(), r.text, g, r.context.unwrap_or("")));
             on("訳");
             on("文");
             Ok("訳文".into())
@@ -284,6 +296,16 @@ mod tests {
         assert_eq!(caps[1].translation, "訳文");
         assert!(mt.0[0].starts_with("en>ja h0") && mt.0[1].starts_with("ja>en h1"), "hallucination dropped, ja speech goes to alt target with context: {:?}", mt.0);
         assert_eq!(s.entries.len(), 2);
+    }
+
+    #[test]
+    fn chinese_speech_matches_a_script_specific_chinese_target() {
+        let cfg = SessionConfig { target_lang: "zh-hant".into(), alt_target_lang: "ja".into(), ..Default::default() };
+        let mut s = Session::new(cfg);
+        let (mut a, mut mt, mut caps) = (asr(vec!["Hello there.", "今天天氣很好。"]), FakeMt(vec![]), vec![]);
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        assert!(mt.0[0].starts_with("en>zh-hant ") && mt.0[1].starts_with("auto>ja "), "zh speech goes to the alt target, PLaMo detects the script: {:?}", mt.0);
     }
 
     #[test]
@@ -410,5 +432,13 @@ mod tests {
     fn old_settings_without_new_fields_still_load() {
         let c: SessionConfig = serde_json::from_str(r#"{"source_lang":null,"target_lang":"ja","alt_target_lang":"en","form":null,"use_context":true,"glossary":[["a","b"]]}"#).unwrap();
         assert!(c.topic.is_empty() && c.glossary.len() == 1);
+    }
+
+    #[test]
+    fn old_plain_chinese_targets_load_as_traditional() {
+        let c: SessionConfig = serde_json::from_str(r#"{"source_lang":"zh","target_lang":"zh","alt_target_lang":"zh"}"#).unwrap();
+        assert_eq!((c.source_lang.as_deref(), c.target_lang.as_str(), c.alt_target_lang.as_str()), (Some("zh"), "zh-hant", "zh-hant"), "Whisper's source code stays \"zh\"");
+        let c: SessionConfig = serde_json::from_str(r#"{"target_lang":"zh-hans","alt_target_lang":"en"}"#).unwrap();
+        assert_eq!((c.target_lang.as_str(), c.alt_target_lang.as_str()), ("zh-hans", "en"));
     }
 }

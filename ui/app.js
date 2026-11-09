@@ -68,7 +68,7 @@ async function persist() {
 function opts(pairs, cur) {
   return pairs.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? "") ? "selected" : ""}>${esc(l)}</option>`).join("");
 }
-const langOpts = (cur, extra = []) => opts([...extra, ...Object.entries(LANGS)], cur);
+const langOpts = (cur, extra = [], langs = LANGS) => opts([...extra, ...Object.entries(langs)], cur);
 function field(label, path, kind = "text", extra = "") {
   const v = get(snap.settings, path);
   if (kind === "check") return `<label class="chk"><input type="checkbox" data-k="${path}" data-t="check" ${v ? "checked" : ""}> ${esc(label)}</label>`;
@@ -163,8 +163,8 @@ function homePage() {
     ${card(t("input"), `${select(t("source"), "source.kind", opts([["system", t("system")], ["mic", t("mic")]], s.source.kind))}
       ${macSystem ? `<p class="muted small">${t("system_audio_note")}</p>` : select(t("device"), "source.device", opts([["", t("default_dev")], ...devs.map((d) => [d, d])], s.source.device), "nullable")}`)}
     ${card(t("languages"), `${select(t("src_lang"), "session.source_lang", langOpts(s.session.source_lang, [["", t("auto")]]), "nullable")}
-      ${select(t("tgt_lang"), "session.target_lang", langOpts(s.session.target_lang))}
-      ${select(t("alt_lang"), "session.alt_target_lang", langOpts(s.session.alt_target_lang))}`)}
+      ${select(t("tgt_lang"), "session.target_lang", langOpts(s.session.target_lang, [], TARGET_LANGS))}
+      ${select(t("alt_lang"), "session.alt_target_lang", langOpts(s.session.alt_target_lang, [], TARGET_LANGS))}`)}
   </div>
   <details class="card"><summary>${t("tuning")}</summary>
     ${select(t("form"), "session.form", opts([["", t("form_default")], ["plain", t("plain")], ["polite", t("polite")]], s.session.form), "nullable")}
