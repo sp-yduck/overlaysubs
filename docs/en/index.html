@@ -211,7 +211,7 @@
           <h3>Start and stop</h3>
           <p><strong>Ctrl+Shift+T</strong> (<strong>Cmd+Shift+T</strong> on macOS) starts and stops translation. You can change the hotkey in Settings.</p>
           <p>The overlay is hidden right after launch. It appears when translation starts and hides automatically after translation stops, leaving the last subtitle on screen briefly. You can also show or hide it manually, even while not translating, from "Show subtitles" in the tray menu or from the switch above the Start button in Settings.</p>
-          <p>On Windows, "System audio" captures whatever your PC is playing. On macOS, select a loopback (virtual audio) device as the "Microphone" (see <a href="#limits">Limitations</a>).</p>
+          <p>Audio input: "System audio" captures whatever your PC is playing. Windows uses WASAPI loopback; on macOS 13+ all apps' audio is captured together via ScreenCaptureKit (no virtual audio device such as BlackHole is needed). The first time, allow OverlaySubs under System Settings → Privacy &amp; Security → "Screen &amp; System Audio Recording" (macOS 15+) or "Screen Recording" (macOS 13–14), then restart the app. Microphone input works on both platforms.</p>
           <figure>
             <img src="../images/overlay.jpg" width="1920" height="630" loading="lazy" alt="The subtitle overlay. On top of other apps, the English source (small) and the Japanese translation (large) are shown on two lines, with Built with PLaMo in the bottom-right corner.">
             <figcaption>The subtitle overlay, shown on top of other apps (background is illustrative).</figcaption>
@@ -362,7 +362,7 @@
           <li>The builds are <strong>not signed and not notarized</strong> (no Windows code-signing certificate; on macOS no Developer ID signature or notarization, <strong>ad-hoc signed only</strong>). SmartScreen / Gatekeeper will warn you (see <a href="#warning">Warnings</a>).</li>
           <li><strong>There is no Intel Mac build.</strong> macOS requires Apple Silicon (M1 or later) and macOS 13 or later.</li>
           <li>Windows <strong>requires a Vulkan-capable GPU and an up-to-date driver</strong>. Without them the app is too slow to be practical.</li>
-          <li>System audio capture on macOS (ScreenCaptureKit) is not implemented yet. You need to select a loopback (virtual audio) device as the "Microphone".</li>
+          <li>On macOS, system audio is captured with ScreenCaptureKit. The first use requires the "Screen &amp; System Audio Recording" (macOS 15+) or "Screen Recording" (macOS 13–14) permission and an app restart (see <a href="#faq">FAQ</a>).</li>
           <li>Capturing a single app only, or processing system audio and the microphone at the same time, is not implemented yet.</li>
           <li><strong>There is no auto-update.</strong> The app checks for a newer release at startup and notifies you, but it never downloads or installs one. Download new versions manually from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> (the only distribution channel).</li>
         </ul>
@@ -426,7 +426,7 @@
         </details>
         <details>
           <summary>I can't capture system audio on macOS.</summary>
-          <p>System audio capture on macOS (ScreenCaptureKit) is not implemented yet. Set up a loopback (virtual audio) device such as BlackHole, set the input to "Microphone" and select that device (see <a href="#limits">Limitations</a>).</p>
+          <p>macOS 13+ can capture system audio with ScreenCaptureKit. First open System Settings → Privacy &amp; Security → "Screen &amp; System Audio Recording" (macOS 15+) or "Screen Recording" (macOS 13–14), turn on OverlaySubs, and restart the app. If it is already on but capture still fails, check that you restarted the app and that macOS didn't prompt you from another screen. If you denied the permission or it is unavailable, the app shows a notification saying so. No virtual audio device such as BlackHole is needed.</p>
         </details>
         <details>
           <summary>Does it work offline?</summary>

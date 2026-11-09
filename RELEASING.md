@@ -273,6 +273,23 @@ Homebrew の OpenSSL を絶対パスで参照しています。llama.cpp の `LL
 システムライブラリ以外の絶対パスや、未同梱の `@rpath` があれば失敗するようにしています。
 この設定を変えたときも rust-cache の `key` の接尾辞を更新してください。
 
+システム音声キャプチャ（ScreenCaptureKit）のバインディングは、ビルド時に小さな Swift ブリッジを
+静的リンクするため、実行時には macOS 同梱の Swift ランタイム（`/usr/lib/swift`）を `@rpath` で参照します。
+rpath は `src-tauri/build.rs` がアプリ本体に付与し（依存クレートの build script が出力する
+`rustc-link-arg` はアプリ本体のリンクに伝播しないため）、検査は Mach-O が `LC_RPATH /usr/lib/swift` を
+持つ場合に限り `@rpath/libswift*` を許可します。macOS 13 以降は OS が Swift ランタイムを提供するため
+同梱は不要です。起動時に `Library not loaded: @rpath/libswift_Concurrency.dylib` で落ちる場合は、
+`src-tauri/build.rs` の macOS 向け `rustc-link-arg` が消えていないか確認してください。
+
+### macOS のビルドが `cannot find 'MTLTensorDataType' in scope` で失敗する
+
+screencapturekit が依存する apple-metal の Swift ブリッジは、macOS 26 SDK で追加された Metal API
+（`MTLTensor*`、`MTLSamplerReductionMode` など）を参照するため、既定の Xcode 16.4（macOS 15.5 SDK）
+ではビルドできません。`release.yml` の macOS ビルドは、`macos-15` ランナーにプリインストールされた
+Xcode 26 を `xcode-select` で選択してからビルドします。手元でビルドする場合も
+`sudo xcode-select -s /Applications/Xcode_26.x.app` としてください（配布物の macOS 13 対応は、
+tauri-cli が `MACOSX_DEPLOYMENT_TARGET=13.0` を設定するため変わりません）。
+
 ### 同じバージョンで作り直したい
 
 Release に 4 アセットがそろっていると、`verify` が「公開済み」と判断して **ビルドをスキップ** します

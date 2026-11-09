@@ -67,7 +67,7 @@ Install steps, what to do when Windows SmartScreen or macOS Gatekeeper warns you
 ## Architecture
 
 ```
-WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ Silero VAD endpointer ─▶ whisper.cpp ─▶ PLaMo 3 Translate (llama.cpp) ─▶ overlay
+WASAPI loopback (Windows) / ScreenCaptureKit system audio (macOS) / microphone ─▶ 16 kHz mono ─▶ Silero VAD endpointer ─▶ whisper.cpp ─▶ PLaMo 3 Translate (llama.cpp) ─▶ overlay
 ```
 
 - `crates/core` holds engine-independent logic: tier selection, model definitions, PFML3 prompts, utterance segmentation, sessions, sentence-level translation, and SRT export. Run `cargo test -p overlaysubs-core`.
@@ -82,7 +82,7 @@ WASAPI loopback / microphone ─▶ 16 kHz mono ─▶ Silero VAD endpointer ─
 - First run asks you to accept the OverlaySubs Terms of Use. Acceptance is stored in `terms-accepted` and not asked again until the terms version changes. "Check this PC" in the settings window detects your hardware and picks a tier (High / Mid / Low / CPU). The result is cached in `hardware.json`, so later launches show it without probing again; "Check again" re-runs the check.
 - Models download from Hugging Face automatically, resume after interruption, and are verified with SHA-256. No account or token required.
 - You can run the optional speed check (benchmark); if it cannot keep up in real time, it switches to one tier lower.
-- Audio input is Windows WASAPI loopback (system audio) or a microphone. On macOS you pick a loopback input device as the microphone.
+- Audio input is system audio or a microphone. Windows captures system audio with WASAPI loopback; on macOS 13+ system audio is captured directly with ScreenCaptureKit, so no loopback / virtual-audio device (such as BlackHole) is needed. The microphone works on both platforms. The first time you use system audio on macOS, allow OverlaySubs under System Settings → Privacy & Security → "Screen & System Audio Recording" (macOS 15+) or "Screen Recording" (macOS 13–14), then restart the app.
 - Source language auto-detect or fixed. You can pick the target language and the "if already in that language" language, so English↔Japanese and Korean↔Japanese work together.
 - Previous utterances are passed as context and translation happens per sentence. Glossary, a free-text topic hint, and Japanese plain/polite style are configurable.
 - Partial results are dimmed; final translations stream in and replace them.
@@ -109,7 +109,7 @@ The tier is decided when you run "Check this PC" in first-run setup, and the mod
 
 ## Build
 
-Prerequisites: Rust stable (edition 2021). On Windows, MSVC + Windows SDK, CMake, LLVM / libclang (for bindgen), the Vulkan SDK, and WebView2. On macOS, Xcode Command Line Tools. Node.js is only needed to run the Tauri CLI through `npx` (not for the app itself).
+Prerequisites: Rust stable (edition 2021). On Windows, MSVC + Windows SDK, CMake, LLVM / libclang (for bindgen), the Vulkan SDK, and WebView2. On macOS, Xcode 26 or Command Line Tools with the macOS 26 SDK: the ScreenCaptureKit bindings compile a small Swift bridge at build time, and the Metal dependency they link needs the macOS 26 SDK. Source builds need a Swift toolchain. Release CI selects the preinstalled Xcode 26 on the `macos-15` runner. Node.js is only needed to run the Tauri CLI through `npx` (not for the app itself).
 
 ```bash
 # Windows (Vulkan, same as the official build)
@@ -129,6 +129,7 @@ whisper.cpp and llama.cpp both embed ggml, so statically linking both into one p
 - Windows: `src-tauri/libs/*.dll` is bundled via `bundle.resources`. `src-tauri/libs/` is gitignored, so before bundling copy llama.cpp's build output (`target/release/build/llama-cpp-sys-2-*/out/bin/*.dll`) into `src-tauri/libs/`. The CI steps are in `.github/workflows/release.yml`.
 - macOS: `beforeBundleCommand` runs `scripts/stage-dylibs.sh`, which collects the dylibs into `target/frameworks`; `bundle.macOS.files` ships them in `Frameworks`.
 - `THIRD_PARTY_NOTICES.md` is bundled too (see `src-tauri/tauri.windows.conf.json` and `tauri.macos.conf.json`).
+- macOS: `src-tauri/Info.plist` is merged into the bundle's generated Info.plist (`bundle.macOS.infoPlist`). It declares the microphone and screen/system-audio usage strings (`NSMicrophoneUsageDescription` / `NSScreenCaptureUsageDescription`).
 
 ## Tests
 

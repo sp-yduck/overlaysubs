@@ -211,7 +211,7 @@
           <h3>開始と停止</h3>
           <p><strong>Ctrl+Shift+T</strong>（macOS は <strong>Cmd+Shift+T</strong>）で翻訳を開始・停止します。ホットキーは設定画面で変更できます。</p>
           <p>オーバーレイはアプリの起動直後は表示されません。翻訳を開始すると表示され、停止すると最後の字幕を少し表示したあとで自動的に隠れます。トレイメニューの「Show subtitles」または設定画面の翻訳開始ボタンの上にあるトグルから、翻訳していないときでも手動で表示・非表示を切り替えられます。</p>
-          <p>音声入力は Windows なら「システム音声」で PC の再生音をそのまま取り込めます。macOS はループバック（仮想オーディオ）デバイスを「マイク」として選んでください（<a href="#limits">現状の制限</a>）。</p>
+          <p>音声入力は「システム音声」で PC の再生音をそのまま取り込めます。Windows は WASAPI loopback、macOS 13 以降は ScreenCaptureKit で、すべてのアプリの音声をまとめてキャプチャします（BlackHole などの仮想オーディオデバイスは不要です）。初めて使うときは、システム設定 → プライバシーとセキュリティの「画面収録とシステム音声録音」（macOS 15 以降。macOS 13〜14 は「画面収録」）で OverlaySubs を許可し、アプリを再起動してください。マイク入力は Windows・macOS の両方で使えます。</p>
           <figure>
             <img src="images/overlay.jpg" width="1920" height="630" loading="lazy" alt="字幕オーバーレイ。他のアプリの上に、英語の原文（小）と日本語の訳文（大）が 2 行で表示されている。右下に Built with PLaMo の表記。">
             <figcaption>字幕オーバーレイ。他のアプリの上に重ねて表示されます（背景はイメージ）。</figcaption>
@@ -362,7 +362,7 @@
           <li>配布ビルドは<strong>未署名・未公証</strong>です（Windows はコード署名なし、macOS は Developer ID 署名なし・公証なしで <strong>ad-hoc 署名のみ</strong>）。SmartScreen / Gatekeeper の警告が出ます（<a href="#warning">警告が表示されたとき</a>）。</li>
           <li><strong>Intel Mac 版はありません。</strong>macOS は Apple Silicon（M1 以降）かつ macOS 13 以降のみです。</li>
           <li>Windows は <strong>Vulkan 対応 GPU と最新ドライバが必須</strong>です。対応していない環境では実用的な速度が出ません。</li>
-          <li>macOS のシステム音声キャプチャ（ScreenCaptureKit）は未実装です。ループバック（仮想オーディオ）デバイスを「マイク」として選ぶ必要があります。</li>
+          <li>macOS のシステム音声は ScreenCaptureKit で取り込みます。初回は「画面収録とシステム音声録音」（macOS 15 以降。macOS 13〜14 は「画面収録」）の許可とアプリの再起動が必要です（<a href="#faq">FAQ</a>）。</li>
           <li>特定のアプリだけをキャプチャする機能、システム音声とマイクを同時に処理する機能は未実装です。</li>
           <li><strong>自動アップデートはありません。</strong>起動時に新しいリリースがあるかを確認して通知しますが、ダウンロードとインストールは自動では行いません。新しいバージョンは <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> から手動でダウンロードしてください（配布は GitHub Releases のみです）。</li>
         </ul>
@@ -426,7 +426,7 @@
         </details>
         <details>
           <summary>macOS でシステム音声を取り込めません。</summary>
-          <p>macOS のシステム音声キャプチャ（ScreenCaptureKit）は未実装です。BlackHole などのループバック（仮想オーディオ）デバイスを用意し、入力元を「マイク」にしてそのデバイスを選んでください（<a href="#limits">現状の制限</a>）。</p>
+          <p>macOS 13 以降は ScreenCaptureKit でシステム音声を取り込めます。最初にシステム設定 → プライバシーとセキュリティ →「画面収録とシステム音声録音」（macOS 15 以降。macOS 13〜14 は「画面収録」）で OverlaySubs をオンにし、OverlaySubs を再起動してください。オンのまま取り込めない場合は、アプリを再起動したかどうか、別の画面で許可を求められていないかを確認してください。許可しなかった場合や利用できない場合は、アプリにその旨の通知が表示されます。BlackHole などの仮想オーディオデバイスは不要です。</p>
         </details>
         <details>
           <summary>オフラインでも使えますか？</summary>

@@ -9,7 +9,8 @@
     "macOS": {
       "files": {
         "Frameworks": "../target/frameworks"
-      }
+      },
+      "infoPlist": "Info.plist"
     }
   }
 }

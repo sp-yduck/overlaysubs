@@ -21,6 +21,7 @@ const I18N = {
     benchmark: "速度を測る", benchmarking: "測定中…", bench_done: "測定が完了しました",
     start: "▶ 翻訳を開始", stop: "■ 翻訳を停止", live: "翻訳中", hotkey: "ホットキー",
     input: "音声入力", source: "入力元", system: "システム音声", mic: "マイク", device: "デバイス", default_dev: "既定",
+    system_audio_note: "macOS のシステム音声はすべてのアプリの音をまとめて取り込みます。初回は「画面収録とシステム音声録音」の許可が必要です。",
     languages: "言語", src_lang: "話されている言語", auto: "自動判定", tgt_lang: "訳す言語", alt_lang: "すでにその言語のとき",
     tuning: "翻訳の調整", form: "日本語の文体", form_default: "既定", plain: "常体", polite: "敬体", context: "直前の発話を文脈として使う",
     topic: "話題（翻訳のヒント）", topic_ph: "例: オンライン講義の録音", glossary: "用語集（1行に「原語=訳語」）", recent: "最近の字幕", no_history: "まだ字幕はありません",
@@ -40,6 +41,9 @@ const I18N = {
     update_available: "v{latest} が公開されています（現在 v{current}）",
     update_open: "リリースページを開く",
     update_later: "後で",
+    err_macos_permission: "macOS の「画面収録とシステム音声録音」の権限が必要です。システム設定 → プライバシーとセキュリティ → 画面収録とシステム音声録音 で OverlaySubs をオンにして、アプリを再起動してください。",
+    err_macos_no_display: "システム音声の取り込みに使えるディスプレイが見つかりません。",
+    err_macos_audio: "システム音声の取り込みを開始できませんでした",
   },
   en: {
     terms_title: "OverlaySubs Terms of Use",
@@ -58,6 +62,7 @@ const I18N = {
     benchmark: "Measure speed", benchmarking: "Measuring…", bench_done: "Measurement complete",
     start: "▶ Start translating", stop: "■ Stop", live: "Translating", hotkey: "Hotkey",
     input: "Audio input", source: "Source", system: "System audio", mic: "Microphone", device: "Device", default_dev: "Default",
+    system_audio_note: "On macOS, system audio captures every app at once. The first time, allow Screen & System Audio Recording.",
     languages: "Languages", src_lang: "Spoken language", auto: "Auto-detect", tgt_lang: "Translate into", alt_lang: "If already in that language",
     tuning: "Translation tuning", form: "Japanese style", form_default: "Default", plain: "Plain", polite: "Polite", context: "Use previous utterances as context",
     topic: "Topic (hint for translation)", topic_ph: "e.g. a recorded online lecture", glossary: "Glossary (one \"source=target\" per line)", recent: "Recent subtitles", no_history: "No subtitles yet",
@@ -77,6 +82,9 @@ const I18N = {
     update_available: "v{latest} is available (you have v{current})",
     update_open: "Open release page",
     update_later: "Later",
+    err_macos_permission: "OverlaySubs needs Screen & System Audio Recording permission. Open System Settings → Privacy & Security → Screen & System Audio Recording, enable OverlaySubs, then restart the app.",
+    err_macos_no_display: "No display is available for system audio capture.",
+    err_macos_audio: "Could not start system audio capture",
   },
 };
 const LANGS = { en: "English", ja: "日本語", ko: "한국어", zh: "中文", es: "Español", fr: "Français", de: "Deutsch", it: "Italiano", pt: "Português", ru: "Русский", vi: "Tiếng Việt", th: "ไทย", id: "Indonesia", ar: "العربية", hi: "हिन्दी", nl: "Nederlands", pl: "Polski" };
