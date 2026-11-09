@@ -228,7 +228,8 @@ const PAGES = { home: homePage, models: modelsPage, overlay: overlayPage, histor
 
 function render() {
   const s = snap.settings;
-  termsLang ??= s.ui_lang;
+  // The terms exist only in Japanese and English.
+  termsLang ??= s.ui_lang === "ja" ? "ja" : "en";
   if (!snap.terms_accepted) {
     $("#app").className = "solo";
     $("#app").innerHTML = termsView();
@@ -247,7 +248,7 @@ function render() {
     <button id="overlay-toggle" class="ovtoggle${snap.overlay_visible ? " on" : ""}" role="switch" aria-checked="${snap.overlay_visible ? "true" : "false"}" title="${esc(snap.overlay_visible ? t("hide_overlay") : t("show_overlay"))}"><span class="lbl">${t("overlay_toggle")}</span><span class="track"><span class="knob"></span></span></button>
     ${btn("toggle", snap.running ? t("stop") : t("start"), { cls: `start ${snap.running ? "running" : "primary"}`, disabled: !ready })}
     <p class="hint">${snap.running ? `<span class="dot live"></span>${t("live")}` : ready ? `${t("hotkey")}: <code>${esc(s.hotkey)}</code>` : t("need_setup")}</p>
-    <select data-k="ui_lang" data-t="str" aria-label="${t("ui_lang")}">${opts([["ja", "日本語"], ["en", "English"]], s.ui_lang)}</select>
+    <select data-k="ui_lang" data-t="str" aria-label="${t("ui_lang")}">${opts([["ja", "日本語"], ["en", "English"], ["zh-hant", "繁體中文"], ["zh-hans", "简体中文"]], s.ui_lang)}</select>
   </aside>
   <section id="page" data-page="${page}">${updateBanner()}${PAGES[page]()}</section>`;
   $("#page").scrollTop = keep;
