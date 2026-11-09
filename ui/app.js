@@ -172,6 +172,7 @@ function homePage() {
 function overlayPage() {
   return `<h2>${t("overlay")}</h2>
   <p class="muted small">${t("overlay_preview_note")}</p>
+  <div class="row">${btn("overlay-reset", t("reset_position"))}</div>
   ${card("", `${field(t("show_source"), "overlay.showSource", "check")}
     ${field(t("click_through"), "overlay.clickThrough", "check")}
     ${field(t("show_credit"), "overlay.showCredit", "check")}
@@ -324,6 +325,10 @@ async function act(name, id, el) {
     await invoke("download", { ids: [s.vad, s.asr, s.translator].filter((id) => !snap.downloaded.includes(id)) });
     progress = {};
     toast(t("download_done"));
+  }
+  if (name === "overlay-reset") {
+    await invoke("reset_overlay_position");
+    toast(t("position_reset"));
   }
   if (name === "bench") {
     const b = await invoke("benchmark");

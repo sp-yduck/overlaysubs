@@ -92,6 +92,8 @@ struct App {
     preview_prev_visible: AtomicBool,
     /// A stopped session is waiting out its grace period before hiding the overlay.
     overlay_hide_pending: AtomicBool,
+    /// Where tauri.conf.json put the overlay at launch, before a saved position was applied.
+    overlay_default_position: Mutex<Option<tauri::PhysicalPosition<i32>>>,
 }
 
 fn config_dir(app: &AppHandle) -> PathBuf {
@@ -544,10 +546,20 @@ fn save_overlay_position(app: &AppHandle, p: tauri::PhysicalPosition<i32>) {
     }
 }
 
+/// Back to where the overlay starts on first launch. The move is saved like a drag.
+/// `center()` is not used: it put the overlay higher than the launch position (measured on macOS).
+#[tauri::command]
+fn reset_overlay_position(app: AppHandle, st: State<App>) -> Result<(), String> {
+    let w = app.get_webview_window("overlay").ok_or("no overlay")?;
+    let p = st.overlay_default_position.lock().unwrap().ok_or("no default overlay position")?;
+    w.set_position(p).map_err(|e| e.to_string())
+}
+
 /// Skipped when the saved spot is on no connected display (an external monitor was unplugged, say),
 /// since the overlay would then sit out of sight.
 fn restore_overlay_position(app: &AppHandle) {
     let Some(w) = app.get_webview_window("overlay") else { return };
+    *app.state::<App>().overlay_default_position.lock().unwrap() = w.outer_position().ok();
     let Ok(j) = std::fs::read_to_string(config_dir(app).join(OVERLAY_POSITION)) else { return };
     let Ok((x, y)) = serde_json::from_str::<(i32, i32)>(&j) else { return };
     let on_screen = w.available_monitors().unwrap_or_default().iter().any(|m| {
@@ -661,7 +673,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, open_url, show_overlay, set_overlay_preview, check_update
+            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, reset_overlay_position, open_url, show_overlay, set_overlay_preview, check_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running overlaysubs");
