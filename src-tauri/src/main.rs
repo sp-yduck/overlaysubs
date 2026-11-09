@@ -93,7 +93,7 @@ struct App {
     preview_prev_visible: AtomicBool,
     /// A stopped session is waiting out its grace period before hiding the overlay.
     overlay_hide_pending: AtomicBool,
-    /// Where tauri.conf.json put the overlay at launch (logical points), before a saved position was applied.
+    /// Where tauri.conf.json put the overlay at launch (desktop units), before a saved position was applied.
     overlay_default_position: Mutex<Option<(f64, f64)>>,
 }
 
@@ -536,20 +536,25 @@ fn set_click_through(app: AppHandle, on: bool) -> Result<(), String> {
     w.set_ignore_cursor_events(on).map_err(|e| e.to_string())
 }
 
-/// Where the overlay was last moved, as logical points `{"x": .., "y": ..}`. Kept out of settings.json, which the
-/// settings window rewrites whole. Physical pixels are not stored: on macOS they are converted with the scale of
-/// whichever display the window is on, so a spot saved on a 1x display would land elsewhere on a 2x one.
+/// Where the overlay was last moved, in desktop units `{"x": .., "y": ..}` (see `DESKTOP_IN_POINTS`). Kept out of
+/// settings.json, which the settings window rewrites whole.
 const OVERLAY_POSITION: &str = "overlay-position.json";
+
+/// The unit of the global desktop coordinates, which all overlay placement uses. macOS lays the desktop out in points,
+/// so a physical value is divided by the scale of the display it is on. Windows (and X11) lay it out in physical
+/// pixels across displays with different scales, and there tao converts a logical position with the scale of the
+/// display the window is on now, so a logical position would land on the wrong display.
+const DESKTOP_IN_POINTS: bool = cfg!(target_os = "macos");
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 enum SavedPosition {
-    Logical { x: f64, y: f64 },
-    /// Physical pixels `[x, y]`, written by earlier builds of this feature.
+    Desktop { x: f64, y: f64 },
+    /// Physical pixels `[x, y]`, written by #42 before this format.
     Physical(i32, i32),
 }
 
-/// A display's bounds or work area, or the overlay's bounds, in logical points: x, y, width, height.
+/// A display's bounds or work area, or the overlay's bounds, in desktop units: x, y, width, height.
 type Rect = (f64, f64, f64, f64);
 
 /// A connected display: its whole bounds and its work area (without the menu bar and Dock or taskbar).
@@ -558,10 +563,23 @@ struct Display {
     work_area: Rect,
 }
 
+/// Physical pixels to desktop units, for a value on a display (or window) with `scale`.
+fn to_desktop(v: f64, scale: f64, in_points: bool) -> f64 {
+    if in_points { v / scale } else { v }
+}
+
+fn desktop_position((x, y): (f64, f64)) -> tauri::Position {
+    if DESKTOP_IN_POINTS {
+        tauri::LogicalPosition::new(x, y).into()
+    } else {
+        tauri::PhysicalPosition::new(x.round() as i32, y.round() as i32).into()
+    }
+}
+
 fn save_overlay_position(w: &tauri::Window, p: tauri::PhysicalPosition<i32>) {
     let Ok(scale) = w.scale_factor() else { return };
-    let l = p.to_logical::<f64>(scale);
-    let json = serde_json::to_string(&SavedPosition::Logical { x: l.x, y: l.y }).unwrap();
+    let at = |v: i32| to_desktop(v as f64, scale, DESKTOP_IN_POINTS);
+    let json = serde_json::to_string(&SavedPosition::Desktop { x: at(p.x), y: at(p.y) }).unwrap();
     let dir = config_dir(w.app_handle());
     if let Err(e) = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join(OVERLAY_POSITION), json)) {
         eprintln!("{OVERLAY_POSITION}: {e}");
@@ -580,7 +598,7 @@ fn reset_overlay_position(app: AppHandle, st: State<App>) -> Result<(), String> 
         .and_then(|(x, y)| fit_on_screen((x, y, size.0, size.1), &displays(&w)))
         .or_else(|| w.primary_monitor().ok().flatten().map(|m| centered(size, display(&m).work_area)))
         .ok_or("no display for the overlay")?;
-    w.set_position(tauri::LogicalPosition::new(p.0, p.1)).map_err(|e| e.to_string())
+    w.set_position(desktop_position(p)).map_err(|e| e.to_string())
 }
 
 /// Applies the saved position, moved so the whole overlay is on a display. Left at the launch position when the saved
@@ -588,23 +606,24 @@ fn reset_overlay_position(app: AppHandle, st: State<App>) -> Result<(), String> 
 fn restore_overlay_position(app: &AppHandle) {
     let Some(w) = app.get_webview_window("overlay") else { return };
     if let (Ok(p), Ok(scale)) = (w.outer_position(), w.scale_factor()) {
-        let l = p.to_logical::<f64>(scale);
-        *app.state::<App>().overlay_default_position.lock().unwrap() = Some((l.x, l.y));
+        let at = |v: i32| to_desktop(v as f64, scale, DESKTOP_IN_POINTS);
+        *app.state::<App>().overlay_default_position.lock().unwrap() = Some((at(p.x), at(p.y)));
     }
     let Ok(j) = std::fs::read_to_string(config_dir(app).join(OVERLAY_POSITION)) else { return };
     let saved = match serde_json::from_str::<SavedPosition>(&j) {
-        Ok(SavedPosition::Logical { x, y }) => (x, y),
-        Ok(SavedPosition::Physical(x, y)) => legacy_to_logical(&w, x, y),
+        Ok(SavedPosition::Desktop { x, y }) => (x, y),
+        Ok(SavedPosition::Physical(x, y)) => legacy_to_desktop(&w, x, y),
         Err(_) => return,
     };
     let Some(size) = overlay_size(&w) else { return };
-    if let Some((x, y)) = fit_on_screen((saved.0, saved.1, size.0, size.1), &displays(&w)) {
-        let _ = w.set_position(tauri::LogicalPosition::new(x, y));
+    if let Some(p) = fit_on_screen((saved.0, saved.1, size.0, size.1), &displays(&w)) {
+        let _ = w.set_position(desktop_position(p));
     }
 }
 
-/// Converts with the scale of the display that holds the point, falling back to the overlay's own.
-fn legacy_to_logical(w: &tauri::WebviewWindow, x: i32, y: i32) -> (f64, f64) {
+/// On macOS, converts with the scale of the display that holds the point (falling back to the overlay's own).
+/// Elsewhere physical pixels already are desktop units.
+fn legacy_to_desktop(w: &tauri::WebviewWindow, x: i32, y: i32) -> (f64, f64) {
     let scale = w
         .available_monitors()
         .unwrap_or_default()
@@ -616,13 +635,12 @@ fn legacy_to_logical(w: &tauri::WebviewWindow, x: i32, y: i32) -> (f64, f64) {
         .map(|m| m.scale_factor())
         .or_else(|| w.scale_factor().ok())
         .unwrap_or(1.0);
-    let l = tauri::PhysicalPosition::new(x, y).to_logical::<f64>(scale);
-    (l.x, l.y)
+    (to_desktop(x as f64, scale, DESKTOP_IN_POINTS), to_desktop(y as f64, scale, DESKTOP_IN_POINTS))
 }
 
 fn overlay_size(w: &tauri::WebviewWindow) -> Option<(f64, f64)> {
-    let s = w.outer_size().ok()?.to_logical::<f64>(w.scale_factor().ok()?);
-    Some((s.width, s.height))
+    let (s, scale) = (w.outer_size().ok()?, w.scale_factor().ok()?);
+    Some((to_desktop(s.width as f64, scale, DESKTOP_IN_POINTS), to_desktop(s.height as f64, scale, DESKTOP_IN_POINTS)))
 }
 
 fn displays(w: &tauri::WebviewWindow) -> Vec<Display> {
@@ -630,12 +648,15 @@ fn displays(w: &tauri::WebviewWindow) -> Vec<Display> {
 }
 
 fn display(m: &tauri::Monitor) -> Display {
-    let scale = m.scale_factor();
-    let rect = |p: tauri::PhysicalPosition<i32>, s: tauri::PhysicalSize<u32>| {
-        let (p, s) = (p.to_logical::<f64>(scale), s.to_logical::<f64>(scale));
-        (p.x, p.y, s.width, s.height)
-    };
-    Display { bounds: rect(*m.position(), *m.size()), work_area: rect(m.work_area().position, m.work_area().size) }
+    let (a, wa) = (m.position(), m.work_area());
+    let px = |p: &tauri::PhysicalPosition<i32>, s: &tauri::PhysicalSize<u32>| (p.x as f64, p.y as f64, s.width as f64, s.height as f64);
+    display_in_desktop(px(a, m.size()), px(&wa.position, &wa.size), m.scale_factor(), DESKTOP_IN_POINTS)
+}
+
+/// A display from its physical bounds and work area.
+fn display_in_desktop(bounds: Rect, work_area: Rect, scale: f64, in_points: bool) -> Display {
+    let r = |(x, y, w, h): Rect| (to_desktop(x, scale, in_points), to_desktop(y, scale, in_points), to_desktop(w, scale, in_points), to_desktop(h, scale, in_points));
+    Display { bounds: r(bounds), work_area: r(work_area) }
 }
 
 /// Moves `win` into the work area of the display it overlaps most, so all of it shows (its top-left corner when it
@@ -802,6 +823,30 @@ mod tests {
         assert_eq!(fit_on_screen((200.0, 1100.0, 1100.0, 221.0), &[mac]), Some((200.0, 815.0)));
     }
 
+    /// 1x primary display and a 2x display to its right, as tao reports them (physical pixels).
+    fn mixed_scale(in_points: bool) -> [Display; 2] {
+        [
+            display_in_desktop((0.0, 0.0, 1920.0, 1080.0), (0.0, 0.0, 1920.0, 1040.0), 1.0, in_points),
+            display_in_desktop((1920.0, 0.0, 3840.0, 2160.0), (1920.0, 0.0, 3840.0, 2120.0), 2.0, in_points),
+        ]
+    }
+
+    #[test]
+    fn mixed_scale_displays_in_physical_desktop_units_do_not_overlap() {
+        // Windows: a spot saved on the 2x display stays there, wherever the overlay starts.
+        let d = mixed_scale(false);
+        assert_eq!((d[1].bounds.0, d[1].bounds.2), (1920.0, 3840.0));
+        assert_eq!(fit_on_screen((2400.0, 200.0, 1100.0, 220.0), &d), Some((2400.0, 200.0)));
+        // Divided by each display's own scale, the 2x display would start at 960 and overlap the 1x one.
+        assert_eq!(mixed_scale(true)[1].bounds.0, 960.0);
+    }
+
+    #[test]
+    fn macos_displays_are_in_points() {
+        let mac = display_in_desktop((0.0, 0.0, 3456.0, 2234.0), (0.0, 66.0, 3456.0, 2006.0), 2.0, true);
+        assert_eq!((mac.bounds, mac.work_area), ((0.0, 0.0, 1728.0, 1117.0), (0.0, 33.0, 1728.0, 1003.0)));
+    }
+
     #[test]
     fn overlay_on_no_display_is_not_placed() {
         assert_eq!(fit(-50000.0, -50000.0, &[HD]), None);
@@ -819,8 +864,8 @@ mod tests {
     }
 
     #[test]
-    fn saved_position_reads_logical_and_earlier_physical_files() {
-        assert!(matches!(serde_json::from_str::<SavedPosition>(r#"{"x":200.5,"y":600}"#), Ok(SavedPosition::Logical { x, y }) if x == 200.5 && y == 600.0));
+    fn saved_position_reads_desktop_and_earlier_physical_files() {
+        assert!(matches!(serde_json::from_str::<SavedPosition>(r#"{"x":200.5,"y":600}"#), Ok(SavedPosition::Desktop { x, y }) if x == 200.5 && y == 600.0));
         assert!(matches!(serde_json::from_str::<SavedPosition>("[400, 1200]"), Ok(SavedPosition::Physical(400, 1200))));
         assert!(serde_json::from_str::<SavedPosition>("garbage").is_err());
     }
