@@ -561,6 +561,9 @@ type Rect = (f64, f64, f64, f64);
 struct Display {
     bounds: Rect,
     work_area: Rect,
+    /// Turns the overlay's logical size into desktop units on this display: its scale where the desktop is in
+    /// physical pixels (the window is rescaled when it moves there), 1 where the desktop is in points.
+    size_scale: f64,
 }
 
 /// Physical pixels to desktop units, for a value on a display (or window) with `scale`.
@@ -595,8 +598,8 @@ fn reset_overlay_position(app: AppHandle, st: State<App>) -> Result<(), String> 
     let size = overlay_size(&w).ok_or("no overlay size")?;
     let launch = *st.overlay_default_position.lock().unwrap();
     let p = launch
-        .and_then(|(x, y)| fit_on_screen((x, y, size.0, size.1), &displays(&w)))
-        .or_else(|| w.primary_monitor().ok().flatten().map(|m| centered(size, display(&m).work_area)))
+        .and_then(|p| fit_on_screen(p, size, &displays(&w)))
+        .or_else(|| w.primary_monitor().ok().flatten().map(|m| centered(size, &display(&m))))
         .ok_or("no display for the overlay")?;
     w.set_position(desktop_position(p)).map_err(|e| e.to_string())
 }
@@ -616,7 +619,7 @@ fn restore_overlay_position(app: &AppHandle) {
         Err(_) => return,
     };
     let Some(size) = overlay_size(&w) else { return };
-    if let Some(p) = fit_on_screen((saved.0, saved.1, size.0, size.1), &displays(&w)) {
+    if let Some(p) = fit_on_screen(saved, size, &displays(&w)) {
         let _ = w.set_position(desktop_position(p));
     }
 }
@@ -638,9 +641,10 @@ fn legacy_to_desktop(w: &tauri::WebviewWindow, x: i32, y: i32) -> (f64, f64) {
     (to_desktop(x as f64, scale, DESKTOP_IN_POINTS), to_desktop(y as f64, scale, DESKTOP_IN_POINTS))
 }
 
+/// The logical size, which stays the same on every display (the physical size changes with the display's scale).
 fn overlay_size(w: &tauri::WebviewWindow) -> Option<(f64, f64)> {
-    let (s, scale) = (w.outer_size().ok()?, w.scale_factor().ok()?);
-    Some((to_desktop(s.width as f64, scale, DESKTOP_IN_POINTS), to_desktop(s.height as f64, scale, DESKTOP_IN_POINTS)))
+    let s = w.outer_size().ok()?.to_logical::<f64>(w.scale_factor().ok()?);
+    Some((s.width, s.height))
 }
 
 fn displays(w: &tauri::WebviewWindow) -> Vec<Display> {
@@ -656,21 +660,25 @@ fn display(m: &tauri::Monitor) -> Display {
 /// A display from its physical bounds and work area.
 fn display_in_desktop(bounds: Rect, work_area: Rect, scale: f64, in_points: bool) -> Display {
     let r = |(x, y, w, h): Rect| (to_desktop(x, scale, in_points), to_desktop(y, scale, in_points), to_desktop(w, scale, in_points), to_desktop(h, scale, in_points));
-    Display { bounds: r(bounds), work_area: r(work_area) }
+    Display { bounds: r(bounds), work_area: r(work_area), size_scale: if in_points { 1.0 } else { scale } }
 }
 
-/// Moves `win` into the work area of the display it overlaps most, so all of it shows (its top-left corner when it
-/// is larger than the area). A spot over the Dock or menu bar still counts as on that display. None when it overlaps
-/// no display.
-fn fit_on_screen(win: Rect, displays: &[Display]) -> Option<(f64, f64)> {
-    let (x, y, w, h) = win;
-    let overlap = |a: &Rect| ((x + w).min(a.0 + a.2) - x.max(a.0)).max(0.0) * ((y + h).min(a.1 + a.3) - y.max(a.1)).max(0.0);
-    let d = displays.iter().filter(|d| overlap(&d.bounds) > 0.0).max_by(|a, b| overlap(&a.bounds).total_cmp(&overlap(&b.bounds)))?;
-    let a = d.work_area;
+/// Moves the overlay at `(x, y)` with logical `size` into the work area of the display it overlaps most, so all of it
+/// shows (its top-left corner when it is larger than the area). Each display is measured with the overlay's size on
+/// that display. A spot over the Dock or menu bar still counts as on that display. None when it overlaps no display.
+fn fit_on_screen((x, y): (f64, f64), size: (f64, f64), displays: &[Display]) -> Option<(f64, f64)> {
+    let overlap = |d: &Display| {
+        let (w, h, a) = (size.0 * d.size_scale, size.1 * d.size_scale, d.bounds);
+        ((x + w).min(a.0 + a.2) - x.max(a.0)).max(0.0) * ((y + h).min(a.1 + a.3) - y.max(a.1)).max(0.0)
+    };
+    let d = displays.iter().filter(|d| overlap(d) > 0.0).max_by(|a, b| overlap(a).total_cmp(&overlap(b)))?;
+    let (w, h, a) = (size.0 * d.size_scale, size.1 * d.size_scale, d.work_area);
     Some((x.min(a.0 + a.2 - w).max(a.0), y.min(a.1 + a.3 - h).max(a.1)))
 }
 
-fn centered((w, h): (f64, f64), a: Rect) -> (f64, f64) {
+/// The overlay with logical `size` centered in the work area of `d`.
+fn centered(size: (f64, f64), d: &Display) -> (f64, f64) {
+    let (w, h, a) = (size.0 * d.size_scale, size.1 * d.size_scale, d.work_area);
     (a.0 + (a.2 - w) / 2.0, a.1 + (a.3 - h) / 2.0)
 }
 
@@ -788,13 +796,13 @@ mod tests {
 
     /// A display whose work area is all of it.
     const fn whole(r: Rect) -> Display {
-        Display { bounds: r, work_area: r }
+        Display { bounds: r, work_area: r, size_scale: 1.0 }
     }
     const HD: Display = whole((0.0, 0.0, 1920.0, 1080.0));
     const OVERLAY: (f64, f64) = (1100.0, 220.0);
 
     fn fit(x: f64, y: f64, displays: &[Display]) -> Option<(f64, f64)> {
-        fit_on_screen((x, y, OVERLAY.0, OVERLAY.1), displays)
+        fit_on_screen((x, y), OVERLAY, displays)
     }
 
     #[test]
@@ -819,8 +827,8 @@ mod tests {
     #[test]
     fn overlay_over_the_dock_is_pulled_into_the_work_area() {
         // 1728x1117 MacBook display: menu bar above y = 33, Dock below y = 1036.
-        let mac = Display { bounds: (0.0, 0.0, 1728.0, 1117.0), work_area: (0.0, 33.0, 1728.0, 1003.0) };
-        assert_eq!(fit_on_screen((200.0, 1100.0, 1100.0, 221.0), &[mac]), Some((200.0, 815.0)));
+        let mac = Display { bounds: (0.0, 0.0, 1728.0, 1117.0), work_area: (0.0, 33.0, 1728.0, 1003.0), size_scale: 1.0 };
+        assert_eq!(fit_on_screen((200.0, 1100.0), (1100.0, 221.0), &[mac]), Some((200.0, 815.0)));
     }
 
     /// 1x primary display and a 2x display to its right, as tao reports them (physical pixels).
@@ -836,9 +844,34 @@ mod tests {
         // Windows: a spot saved on the 2x display stays there, wherever the overlay starts.
         let d = mixed_scale(false);
         assert_eq!((d[1].bounds.0, d[1].bounds.2), (1920.0, 3840.0));
-        assert_eq!(fit_on_screen((2400.0, 200.0, 1100.0, 220.0), &d), Some((2400.0, 200.0)));
+        assert_eq!(fit_on_screen((2400.0, 200.0), OVERLAY, &d), Some((2400.0, 200.0)));
         // Divided by each display's own scale, the 2x display would start at 960 and overlap the 1x one.
         assert_eq!(mixed_scale(true)[1].bounds.0, 960.0);
+    }
+
+    /// A 200% primary display and a 100% display to its right, in physical pixels.
+    fn primary_200_secondary_100() -> [Display; 2] {
+        [
+            display_in_desktop((0.0, 0.0, 3840.0, 2160.0), (0.0, 0.0, 3840.0, 2080.0), 2.0, false),
+            display_in_desktop((3840.0, 0.0, 1920.0, 1080.0), (3840.0, 0.0, 1920.0, 1040.0), 1.0, false),
+        ]
+    }
+
+    #[test]
+    fn overlay_is_measured_at_the_scale_of_the_display_it_goes_to() {
+        let d = primary_200_secondary_100();
+        // Saved on the 100% display, restored while the overlay starts on the 200% one (2200x440 there).
+        // At 100% it is 1100x220, so the spot is valid and must not move.
+        assert_eq!(fit_on_screen((4500.0, 700.0), OVERLAY, &d), Some((4500.0, 700.0)));
+        // The other way round: on the 200% display the overlay is 2200x440, so it is pulled up to fit.
+        assert_eq!(fit_on_screen((1000.0, 1800.0), OVERLAY, &d), Some((1000.0, 1640.0)));
+    }
+
+    #[test]
+    fn reset_centers_with_the_size_on_the_primary_display() {
+        let d = primary_200_secondary_100();
+        assert_eq!(centered(OVERLAY, &d[0]), (820.0, 820.0));
+        assert_eq!(centered(OVERLAY, &d[1]), (4250.0, 410.0));
     }
 
     #[test]
@@ -860,7 +893,7 @@ mod tests {
 
     #[test]
     fn centered_on_a_work_area() {
-        assert_eq!(centered(OVERLAY, (0.0, 25.0, 1920.0, 1055.0)), (410.0, 442.5));
+        assert_eq!(centered(OVERLAY, &whole((0.0, 25.0, 1920.0, 1055.0))), (410.0, 442.5));
     }
 
     #[test]
