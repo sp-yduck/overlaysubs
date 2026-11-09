@@ -15,7 +15,7 @@ OverlaySubs の配布経路は **GitHub Releases のみ** です。`v*` タグ�
 | ジョブ | 条件 | 内容 |
 |---|---|---|
 | `verify` | タグ push のみ | タグ名 `vX.Y.Z` が `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `crates/core/Cargo.toml` の version と一致するか検証。`productName` が `OverlaySubs` であることも確認 |
-| `build` | タグ push と手動実行 | `windows-latest`（Vulkan）と `macos-15`（Metal、ad-hoc 署名）でビルドし、**固定名にリネームしてから** artifact にアップロード |
+| `build` | タグ push、手動実行、ラベル `ci:build` 付き PR | `windows-latest`（Vulkan）と `macos-15`（Metal、ad-hoc 署名）でビルドし、**固定名にリネームしてから** artifact にアップロード |
 | `publish` | タグ push のみ | `SHA256SUMS.txt` を生成し、Release を最新として公開。本文はダウンロード表・警告の回避手順・CHANGELOG の該当セクション |
 
 Release に添付される固定名アセット（README やランディングページが参照する契約）:
@@ -31,6 +31,10 @@ Release に添付される固定名アセット（README やランディング�
 
 `workflow_dispatch` は **ビルドのみのドライラン** です。`verify` と `publish` はスキップされ、
 Release は作成されません。
+
+**PR でも同じドライランができます。** PR に `ci:build` ラベルを付けると `build` の 2 ジョブだけが
+走り、インストーラがその run の artifact として残ります。**fork からの PR でも動く**ので、
+マージ前に実機でインストールして試せます。手順と注意点は §6「PR のビルド検証」を参照してください。
 
 ---
 
@@ -350,3 +354,70 @@ SmartScreen と Gatekeeper の警告が出ます（[公式サイトの「警告�
 `bundle.windows.certificateThumbprint` などを設定します。
 
 署名を入れるまでは、公式サイトの「警告が表示されたとき」（<https://sp-yduck.github.io/overlaysubs/#warning>）を案内してください。
+
+---
+
+## 6. PR のビルド検証（フォークからの PR を含む）
+
+PR に **`ci:build` ラベル** を付けると、`release.yml` の `build` ジョブだけが走ります
+（`verify` / `publish` はスキップ）。マージ前に Windows / macOS のインストーラを実際に作って
+インストールできるので、Tauri のバンドルやネイティブ依存（whisper.cpp / llama.cpp）に触る変更の
+確認に使えます。**fork からの PR でも同じように動きます。**
+
+### 6.1 初回だけ: ラベルを作る
+
+```bash
+gh label create "ci:build" -R sp-yduck/overlaysubs \
+  --color 1d76db --description "この PR で Windows / macOS のリリースビルドを実行する"
+```
+
+### 6.2 実行する
+
+```bash
+# PR にラベルを付ける（メンテナの操作。fork PR でも可）
+gh pr edit <PR番号> --add-label "ci:build"
+```
+
+- ラベルを付けた時点で 1 回目のビルドが始まります。以後その PR に push されるたびに
+  自動で再ビルドします（`synchronize`）
+- 同じ PR で再実行したいときは、ラベルを外して付け直してください（`labeled` が再度発生します）
+- **初回コントリビュータの PR は承認が必要**です。run 画面の「Approve and run workflows」を
+  押すか、Settings → Actions → General の「Fork pull request workflows from outside
+  collaborators」の設定に従ってください
+- 同じ PR に新しい commit を push すると、**前の run は自動でキャンセル**されます
+  （タグ push の run はキャンセルされません）
+- このワークフローの変更が `main` にマージされる前の PR では、ラベルを付けてもビルドは
+  走りません（`pull_request` の run は PR のマージコミットにあるワークフロー定義で動くため）
+
+### 6.3 成果物を取得して試す
+
+```bash
+# PR の run を探す（fork のブランチでも --event で絞れば確実）
+RUN_ID=$(gh run list --workflow=release.yml --event=pull_request \
+  --limit=1 --json databaseId --jq '.[0].databaseId')
+gh run view "$RUN_ID"
+
+gh run download "$RUN_ID" -n overlaysubs-windows-dist
+gh run download "$RUN_ID" -n overlaysubs-macos-dist
+ls -lh overlaysubs-windows-dist overlaysubs-macos-dist
+```
+
+固定名の 3 アセット（`overlaysubs-windows-x64-setup.exe` / `overlaysubs-windows-x64.msi` /
+`overlaysubs-macos-arm64.dmg`）がそろっていれば OK です。PR の artifact は **3 日**で消えます
+（ドライランは 7 日）。
+
+### 6.4 制約と注意
+
+- **secrets は渡りません**。`GITHUB_TOKEN` も read-only に固定されるため、`publish` は
+  仮にワークフローを書き換えても実行できません。macOS は ad-hoc 署名（公証なし）で
+  ビルドされるので、Gatekeeper の警告の出方は配布ビルドと同じですが、Developer ID 署名や
+  公証そのものの検証はできません。署名付きで確認したい変更は、メンテナが一時ブランチに
+  取り込んで `gh workflow run release.yml --ref <ブランチ>` でドライランしてください
+- **`publish` は絶対に走りません**。タグ push のときだけです。PR の artifact はテスト専用で、
+  Release には添付されません
+- PR は `release.yml` 自体も書き換えられるため、**PR のビルドが緑でもリリースの根拠には
+  しない**でください。正となるのは `main` のタグ push で作ったビルドです
+- PR ビルドはキャッシュを保存しません（リリース用キャッシュを追い出さないため）。そのぶん
+  1 回目は時間がかかります
+- 2 OS × 最大 4 時間の timeout です。public リポジトリなら Actions の分数は無料ですが、
+  ラベルで必要なときだけ回す運用にしてください
