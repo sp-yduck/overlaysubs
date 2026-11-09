@@ -140,6 +140,9 @@ struct Snapshot {
     running: bool,
     overlay_visible: bool,
     models_dir: PathBuf,
+    /// `std::env::consts::OS`; the UI needs it because macOS system audio is captured as a
+    /// whole and has no device to choose.
+    platform: &'static str,
     devices: capture::Devices,
     /// Last "Check this PC" result from disk, so the model setup screen can show it again after a restart.
     hardware: Option<HardwareCache>,
@@ -159,6 +162,7 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
         registry,
         downloaded,
         models_dir: dir,
+        platform: std::env::consts::OS,
         devices: capture::devices(),
         hardware: hw::cached(&config_dir(&app)),
     })

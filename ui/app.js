@@ -8,6 +8,15 @@ const busy = new Set();
 const $ = (s) => document.querySelector(s);
 const t = (k) => (I18N[snap?.settings.ui_lang] || I18N.ja)[k] || k;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+/** Backend errors may be codes such as E_MACOS_PERMISSION or E_MACOS_AUDIO|detail; localize known codes and keep unknown ones verbatim. */
+function errText(e) {
+  const m = /^E_([A-Z0-9_]+)(?:\|([\s\S]*))?$/.exec(String(e ?? ""));
+  if (!m) return String(e);
+  const key = "err_" + m[1].toLowerCase();
+  const msg = t(key);
+  if (msg === key) return String(e);
+  return m[2] ? `${msg} (${m[2]})` : msg;
+}
 const gb = (b) => (b < 1e8 ? (b / 1e6).toFixed(1) + " MB" : (b / 1e9).toFixed(2) + " GB");
 const model = (id) => snap.registry.models.find((m) => m.id === id);
 
@@ -45,7 +54,7 @@ async function checkUpdate() {
 
 async function persist() {
   try { await invoke("save_settings", { settings: snap.settings }); toast(t("saved")); }
-  catch (e) { toast(String(e), "error"); }
+  catch (e) { toast(errText(e), "error"); }
   await refresh();
 }
 
@@ -138,13 +147,15 @@ function modelsPage() {
 function homePage() {
   const s = snap.settings;
   const { ready } = setupState();
+  // macOS captures system audio from every app through ScreenCaptureKit, so there is nothing to pick.
+  const macSystem = s.source.kind === "system" && snap.platform === "macos";
   const devs = s.source.kind === "system" ? snap.devices.outputs : snap.devices.inputs;
   const glossary = (s.session.glossary || []).map(([a, b]) => `${a}=${b}`).join("\n");
   return `<h2>${t("home")}</h2>
   ${ready ? "" : `<div class="banner"><span>${t("need_setup_long")}</span>${btn("goto-models", t("goto_models"), { cls: "primary" })}</div>`}
   <div class="grid2">
     ${card(t("input"), `${select(t("source"), "source.kind", opts([["system", t("system")], ["mic", t("mic")]], s.source.kind))}
-      ${select(t("device"), "source.device", opts([["", t("default_dev")], ...devs.map((d) => [d, d])], s.source.device), "nullable")}`)}
+      ${macSystem ? `<p class="muted small">${t("system_audio_note")}</p>` : select(t("device"), "source.device", opts([["", t("default_dev")], ...devs.map((d) => [d, d])], s.source.device), "nullable")}`)}
     ${card(t("languages"), `${select(t("src_lang"), "session.source_lang", langOpts(s.session.source_lang, [["", t("auto")]]), "nullable")}
       ${select(t("tgt_lang"), "session.target_lang", langOpts(s.session.target_lang))}
       ${select(t("alt_lang"), "session.alt_target_lang", langOpts(s.session.alt_target_lang))}`)}
@@ -336,7 +347,7 @@ async function act(name, id, el) {
     const path = await saveDialog({ defaultPath: `overlaysubs.${format}`, filters: [{ name: format, extensions: [format] }] });
     if (path) { await invoke("export_history", { path, format, withSource: snap.settings.overlay.showSource }); toast(t("exported")); toast(t("output_note"), "warn"); }
   }
-  if (name === "open-release") return invoke("open_url", { url: updateInfo.url }).catch((e) => toast(String(e), "error"));
+  if (name === "open-release") return invoke("open_url", { url: updateInfo.url }).catch((e) => toast(errText(e), "error"));
   if (name === "dismiss-update") { updateInfo = null; return render(); }
   await refresh();
 }
@@ -348,14 +359,14 @@ document.addEventListener("click", async (ev) => {
   snap.overlay_visible = show;
   drawOverlayToggle();
   try { await invoke("show_overlay", { show }); }
-  catch (e) { snap.overlay_visible = !show; drawOverlayToggle(); toast(String(e), "error"); }
+  catch (e) { snap.overlay_visible = !show; drawOverlayToggle(); toast(errText(e), "error"); }
 });
 
 document.addEventListener("click", async (ev) => {
   const link = ev.target.closest("a[data-external]");
   if (link) {
     ev.preventDefault();
-    invoke("open_url", { url: link.href }).catch((e) => toast(String(e), "error"));
+    invoke("open_url", { url: link.href }).catch((e) => toast(errText(e), "error"));
     return;
   }
   const el = ev.target.closest("[data-act]");
@@ -366,7 +377,7 @@ document.addEventListener("click", async (ev) => {
   busy.add(key);
   if (snap) render();
   try { await act(name, id, el); }
-  catch (e) { toast(String(e), "error"); }
+  catch (e) { toast(errText(e), "error"); }
   finally { busy.delete(key); if (snap) render(); }
 });
 
@@ -387,6 +398,6 @@ listen("overlay-visible", (e) => {
   snap.overlay_visible = e.payload;
   drawOverlayToggle();
 });
-listen("error", (e) => toast(String(e.payload), "error"));
+listen("error", (e) => toast(errText(e.payload), "error"));
 listen("caption", (e) => { if (e.payload.stage === "final") loadHistory(); });
 refresh().then(loadHistory);

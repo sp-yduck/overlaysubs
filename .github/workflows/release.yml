@@ -452,6 +452,7 @@ jobs:
           LC_LOAD_WEAK_DYLIB = 0x80000018
           LC_REEXPORT_DYLIB = 0x8000001F
           LC_LOAD_UPWARD_DYLIB = 0x80000023
+          LC_RPATH = 0x8000001C
           DYLIB_COMMANDS = {
               LC_LOAD_DYLIB,
               LC_LOAD_WEAK_DYLIB,
@@ -460,6 +461,11 @@ jobs:
           }
           # Provided by macOS itself; anything else has to ship inside the .app.
           SYSTEM_PREFIXES = ("/usr/lib/", "/System/Library/", "/Library/Apple/")
+          # The Swift runtime ships with macOS (12.0+) at /usr/lib/swift. The linker records
+          # @rpath/libswift*.dylib for those libraries, so an app linking a Swift static bridge
+          # may depend on them even though they must NOT be bundled (macOS 13 is our minimum).
+          SWIFT_RUNTIME_PREFIX = "libswift"
+          SWIFT_RUNTIME_RPATH = "/usr/lib/swift"
 
           app = os.path.abspath(sys.argv[1])
           contents = os.path.join(app, "Contents")
@@ -472,8 +478,8 @@ jobs:
               return data[offset:end].decode("utf-8", "replace")
 
 
-          def _parse_thin(data, offset, dependencies):
-              """Collect the dylib load commands of one thin Mach-O image."""
+          def _parse_thin(data, offset, dependencies, rpaths):
+              """Collect the dylib load commands and LC_RPATH entries of one thin Mach-O image."""
               if struct.unpack_from("<I", data, offset)[0] != MH_MAGIC_64:
                   return  # 32-bit images are not expected in an arm64 bundle
               command_count = struct.unpack_from("<I", data, offset + 16)[0]
@@ -483,33 +489,38 @@ jobs:
                   if command in DYLIB_COMMANDS:
                       name_offset = struct.unpack_from("<I", data, position + 8)[0]
                       dependencies.append(_string(data, position + name_offset))
+                  elif command == LC_RPATH:
+                      path_offset = struct.unpack_from("<I", data, position + 8)[0]
+                      rpaths.append(_string(data, position + path_offset))
                   position += size
 
 
           def dependencies_of(path):
-              """Return the dylib dependencies of path, or None when it is not Mach-O."""
+              """Return (dylib dependencies, rpaths) of path, or None when it is not Mach-O."""
               with open(path, "rb") as handle:
                   data = handle.read()
               if len(data) < 8:
                   return None
               if struct.unpack_from("<I", data, 0)[0] == MH_MAGIC_64:
                   dependencies = []
-                  _parse_thin(data, 0, dependencies)
-                  return dependencies
+                  rpaths = []
+                  _parse_thin(data, 0, dependencies, rpaths)
+                  return dependencies, rpaths
               magic = struct.unpack_from(">I", data, 0)[0]
               if magic not in (FAT_MAGIC, FAT_MAGIC_64):
                   return None
               dependencies = []
+              rpaths = []
               for index in range(struct.unpack_from(">I", data, 4)[0]):
                   if magic == FAT_MAGIC:
                       offset = struct.unpack_from(">I", data, 8 + index * 20 + 8)[0]
                   else:
                       offset = struct.unpack_from(">Q", data, 8 + index * 32 + 8)[0]
-                  _parse_thin(data, offset, dependencies)
-              return dependencies
+                  _parse_thin(data, offset, dependencies, rpaths)
+              return dependencies, rpaths
 
 
-          def unbundled_dependency(dependency, owner):
+          def unbundled_dependency(dependency, owner, rpaths):
               """Return why dependency cannot load on a Mac without Homebrew, or None."""
               if dependency.startswith("/"):
                   if dependency.startswith(SYSTEM_PREFIXES):
@@ -518,6 +529,11 @@ jobs:
               if dependency.startswith("@rpath/"):
                   name = dependency[len("@rpath/"):]
                   if os.path.exists(os.path.join(frameworks_dir, name)):
+                      return None
+                  # Swift runtime only, and only when this image really searches /usr/lib/swift.
+                  if name.startswith(SWIFT_RUNTIME_PREFIX) and any(
+                      os.path.normpath(path) == SWIFT_RUNTIME_RPATH for path in rpaths
+                  ):
                       return None
                   return f"depends on {dependency}, which is missing from Contents/Frameworks"
               if dependency.startswith("@loader_path/"):
@@ -539,15 +555,16 @@ jobs:
               for name in sorted(names):
                   path = os.path.join(directory, name)
                   try:
-                      dependencies = dependencies_of(path)
+                      inspected_macho = dependencies_of(path)
                   except (OSError, ValueError, struct.error) as error:
                       print(f"::warning::could not inspect {os.path.relpath(path, app)}: {error}")
                       continue
-                  if dependencies is None:
+                  if inspected_macho is None:
                       continue
+                  dependencies, rpaths = inspected_macho
                   inspected += 1
                   for dependency in dependencies:
-                      problem = unbundled_dependency(dependency, path)
+                      problem = unbundled_dependency(dependency, path, rpaths)
                       if problem is not None:
                           print(f"::error::{os.path.relpath(path, app)} {problem}")
                           problems += 1

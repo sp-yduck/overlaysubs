@@ -67,7 +67,7 @@ PC 上で再生されるあらゆる音声をリアルタイムで文字起こ�
 ## 仕組み
 
 ```
-WASAPI loopback / マイク ─▶ 16kHz mono ─▶ Silero VAD による発話区切り ─▶ whisper.cpp ─▶ PLaMo 3 Translate (llama.cpp) ─▶ オーバーレイ
+WASAPI loopback（Windows）/ ScreenCaptureKit のシステム音声（macOS）/ マイク ─▶ 16kHz mono ─▶ Silero VAD による発話区切り ─▶ whisper.cpp ─▶ PLaMo 3 Translate (llama.cpp) ─▶ オーバーレイ
 ```
 
 - `crates/core` はエンジン非依存のロジックです。ティア選択、モデル定義、PFML3 プロンプト、発話区切り、セッション、文単位の翻訳、SRT 出力を持ちます。`cargo test -p overlaysubs-core` で検証できます。
@@ -82,7 +82,7 @@ WASAPI loopback / マイク ─▶ 16kHz mono ─▶ Silero VAD による発話�
 - 初回起動で OverlaySubs 利用規約に同意します。同意は設定フォルダの `terms-accepted` に保存し、規約の版が変わるまで再表示しません。設定画面の「PC の性能を調べる」でハードウェアを検出し、ティア（High / Mid / Low / CPU）に応じたモデルを自動選択します。検出結果は `hardware.json` にキャッシュし、次回起動時はハードウェアを調べ直さずに表示します（「もう一度調べる」で再検出）。
 - モデルは Hugging Face から自動ダウンロードします。中断しても再開でき、SHA-256 で検証します。アカウントやトークンは不要です。
 - 任意の速度チェック（ベンチマーク）を実行でき、リアルタイムに間に合わなければ1段下げたモデルに切り替えます。
-- 音声入力は Windows の WASAPI loopback（システム音声）とマイク。macOS ではループバック入力デバイスをマイクとして選びます。
+- 音声入力はシステム音声とマイクです。Windows は WASAPI loopback で、macOS 13 以降は ScreenCaptureKit でシステム音声（すべてのアプリの再生音）を直接取り込みます。BlackHole などのループバック（仮想オーディオ）デバイスは不要です。マイクは Windows・macOS の両方で使えます。macOS で初めてシステム音声を使うときは、システム設定 → プライバシーとセキュリティの「画面収録とシステム音声録音」（macOS 15 以降。macOS 13〜14 は「画面収録」）で OverlaySubs を許可し、アプリを再起動してください。
 - 入力言語の自動判定または固定。訳文言語と「入力が訳文と同じ言語のとき」の言語を選べるので、英⇔日・韓⇔日を同時に扱えます。
 - 直前の発話を文脈として渡し、文単位で訳します。用語集、話題（翻訳のヒント）、日本語の敬体／常体を指定できます。
 - 暫定結果は薄く表示し、確定訳はストリーミングで上書きします。
@@ -109,7 +109,7 @@ WASAPI loopback / マイク ─▶ 16kHz mono ─▶ Silero VAD による発話�
 
 ## ビルド
 
-必要なもの: Rust stable（edition 2021）。Windows は MSVC + Windows SDK、CMake、LLVM / libclang（bindgen 用）、Vulkan SDK、WebView2。macOS は Xcode Command Line Tools。Node.js は Tauri CLI を `npx` で動かすためだけに使います（アプリ本体には不要）。
+必要なもの: Rust stable（edition 2021）。Windows は MSVC + Windows SDK、CMake、LLVM / libclang（bindgen 用）、Vulkan SDK、WebView2。macOS は Swift ツールチェーン（Xcode、または macOS 13 以降の SDK を含む Command Line Tools）が必要です。ScreenCaptureKit の Rust バインディングがビルド時に小さな Swift ブリッジをコンパイルするためです。リリース CI は `macos-15` ランナーでビルドするため影響はありません。Node.js は Tauri CLI を `npx` で動かすためだけに使います（アプリ本体には不要）。
 
 ```bash
 # Windows（Vulkan。公式ビルドと同じ）
@@ -129,6 +129,7 @@ whisper.cpp と llama.cpp はどちらも ggml を含むため、同じプロセ
 - Windows: `src-tauri/libs/*.dll` を `bundle.resources` で同梱します。`src-tauri/libs/` は `.gitignore` 対象なので、バンドル前に llama.cpp のビルド成果物（`target/release/build/llama-cpp-sys-2-*/out/bin/*.dll`）を `src-tauri/libs/` にコピーしてください。CI の手順は `.github/workflows/release.yml` にあります。
 - macOS: `beforeBundleCommand` が `scripts/stage-dylibs.sh` を実行し、`target/frameworks` に dylib を集めて `bundle.macOS.files` で同梱します。
 - `THIRD_PARTY_NOTICES.md` もバンドルに同梱されます（`src-tauri/tauri.windows.conf.json` / `tauri.macos.conf.json`）。
+- macOS: `src-tauri/Info.plist` はバンドルの生成される Info.plist にマージされます（`bundle.macOS.infoPlist`）。マイクと画面収録／システム音声の利用目的（`NSMicrophoneUsageDescription` / `NSScreenCaptureUsageDescription`）を宣言しています。
 
 ## テスト
 

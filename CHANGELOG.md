@@ -8,8 +8,19 @@ OverlaySubs の主な変更点を記録します。
 
 次のリリースに向けた変更点をここに追記します。
 
+### Added
+
+- macOS 13 以降で、Mac で再生中のシステム音声を ScreenCaptureKit 経由で直接取り込めるようにしました。すべてのアプリの音声をまとめてキャプチャします。Windows はこれまでどおり WASAPI loopback、マイク入力は Windows・macOS の両方で使えます。BlackHole などのループバック（仮想オーディオ）デバイスを用意する必要はありません。
+- macOS で初めてシステム音声を使うときの権限許可に対応しました。システム設定 → プライバシーとセキュリティの「画面収録とシステム音声録音」（macOS 15 以降。macOS 13〜14 は「画面収録」）で OverlaySubs を許可し、アプリを再起動すると使えます。許可しなかった場合や利用できない場合は、その旨を通知で表示します。
+- macOS のアプリバンドルに `Info.plist` を同梱し、Tauri が生成する Info.plist に `NSMicrophoneUsageDescription`（マイクの利用目的）と `NSScreenCaptureUsageDescription`（画面収録・システム音声の利用目的）をマージするようにしました。
+
+### Changed
+
+- macOS のソースビルドに Swift ツールチェーンが必要になりました。ScreenCaptureKit の Rust バインディングがビルド時に小さな Swift ブリッジをコンパイルするため、Xcode、または macOS 13 以降の SDK を含む Command Line Tools が必要です。リリース CI は `macos-15` ランナーでビルドするため影響はありません。
+
 ### Fixed
 
+- macOS 版でマイク入力を使うと、マイクの利用目的（`NSMicrophoneUsageDescription`）が Info.plist に無いためにアプリがクラッシュする問題を修正しました。利用目的の文字列を同梱するようにし、あわせてシステム音声の権限プロンプト用に `NSScreenCaptureUsageDescription` を追加しました。
 - macOS 版が、Homebrew を入れていない Mac で起動直後に「問題が起きたため OverlaySubs を開けません」と表示されて終了する問題を修正しました。同梱していた llama の dylib がビルド環境（GitHub ランナー）の Homebrew の OpenSSL を絶対パスで参照していたため、Homebrew の無い Mac では `libssl.4.dylib` を読み込めずに dyld が終了していました。ビルド時に OpenSSL を検出・リンクさせないようにし、あわせて配布物の検査をバンドル内の全 Mach-O（同梱 dylib を含む）に広げて、システム以外の絶対パス依存が残っていればリリースを止めるようにしました。
 
 ## [0.2.4] - 2026-11-08

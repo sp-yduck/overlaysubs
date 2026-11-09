@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>OverlaySubs uses the microphone to transcribe and translate speech into subtitles. Audio is processed on this Mac and is never sent anywhere.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>OverlaySubs records system audio so it can transcribe and translate what your Mac is playing into subtitles. Screen content is never captured or stored.</string>
+</dict>
+</plist>

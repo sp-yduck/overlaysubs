@@ -1,4 +1,5 @@
-//! Engine-agnostic logic: tier selection, cached hardware probe, model registry, PLaMo prompt, endpointing, session, export, latest-release check.
+//! Engine-agnostic logic: audio PCM conversion, tier selection, cached hardware probe, model registry, PLaMo prompt, endpointing, session, export, latest-release check.
+pub mod audio;
 pub mod cache;
 pub mod endpoint;
 pub mod export;

@@ -159,7 +159,7 @@ platforms). The two workspace crates `overlaysubs` and `overlaysubs-core` are
 excluded. The license column reproduces each package's `license` field
 verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 
-- Third-party crates: **503**
+- Third-party crates: **507**
 - Distinct license units: **16**
 - Crates with no `license` field: **0** (every crate declares a license; none required a "see crate" fallback)
 
@@ -169,10 +169,12 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `aho-corasick` | 1.1.5 | Unlicense OR MIT | https://github.com/BurntSushi/aho-corasick |
 | `alloc-no-stdlib` | 3.0.0 | BSD-3-Clause | https://github.com/dropbox/rust-alloc-no-stdlib |
 | `alloc-stdlib` | 0.3.0 | BSD-3-Clause | https://github.com/dropbox/rust-alloc-no-stdlib |
-| `alsa` | 0.9.1 | Apache-2.0/MIT | https://github.com/diwic/alsa-rs |
-| `alsa-sys` | 0.3.1 | MIT | https://github.com/diwic/alsa-sys |
+| `alsa` | 0.11.0 | Apache-2.0/MIT | https://github.com/diwic/alsa-rs |
+| `alsa-sys` | 0.4.0 | MIT | https://github.com/diwic/alsa-sys |
 | `android_system_properties` | 0.1.6 | MIT OR Apache-2.0 | https://github.com/nical/android_system_properties |
 | `anyhow` | 1.0.104 | MIT OR Apache-2.0 | https://github.com/dtolnay/anyhow |
+| `apple-cf` | 0.11.7 | MIT OR Apache-2.0 | https://github.com/doom-fish/apple-cf-rs |
+| `apple-metal` | 0.10.4 | MIT OR Apache-2.0 | https://github.com/doom-fish/apple-metal-rs |
 | `atk` | 0.18.2 | MIT | https://github.com/gtk-rs/gtk3-rs |
 | `atk-sys` | 0.18.2 | MIT | https://github.com/gtk-rs/gtk3-rs |
 | `atomic-waker` | 1.1.2 | Apache-2.0 OR MIT | https://github.com/smol-rs/atomic-waker |
@@ -186,6 +188,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `bitflags` | 1.3.2 | MIT/Apache-2.0 | https://github.com/bitflags/bitflags |
 | `bitflags` | 2.13.2 | MIT OR Apache-2.0 | https://github.com/bitflags/bitflags |
 | `block-buffer` | 0.10.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
+| `block-buffer` | 0.12.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | `block2` | 0.6.2 | MIT | https://github.com/madsmtm/objc2 |
 | `brotli` | 9.1.1 | BSD-3-Clause AND MIT | https://github.com/dropbox/rust-brotli |
 | `brotli-decompressor` | 6.2.0 | BSD-3-Clause/MIT | https://github.com/dropbox/rust-brotli-decompressor |
@@ -212,19 +215,21 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `clang-sys` | 1.9.1 | Apache-2.0 | https://github.com/KyleMayes/clang-sys |
 | `cmake` | 0.1.58 | MIT OR Apache-2.0 | https://github.com/rust-lang/cmake-rs |
 | `combine` | 4.6.9 | MIT | https://github.com/Marwes/combine |
+| `const-oid` | 0.10.2 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
 | `cookie` | 0.18.2 | MIT OR Apache-2.0 | https://github.com/SergioBenitez/cookie-rs |
 | `core-foundation` | 0.10.1 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
 | `core-foundation-sys` | 0.8.7 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
 | `core-graphics` | 0.25.0 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
 | `core-graphics-types` | 0.2.0 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
-| `coreaudio-rs` | 0.13.0 | MIT/Apache-2.0 | https://github.com/RustAudio/coreaudio-rs.git |
-| `cpal` | 0.16.0 | Apache-2.0 | https://github.com/rustaudio/cpal |
+| `coreaudio-rs` | 0.14.2 | MIT/Apache-2.0 | https://github.com/RustAudio/coreaudio-rs.git |
+| `cpal` | 0.18.2 | Apache-2.0 | https://github.com/RustAudio/cpal |
 | `cpufeatures` | 0.2.17 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | `cpufeatures` | 0.3.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | `crc32fast` | 1.5.4 | MIT OR Apache-2.0 | https://github.com/srijs/rust-crc32fast |
 | `crossbeam-channel` | 0.5.17 | MIT OR Apache-2.0 | https://github.com/crossbeam-rs/crossbeam |
 | `crossbeam-utils` | 0.8.23 | MIT OR Apache-2.0 | https://github.com/crossbeam-rs/crossbeam |
 | `crypto-common` | 0.1.7 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
+| `crypto-common` | 0.2.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | `cssparser` | 0.37.0 | MPL-2.0 | https://github.com/servo/rust-cssparser |
 | `cssparser-macros` | 0.7.1 | MPL-2.0 | https://github.com/servo/rust-cssparser |
 | `ctor` | 1.0.13 | Apache-2.0 OR MIT | https://github.com/mmastrac/linktime |
@@ -240,6 +245,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `derive_more` | 2.1.1 | MIT | https://github.com/JelteF/derive_more |
 | `derive_more-impl` | 2.1.1 | MIT | https://github.com/JelteF/derive_more |
 | `digest` | 0.10.7 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
+| `digest` | 0.11.3 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | `dirs` | 7.0.0 | MIT OR Apache-2.0 | https://codeberg.org/dirs/dirs-rs |
 | `dirs-sys` | 0.5.0 | MIT OR Apache-2.0 | https://github.com/dirs-dev/dirs-sys-rs |
 | `dispatch2` | 0.3.1 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
@@ -247,6 +253,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `dlopen2` | 0.8.2 | MIT | https://github.com/OpenByteDev/dlopen2 |
 | `dlopen2_derive` | 0.4.3 | MIT | https://github.com/OpenByteDev/dlopen2 |
 | `dom_query` | 0.28.0 | MIT | https://github.com/niklak/dom_query |
+| `doom-fish-utils` | 0.4.3 | MIT OR Apache-2.0 | https://github.com/doom-fish/doom-fish-utils |
 | `dpi` | 0.1.2 | Apache-2.0 AND MIT | https://github.com/rust-windowing/winit |
 | `dtoa` | 1.0.11 | MIT OR Apache-2.0 | https://github.com/dtolnay/dtoa |
 | `dtoa-short` | 0.3.5 | MPL-2.0 | https://github.com/upsuper/dtoa-short |
@@ -314,6 +321,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `http-body` | 1.1.0 | MIT | https://github.com/hyperium/http-body |
 | `http-body-util` | 0.1.5 | MIT | https://github.com/hyperium/http-body |
 | `httparse` | 1.10.1 | MIT OR Apache-2.0 | https://github.com/seanmonstar/httparse |
+| `hybrid-array` | 0.4.15 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hybrid-array |
 | `hyper` | 1.12.0 | MIT | https://github.com/hyperium/hyper |
 | `hyper-rustls` | 0.27.10 | Apache-2.0 OR ISC OR MIT | https://github.com/rustls/hyper-rustls |
 | `hyper-util` | 0.1.21 | MIT | https://github.com/hyperium/hyper-util |
@@ -344,6 +352,8 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `jiff-tzdb` | 0.1.9 | Unlicense OR MIT | https://github.com/BurntSushi/jiff |
 | `jiff-tzdb-platform` | 0.1.3 | Unlicense OR MIT | https://github.com/BurntSushi/jiff |
 | `jni` | 0.21.1 | MIT/Apache-2.0 | https://github.com/jni-rs/jni-rs |
+| `jni` | 0.22.4 | MIT OR Apache-2.0 | https://github.com/jni-rs/jni-rs |
+| `jni-macros` | 0.22.4 | MIT OR Apache-2.0 | https://github.com/jni-rs/jni-rs |
 | `jni-sys` | 0.3.1 | MIT OR Apache-2.0 | https://github.com/jni-rs/jni-sys |
 | `jni-sys` | 0.4.1 | MIT OR Apache-2.0 | https://github.com/jni-rs/jni-sys |
 | `jni-sys-macros` | 0.4.1 | MIT OR Apache-2.0 | https://github.com/jni-rs/jni-sys |
@@ -367,7 +377,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `lock_api` | 0.4.14 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | `log` | 0.4.35 | MIT OR Apache-2.0 | https://github.com/rust-lang/log |
 | `lru-slab` | 0.1.3 | MIT OR Apache-2.0 OR Zlib | https://github.com/Ralith/lru-slab |
-| `mach2` | 0.4.3 | BSD-2-Clause OR MIT OR Apache-2.0 | https://github.com/JohnTitor/mach2 |
+| `mach2` | 0.6.0 | BSD-2-Clause OR MIT OR Apache-2.0 | https://github.com/JohnTitor/mach2 |
 | `markup5ever` | 0.39.0 | MIT OR Apache-2.0 | https://github.com/servo/html5ever |
 | `memchr` | 2.8.3 | Unlicense OR MIT | https://github.com/BurntSushi/memchr |
 | `memoffset` | 0.9.1 | MIT | https://github.com/Gilnaa/memoffset |
@@ -391,6 +401,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `objc2` | 0.6.5 | MIT | https://github.com/madsmtm/objc2 |
 | `objc2-app-kit` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | `objc2-audio-toolbox` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
+| `objc2-avf-audio` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | `objc2-cloud-kit` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | `objc2-core-audio` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | `objc2-core-audio-types` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
@@ -405,6 +416,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `objc2-foundation` | 0.3.2 | MIT | https://github.com/madsmtm/objc2 |
 | `objc2-io-kit` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | `objc2-io-surface` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
+| `objc2-open-directory` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | `objc2-quartz-core` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | `objc2-ui-kit` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | `objc2-user-notifications` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
@@ -473,6 +485,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `schemars` | 1.2.3 | MIT | https://github.com/GREsau/schemars |
 | `schemars_derive` | 0.8.22 | MIT | https://github.com/GREsau/schemars |
 | `scopeguard` | 1.2.0 | MIT OR Apache-2.0 | https://github.com/bluss/scopeguard |
+| `screencapturekit` | 11.1.2 | MIT OR Apache-2.0 | https://github.com/doom-fish/screencapturekit-rs |
 | `selectors` | 0.38.0 | MPL-2.0 | https://github.com/servo/stylo |
 | `semver` | 1.0.28 | MIT OR Apache-2.0 | https://github.com/dtolnay/semver |
 | `serde` | 1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
@@ -491,9 +504,12 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `serialize-to-javascript-impl` | 0.1.2 | MIT OR Apache-2.0 | https://github.com/chippers/serialize-to-javascript |
 | `servo_arc` | 0.4.3 | MIT OR Apache-2.0 | https://github.com/servo/stylo |
 | `sha2` | 0.10.9 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
+| `sha2` | 0.11.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
 | `shlex` | 1.3.0 | MIT OR Apache-2.0 | https://github.com/comex/rust-shlex |
 | `shlex` | 2.0.1 | MIT OR Apache-2.0 | https://github.com/comex/rust-shlex |
 | `simd-adler32` | 0.3.10 | MIT | https://github.com/mcountryman/simd-adler32 |
+| `simd_cesu8` | 1.2.0 | Apache-2.0 OR MIT | https://github.com/seancroach/simd_cesu8 |
+| `simdutf8` | 0.1.5 | MIT OR Apache-2.0 | https://github.com/rusticstuff/simdutf8 |
 | `siphasher` | 1.0.4 | MIT OR Apache-2.0 | https://github.com/jedisct1/rust-siphash |
 | `slab` | 0.4.12 | MIT | https://github.com/tokio-rs/slab |
 | `smallvec` | 1.16.4 | MIT OR Apache-2.0 | https://github.com/servo/rust-smallvec |
@@ -513,7 +529,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `syn` | 3.0.9 | MIT OR Apache-2.0 | https://github.com/dtolnay/syn |
 | `sync_wrapper` | 1.0.2 | Apache-2.0 | https://github.com/Actyx/sync_wrapper |
 | `synstructure` | 0.14.0 | MIT | https://github.com/mystor/synstructure |
-| `sysinfo` | 0.37.2 | MIT | https://github.com/GuillaumeGomez/sysinfo |
+| `sysinfo` | 0.40.1 | MIT | https://github.com/GuillaumeGomez/sysinfo |
 | `system-deps` | 6.2.2 | MIT OR Apache-2.0 | https://github.com/gdesmott/system-deps |
 | `tao` | 0.37.2 | Apache-2.0 | https://github.com/tauri-apps/tao |
 | `tao-macros` | 0.1.4 | MIT OR Apache-2.0 | https://github.com/tauri-apps/tao |
@@ -602,26 +618,15 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `winapi-util` | 0.1.11 | Unlicense OR MIT | https://github.com/BurntSushi/winapi-util |
 | `winapi-x86_64-pc-windows-gnu` | 0.4.0 | MIT/Apache-2.0 | https://github.com/retep998/winapi-rs |
 | `window-vibrancy` | 0.8.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri-plugin-vibrancy |
-| `windows` | 0.54.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| `windows` | 0.61.3 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows` | 0.62.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| `windows-collections` | 0.2.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-collections` | 0.3.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| `windows-core` | 0.54.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| `windows-core` | 0.61.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-core` | 0.62.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| `windows-future` | 0.2.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-future` | 0.3.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-implement` | 0.60.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-interface` | 0.59.3 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| `windows-link` | 0.1.3 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-link` | 0.2.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| `windows-numerics` | 0.2.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-numerics` | 0.3.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| `windows-result` | 0.1.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| `windows-result` | 0.3.4 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-result` | 0.4.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| `windows-strings` | 0.4.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-strings` | 0.5.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-sys` | 0.45.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-sys` | 0.52.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
@@ -629,7 +634,6 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `windows-sys` | 0.61.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-targets` | 0.42.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-targets` | 0.52.6 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| `windows-threading` | 0.1.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-threading` | 0.2.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows-version` | 0.1.7 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | `windows_aarch64_gnullvm` | 0.42.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
@@ -682,17 +686,19 @@ The text was taken from the license file of the first crate (alphabetically)
 that offers the license and ships a matching file; the source is noted under
 each section.
 
-### 4.1 MIT (458 crates)
+### 4.1 MIT (462 crates)
 
 Applies to the following crates (name version):
 
 ```text
   adler2 2.0.1
   aho-corasick 1.1.5
-  alsa 0.9.1
-  alsa-sys 0.3.1
+  alsa 0.11.0
+  alsa-sys 0.4.0
   android_system_properties 0.1.6
   anyhow 1.0.104
+  apple-cf 0.11.7
+  apple-metal 0.10.4
   atk 0.18.2
   atk-sys 0.18.2
   atomic-waker 1.1.2
@@ -705,6 +711,7 @@ Applies to the following crates (name version):
   bitflags 1.3.2
   bitflags 2.13.2
   block-buffer 0.10.4
+  block-buffer 0.12.1
   block2 0.6.2
   brotli 9.1.1
   brotli-decompressor 6.2.0
@@ -730,18 +737,20 @@ Applies to the following crates (name version):
   chrono 0.4.45
   cmake 0.1.58
   combine 4.6.9
+  const-oid 0.10.2
   cookie 0.18.2
   core-foundation 0.10.1
   core-foundation-sys 0.8.7
   core-graphics 0.25.0
   core-graphics-types 0.2.0
-  coreaudio-rs 0.13.0
+  coreaudio-rs 0.14.2
   cpufeatures 0.2.17
   cpufeatures 0.3.1
   crc32fast 1.5.4
   crossbeam-channel 0.5.17
   crossbeam-utils 0.8.23
   crypto-common 0.1.7
+  crypto-common 0.2.2
   ctor 1.0.13
   darling 0.24.1
   darling_core 0.24.1
@@ -755,6 +764,7 @@ Applies to the following crates (name version):
   derive_more 2.1.1
   derive_more-impl 2.1.1
   digest 0.10.7
+  digest 0.11.3
   dirs 7.0.0
   dirs-sys 0.5.0
   dispatch2 0.3.1
@@ -762,6 +772,7 @@ Applies to the following crates (name version):
   dlopen2 0.8.2
   dlopen2_derive 0.4.3
   dom_query 0.28.0
+  doom-fish-utils 0.4.3
   dpi 0.1.2
   dtoa 1.0.11
   dyn-clone 1.0.20
@@ -825,6 +836,7 @@ Applies to the following crates (name version):
   http-body 1.1.0
   http-body-util 0.1.5
   httparse 1.10.1
+  hybrid-array 0.4.15
   hyper 1.12.0
   hyper-rustls 0.27.10
   hyper-util 0.1.21
@@ -848,6 +860,8 @@ Applies to the following crates (name version):
   jiff-tzdb 0.1.9
   jiff-tzdb-platform 0.1.3
   jni 0.21.1
+  jni 0.22.4
+  jni-macros 0.22.4
   jni-sys 0.3.1
   jni-sys 0.4.1
   jni-sys-macros 0.4.1
@@ -868,7 +882,7 @@ Applies to the following crates (name version):
   lock_api 0.4.14
   log 0.4.35
   lru-slab 0.1.3
-  mach2 0.4.3
+  mach2 0.6.0
   markup5ever 0.39.0
   memchr 2.8.3
   memoffset 0.9.1
@@ -892,6 +906,7 @@ Applies to the following crates (name version):
   objc2 0.6.5
   objc2-app-kit 0.3.2
   objc2-audio-toolbox 0.3.2
+  objc2-avf-audio 0.3.2
   objc2-cloud-kit 0.3.2
   objc2-core-audio 0.3.2
   objc2-core-audio-types 0.3.2
@@ -906,6 +921,7 @@ Applies to the following crates (name version):
   objc2-foundation 0.3.2
   objc2-io-kit 0.3.2
   objc2-io-surface 0.3.2
+  objc2-open-directory 0.3.2
   objc2-quartz-core 0.3.2
   objc2-ui-kit 0.3.2
   objc2-user-notifications 0.3.2
@@ -969,6 +985,7 @@ Applies to the following crates (name version):
   schemars 1.2.3
   schemars_derive 0.8.22
   scopeguard 1.2.0
+  screencapturekit 11.1.2
   semver 1.0.28
   serde 1.0.229
   serde-untagged 0.1.9
@@ -986,9 +1003,12 @@ Applies to the following crates (name version):
   serialize-to-javascript-impl 0.1.2
   servo_arc 0.4.3
   sha2 0.10.9
+  sha2 0.11.1
   shlex 1.3.0
   shlex 2.0.1
   simd-adler32 0.3.10
+  simd_cesu8 1.2.0
+  simdutf8 0.1.5
   siphasher 1.0.4
   slab 0.4.12
   smallvec 1.16.4
@@ -1006,7 +1026,7 @@ Applies to the following crates (name version):
   syn 2.0.119
   syn 3.0.9
   synstructure 0.14.0
-  sysinfo 0.37.2
+  sysinfo 0.40.1
   system-deps 6.2.2
   tao-macros 0.1.4
   tauri 2.12.5
@@ -1088,26 +1108,15 @@ Applies to the following crates (name version):
   winapi-util 0.1.11
   winapi-x86_64-pc-windows-gnu 0.4.0
   window-vibrancy 0.8.1
-  windows 0.54.0
-  windows 0.61.3
   windows 0.62.2
-  windows-collections 0.2.0
   windows-collections 0.3.2
-  windows-core 0.54.0
-  windows-core 0.61.2
   windows-core 0.62.2
-  windows-future 0.2.1
   windows-future 0.3.2
   windows-implement 0.60.2
   windows-interface 0.59.3
-  windows-link 0.1.3
   windows-link 0.2.1
-  windows-numerics 0.2.0
   windows-numerics 0.3.1
-  windows-result 0.1.2
-  windows-result 0.3.4
   windows-result 0.4.1
-  windows-strings 0.4.2
   windows-strings 0.5.1
   windows-sys 0.45.0
   windows-sys 0.52.0
@@ -1115,7 +1124,6 @@ Applies to the following crates (name version):
   windows-sys 0.61.2
   windows-targets 0.42.2
   windows-targets 0.52.6
-  windows-threading 0.1.0
   windows-threading 0.2.1
   windows-version 0.1.7
   windows_aarch64_gnullvm 0.42.2
@@ -1173,15 +1181,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### 4.2 Apache-2.0 (347 crates)
+### 4.2 Apache-2.0 (351 crates)
 
 Applies to the following crates (name version):
 
 ```text
   adler2 2.0.1
-  alsa 0.9.1
+  alsa 0.11.0
   android_system_properties 0.1.6
   anyhow 1.0.104
+  apple-cf 0.11.7
+  apple-metal 0.10.4
   atomic-waker 1.1.2
   autocfg 1.5.1
   base64 0.21.7
@@ -1192,6 +1202,7 @@ Applies to the following crates (name version):
   bitflags 1.3.2
   bitflags 2.13.2
   block-buffer 0.10.4
+  block-buffer 0.12.1
   bs58 0.5.1
   bumpalo 3.20.3
   bytemuck 1.25.2
@@ -1207,19 +1218,21 @@ Applies to the following crates (name version):
   chrono 0.4.45
   clang-sys 1.9.1
   cmake 0.1.58
+  const-oid 0.10.2
   cookie 0.18.2
   core-foundation 0.10.1
   core-foundation-sys 0.8.7
   core-graphics 0.25.0
   core-graphics-types 0.2.0
-  coreaudio-rs 0.13.0
-  cpal 0.16.0
+  coreaudio-rs 0.14.2
+  cpal 0.18.2
   cpufeatures 0.2.17
   cpufeatures 0.3.1
   crc32fast 1.5.4
   crossbeam-channel 0.5.17
   crossbeam-utils 0.8.23
   crypto-common 0.1.7
+  crypto-common 0.2.2
   ctor 1.0.13
   dasp_sample 0.11.0
   dbus 0.9.12
@@ -1228,10 +1241,12 @@ Applies to the following crates (name version):
   defmt-parser 1.1.0
   deranged 0.5.9
   digest 0.10.7
+  digest 0.11.3
   dirs 7.0.0
   dirs-sys 0.5.0
   dispatch2 0.3.1
   displaydoc 0.2.7
+  doom-fish-utils 0.4.3
   dpi 0.1.2
   dtoa 1.0.11
   dunce 1.0.5
@@ -1276,6 +1291,7 @@ Applies to the following crates (name version):
   html5ever 0.39.0
   http 1.5.0
   httparse 1.10.1
+  hybrid-array 0.4.15
   hyper-rustls 0.27.10
   iana-time-zone 0.1.65
   iana-time-zone-haiku 0.1.2
@@ -1288,6 +1304,8 @@ Applies to the following crates (name version):
   itertools 0.13.0
   itoa 1.0.18
   jni 0.21.1
+  jni 0.22.4
+  jni-macros 0.22.4
   jni-sys 0.3.1
   jni-sys 0.4.1
   jni-sys-macros 0.4.1
@@ -1307,7 +1325,7 @@ Applies to the following crates (name version):
   lock_api 0.4.14
   log 0.4.35
   lru-slab 0.1.3
-  mach2 0.4.3
+  mach2 0.6.0
   markup5ever 0.39.0
   mime 0.3.18
   minimal-lexical 0.2.1
@@ -1325,6 +1343,7 @@ Applies to the following crates (name version):
   num_enum_derive 0.7.6
   objc2-app-kit 0.3.2
   objc2-audio-toolbox 0.3.2
+  objc2-avf-audio 0.3.2
   objc2-cloud-kit 0.3.2
   objc2-core-audio 0.3.2
   objc2-core-audio-types 0.3.2
@@ -1337,6 +1356,7 @@ Applies to the following crates (name version):
   objc2-exception-helper 0.1.1
   objc2-io-kit 0.3.2
   objc2-io-surface 0.3.2
+  objc2-open-directory 0.3.2
   objc2-quartz-core 0.3.2
   objc2-ui-kit 0.3.2
   objc2-user-notifications 0.3.2
@@ -1384,6 +1404,7 @@ Applies to the following crates (name version):
   rustversion 1.0.23
   ryu 1.0.23
   scopeguard 1.2.0
+  screencapturekit 11.1.2
   semver 1.0.28
   serde 1.0.229
   serde-untagged 0.1.9
@@ -1401,8 +1422,11 @@ Applies to the following crates (name version):
   serialize-to-javascript-impl 0.1.2
   servo_arc 0.4.3
   sha2 0.10.9
+  sha2 0.11.1
   shlex 1.3.0
   shlex 2.0.1
+  simd_cesu8 1.2.0
+  simdutf8 0.1.5
   siphasher 1.0.4
   smallvec 1.16.4
   socket2 0.6.5
@@ -1474,26 +1498,15 @@ Applies to the following crates (name version):
   winapi-i686-pc-windows-gnu 0.4.0
   winapi-x86_64-pc-windows-gnu 0.4.0
   window-vibrancy 0.8.1
-  windows 0.54.0
-  windows 0.61.3
   windows 0.62.2
-  windows-collections 0.2.0
   windows-collections 0.3.2
-  windows-core 0.54.0
-  windows-core 0.61.2
   windows-core 0.62.2
-  windows-future 0.2.1
   windows-future 0.3.2
   windows-implement 0.60.2
   windows-interface 0.59.3
-  windows-link 0.1.3
   windows-link 0.2.1
-  windows-numerics 0.2.0
   windows-numerics 0.3.1
-  windows-result 0.1.2
-  windows-result 0.3.4
   windows-result 0.4.1
-  windows-strings 0.4.2
   windows-strings 0.5.1
   windows-sys 0.45.0
   windows-sys 0.52.0
@@ -1501,7 +1514,6 @@ Applies to the following crates (name version):
   windows-sys 0.61.2
   windows-targets 0.42.2
   windows-targets 0.52.6
-  windows-threading 0.1.0
   windows-threading 0.2.1
   windows-version 0.1.7
   windows_aarch64_gnullvm 0.42.2
@@ -1733,7 +1745,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### 4.3 Zlib (29 crates)
+### 4.3 Zlib (31 crates)
 
 Applies to the following crates (name version):
 
@@ -1746,6 +1758,7 @@ Applies to the following crates (name version):
   miniz_oxide 0.9.1
   objc2-app-kit 0.3.2
   objc2-audio-toolbox 0.3.2
+  objc2-avf-audio 0.3.2
   objc2-cloud-kit 0.3.2
   objc2-core-audio 0.3.2
   objc2-core-audio-types 0.3.2
@@ -1758,6 +1771,7 @@ Applies to the following crates (name version):
   objc2-exception-helper 0.1.1
   objc2-io-kit 0.3.2
   objc2-io-surface 0.3.2
+  objc2-open-directory 0.3.2
   objc2-quartz-core 0.3.2
   objc2-ui-kit 0.3.2
   objc2-user-notifications 0.3.2
@@ -3153,10 +3167,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 Applies to the following crates (name version):
 
 ```text
-  mach2 0.4.3
+  mach2 0.6.0
 ```
 
-Text source: the LICENSE-BSD file in the mach2 0.4.3 package.
+Text source: the LICENSE-BSD file in the mach2 0.6.0 package.
 
 ```text
 Copyright (c) 2019 Nick Fitzgerald, 2021 Yuki Okushi

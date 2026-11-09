@@ -28,6 +28,11 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 sha2 = "0.11"
 sysinfo = "0.40"
 
+# macOS system audio comes from ScreenCaptureKit: cpal only sees input devices there, and a
+# loopback/virtual audio driver would have to be installed by the user.
+[target.'cfg(target_os = "macos")'.dependencies]
+screencapturekit = { version = "11.1.2", features = ["macos_13_0"] }
+
 [features]
 vulkan = ["whisper-rs/vulkan", "llama-cpp-2/vulkan"]
 cuda = ["whisper-rs/cuda", "llama-cpp-2/cuda"]
