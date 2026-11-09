@@ -25,7 +25,7 @@ body:
     attributes:
       label: OverlaySubs version
       description: You can find it on the "About" page of the app or in the name of the file you downloaded.
-      placeholder: "0.3.0"
+      placeholder: "0.4.0"
     validations:
       required: true
 
