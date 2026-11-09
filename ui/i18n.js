@@ -190,4 +190,4 @@ const LANGS = { en: "English", ja: "日本語", ko: "한국어", zh: "中文", e
 // PLaMo 3 Translate has no plain "zh" target, only Simplified ("zh-hans") and Traditional ("zh-hant").
 // The input-language list keeps "zh" because Whisper only knows that code.
 const TARGET_LANGS = Object.fromEntries(Object.entries(LANGS).flatMap(([k, v]) => (k === "zh" ? [["zh-hant", "中文（繁體）"], ["zh-hans", "中文（简体）"]] : [[k, v]])));
-const OVERLAY_DEFAULTS = { showSource: true, fontSize: 28, font: "system-ui, sans-serif", bg: 0.55, lines: 10, linger: 8, clickThrough: false };
+const OVERLAY_DEFAULTS = { showSource: true, fontSize: 28, font: "system-ui, sans-serif", bg: 0.55, lines: 10, linger: 10, clickThrough: false };
