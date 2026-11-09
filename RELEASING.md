@@ -207,7 +207,7 @@ curl -sIL -o /dev/null -w '%{http_code}\n' https://sp-yduck.github.io/overlaysub
 2. **`Cargo.lock` を更新**（`version` がロックにも入っているため）
 
    ```bash
-   cargo metadata --no-deps --format-version 1 > /dev/null   # Cargo.lock を更新
+   cargo metadata --format-version 1 > /dev/null   # Cargo.lock を更新
    git diff --stat Cargo.lock
    ```
 3. **`CHANGELOG.md` に `## [X.Y.Z] - YYYY-MM-DD` を追記**。Release 本文に自動で取り込まれます
