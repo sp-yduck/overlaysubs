@@ -106,6 +106,10 @@ function termsView() {
   </div>`;
 }
 
+/** In-flight progress markup. Download events patch it in place instead of re-rendering. */
+const progressView = (p) =>
+  `<progress data-prog="${esc(p.id)}" max="${p.total}" value="${p.done}"></progress><span class="muted" data-pct="${esc(p.id)}">${Math.floor((100 * p.done) / p.total)}%</span>`;
+
 function modelRow(kind, key) {
   const s = snap.settings.selection;
   const list = snap.registry.models.filter((m) => m.kind === kind);
@@ -115,11 +119,11 @@ function modelRow(kind, key) {
   const status = have
     ? `<span class="ok">✓ ${t("downloaded")}</span> ${btn("delete", t("delete"), { cls: "small", id: cur.id })}`
     : p
-      ? `<progress data-prog="${esc(cur.id)}" max="${p.total}" value="${p.done}"></progress><span class="muted" data-pct="${esc(cur.id)}">${Math.floor((100 * p.done) / p.total)}%</span>`
+      ? progressView(p)
       : `<span class="muted">${t("missing")} · ${gb(cur.size)}</span>`;
   return `<div class="mrow">
     ${select(t(kind), `selection.${key}`, opts(list.map((m) => [m.id, `${m.label} · ${gb(m.size)}${snap.downloaded.includes(m.id) ? " ✓" : ""}`]), s[key]))}
-    <div class="mstatus">${status}</div></div>`;
+    <div class="mstatus" data-mstatus="${esc(cur.id)}">${status}</div></div>`;
 }
 
 function modelsPage() {
@@ -395,16 +399,20 @@ document.addEventListener("click", async (ev) => {
 
 listen("download", (e) => {
   const p = e.payload;
-  const first = !progress[p.id];
   progress[p.id] = p;
   // Progress is shown only on the models page. Re-rendering other pages on every chunk replaces the nav
   // buttons between mousedown and mouseup, so clicks are lost until the download ends.
   if (page !== "models") return;
-  // Patch in place: a full render on every chunk would steal focus from inputs.
-  const bar = document.querySelector(`[data-prog="${CSS.escape(p.id)}"]`);
-  if (first || !bar) return render();
+  // Patch the status cell of the row that shows this model. The cell is keyed by model id, so a selection
+  // change during the download removes it and leaves nothing to update; switching back re-renders from the
+  // recorded progress. Never render() here: rebuilding the page between mousedown and mouseup swallows the
+  // click, closes an open <select>, and resets the <details> sections.
+  const cell = document.querySelector(`[data-mstatus="${CSS.escape(p.id)}"]`);
+  if (!cell) return;
+  const bar = cell.querySelector(`[data-prog="${CSS.escape(p.id)}"]`);
+  if (!bar) { cell.innerHTML = progressView(p); return; }
   bar.value = p.done;
-  const pct = document.querySelector(`[data-pct="${CSS.escape(p.id)}"]`);
+  const pct = cell.querySelector(`[data-pct="${CSS.escape(p.id)}"]`);
   if (pct) pct.textContent = `${Math.floor((100 * p.done) / p.total)}%`;
 });
 listen("running", refresh);
