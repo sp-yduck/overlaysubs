@@ -72,7 +72,7 @@ WASAPI loopback (Windows) / ScreenCaptureKit system audio (macOS) / microphone â
 
 - `crates/core` holds engine-independent logic: tier selection, model definitions, PFML3 prompts, utterance segmentation, sessions, sentence-level translation, and SRT export. Run `cargo test -p overlaysubs-core`.
 - `src-tauri` is the Tauri app: audio capture, whisper.cpp / llama.cpp adapters, model downloads, tray, hotkeys, and settings persistence.
-- `ui` is the settings window and overlay: plain HTML/JS/CSS with no build step; `ui/i18n.js` holds the Japanese and English strings.
+- `ui` is the settings window and overlay: plain HTML/JS/CSS with no build step; `ui/i18n.js` holds the Japanese, English and Chinese (Traditional and Simplified) strings.
 - The ASR and translation engines sit behind the `session::Asr` / `session::Translator` traits and can be swapped.
 - `models.json` defines the models (URL, size, SHA-256, tier). URLs are pinned to Hugging Face commits (using `main` would break the hash when upstream re-uploads). Placing a `models.json` in the config folder overrides the bundled one without an app update.
 - `licenses/` ships the OverlaySubs Terms of Use (Japanese and English); `THIRD_PARTY_NOTICES.md` lists the bundled libraries' licenses. The PLaMo 3 license is not bundled; the app and docs link to the official page instead.
@@ -88,7 +88,7 @@ WASAPI loopback (Windows) / ScreenCaptureKit system audio (macOS) / microphone â
 - Partial results are dimmed; final translations stream in and replace them.
 - Always-on-top, semi-transparent overlay (click-through can be enabled in settings). Original text, font size, font, background opacity, line count, display time, and the "Built with PLaMo" credit are configurable. The overlay appears while translating and hides when translation stops; you can also toggle it from "Show subtitles" in the tray menu or with the switch above the Start button. While translation is stopped, opening "Subtitles" shows the overlay with a sample caption so you can tune the appearance live.
 - Export history as text or SRT.
-- Tray/menu-bar resident, global hotkey (default `CmdOrCtrl+Shift+T`; `Ctrl+Shift+T` on Windows, `Cmd+Shift+T` on macOS) to start/stop. UI in Japanese and English.
+- Tray/menu-bar resident, global hotkey (default `CmdOrCtrl+Shift+T`; `Ctrl+Shift+T` on Windows, `Cmd+Shift+T` on macOS) to start/stop. UI in Japanese, English and Chinese (Traditional and Simplified); the first launch picks one from the OS language settings, and falls back to English. The Terms of Use exist only in Japanese and English, so the Chinese UI shows the English version.
 - At startup the app makes one anonymous request to the GitHub Releases API to check for a newer version; if there is one, a dismissible banner in the settings window shows the latest and current version with "Open release page" and "Later" buttons. Nothing is downloaded or installed automatically, and if the check fails (offline, API error) nothing is shown. Dismissing the banner lasts until the app restarts.
 - Audio, transcripts, and translations are never sent anywhere. No telemetry. The only network access is the model download and one anonymous GitHub API request at startup to check for a newer release (it sends no account, token, or personal data; if it fails, nothing happens). The app works offline once the models are downloaded.
 

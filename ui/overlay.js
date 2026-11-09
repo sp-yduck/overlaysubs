@@ -13,7 +13,7 @@ const t = (k) => (I18N[uiLang] || I18N.ja)[k] || k;
 
 function apply(settings) {
   cfg = { ...OVERLAY_DEFAULTS, ...settings.overlay };
-  uiLang = settings.ui_lang || uiLang;
+  uiLang = settings.ui_lang || detectUiLang(navigator.languages);
   const r = document.documentElement.style;
   r.setProperty("--size", cfg.fontSize + "px");
   r.setProperty("--font", cfg.font);
