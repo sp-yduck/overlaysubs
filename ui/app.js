@@ -38,6 +38,12 @@ function toast(msg, kind = "ok") {
 async function refresh() {
   snap = await invoke("snapshot");
   snap.settings.overlay = { ...OVERLAY_DEFAULTS, ...snap.settings.overlay };
+  if (!snap.settings.ui_lang) {
+    snap.settings.ui_lang = detectUiLang(navigator.languages);
+    // A failed save must not keep the first screen blank; the detected language still applies this session.
+    try { await invoke("save_settings", { settings: snap.settings }); }
+    catch (e) { toast(errText(e), "error"); }
+  }
   if (snap.terms_accepted) checkUpdate();
   render();
 }
@@ -62,7 +68,7 @@ async function persist() {
 function opts(pairs, cur) {
   return pairs.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? "") ? "selected" : ""}>${esc(l)}</option>`).join("");
 }
-const langOpts = (cur, extra = []) => opts([...extra, ...Object.entries(LANGS)], cur);
+const langOpts = (cur, extra = [], langs = LANGS) => opts([...extra, ...Object.entries(langs)], cur);
 function field(label, path, kind = "text", extra = "") {
   const v = get(snap.settings, path);
   if (kind === "check") return `<label class="chk"><input type="checkbox" data-k="${path}" data-t="check" ${v ? "checked" : ""}> ${esc(label)}</label>`;
@@ -157,8 +163,8 @@ function homePage() {
     ${card(t("input"), `${select(t("source"), "source.kind", opts([["system", t("system")], ["mic", t("mic")]], s.source.kind))}
       ${macSystem ? `<p class="muted small">${t("system_audio_note")}</p>` : select(t("device"), "source.device", opts([["", t("default_dev")], ...devs.map((d) => [d, d])], s.source.device), "nullable")}`)}
     ${card(t("languages"), `${select(t("src_lang"), "session.source_lang", langOpts(s.session.source_lang, [["", t("auto")]]), "nullable")}
-      ${select(t("tgt_lang"), "session.target_lang", langOpts(s.session.target_lang))}
-      ${select(t("alt_lang"), "session.alt_target_lang", langOpts(s.session.alt_target_lang))}`)}
+      ${select(t("tgt_lang"), "session.target_lang", langOpts(s.session.target_lang, [], TARGET_LANGS))}
+      ${select(t("alt_lang"), "session.alt_target_lang", langOpts(s.session.alt_target_lang, [], TARGET_LANGS))}`)}
   </div>
   <details class="card"><summary>${t("tuning")}</summary>
     ${select(t("form"), "session.form", opts([["", t("form_default")], ["plain", t("plain")], ["polite", t("polite")]], s.session.form), "nullable")}
@@ -229,7 +235,8 @@ const PAGES = { home: homePage, models: modelsPage, overlay: overlayPage, histor
 
 function render() {
   const s = snap.settings;
-  termsLang ??= s.ui_lang;
+  // The terms exist only in Japanese and English.
+  termsLang ??= s.ui_lang === "ja" ? "ja" : "en";
   if (!snap.terms_accepted) {
     $("#app").className = "solo";
     $("#app").innerHTML = termsView();
@@ -248,7 +255,7 @@ function render() {
     <button id="overlay-toggle" class="ovtoggle${snap.overlay_visible ? " on" : ""}" role="switch" aria-checked="${snap.overlay_visible ? "true" : "false"}" title="${esc(snap.overlay_visible ? t("hide_overlay") : t("show_overlay"))}"><span class="lbl">${t("overlay_toggle")}</span><span class="track"><span class="knob"></span></span></button>
     ${btn("toggle", snap.running ? t("stop") : t("start"), { cls: `start ${snap.running ? "running" : "primary"}`, disabled: !ready })}
     <p class="hint">${snap.running ? `<span class="dot live"></span>${t("live")}` : ready ? `${t("hotkey")}: <code>${esc(s.hotkey)}</code>` : t("need_setup")}</p>
-    <select data-k="ui_lang" data-t="str" aria-label="${t("ui_lang")}">${opts([["ja", "日本語"], ["en", "English"]], s.ui_lang)}</select>
+    <select data-k="ui_lang" data-t="str" aria-label="${t("ui_lang")}">${opts([["ja", "日本語"], ["en", "English"], ["zh-hant", "繁體中文"], ["zh-hans", "简体中文"]], s.ui_lang)}</select>
   </aside>
   <section id="page" data-page="${page}">${updateBanner()}${PAGES[page]()}</section>`;
   $("#page").scrollTop = keep;
@@ -390,6 +397,9 @@ listen("download", (e) => {
   const p = e.payload;
   const first = !progress[p.id];
   progress[p.id] = p;
+  // Progress is shown only on the models page. Re-rendering other pages on every chunk replaces the nav
+  // buttons between mousedown and mouseup, so clicks are lost until the download ends.
+  if (page !== "models") return;
   // Patch in place: a full render on every chunk would steal focus from inputs.
   const bar = document.querySelector(`[data-prog="${CSS.escape(p.id)}"]`);
   if (first || !bar) return render();

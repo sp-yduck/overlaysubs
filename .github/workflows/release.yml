@@ -7,25 +7,40 @@ name: release
 #
 # workflow_dispatch is a build-only dry run: verify and publish are skipped, both build jobs
 # run, and each uploads an artifact whose contents are the exact final release filenames.
+#
+# pull_request is the same build-only dry run for pull requests, including the ones opened from
+# forks: a maintainer adds the "ci:build" label, both build jobs run, and the installers are
+# uploaded as run artifacts so they can be installed and tested before the change lands. Every
+# later push to a labelled PR rebuilds. A fork PR gets no repository secrets and a read-only
+# GITHUB_TOKEN (GitHub enforces both regardless of the permissions below), so verify/publish
+# cannot run for it -- publish is tag-push-only anyway -- and the macOS build falls back to
+# ad-hoc signing exactly like the dry run. See RELEASING.md section 6 for the operational side.
 on:
   push:
     tags: ["v*"]
+  # "labeled" starts the first build; "synchronize" rebuilds the PR on every later push (the
+  # job-level condition below filters both events down to PRs that carry the label).
+  pull_request:
+    types: [labeled, synchronize, reopened]
   # Bare dispatch (no inputs) is intentional: `gh workflow run release.yml --ref main`.
   workflow_dispatch:
 
 # One run per ref, so a duplicate tag push cannot race an in-flight release build.
 # cancel-in-progress stays false on purpose: a run that is already uploading assets must
 # never be killed by a duplicate event (the publish job is create-or-update, i.e. idempotent).
+# PR builds are keyed per PR and DO cancel: only the newest commit of a PR is worth testing, and
+# otherwise a run would queue for hours behind the previous commit's build of the same PR.
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('pr-build-{0}', github.event.pull_request.number) || format('release-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least privilege at the top level; only the publish job opts into contents: write.
 permissions:
   contents: read
 
 jobs:
-  # Tag pushes only. A dry run has no tag to compare, so this job is skipped entirely.
+  # Tag pushes only. A dry run (workflow_dispatch or a pull_request) has no tag to compare,
+  # so this job is skipped entirely.
   verify:
     name: verify tag matches app version
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -113,9 +128,10 @@ jobs:
           # Written exactly once: duplicate keys in $GITHUB_OUTPUT are not a documented contract.
           echo "release_exists=$release_exists" >> "$GITHUB_OUTPUT"
 
-  # Runs on tag pushes and on workflow_dispatch. `always()` is required because verify is
-  # skipped for a dry run: without it, a skipped `needs` job would skip the builds too.
-  # verify failure still blocks the build (and therefore the publish) on tag pushes.
+  # Runs on tag pushes, on workflow_dispatch, and on pull requests labelled "ci:build".
+  # `always()` is required because verify is skipped for a dry run: without it, a skipped
+  # `needs` job would skip the builds too. verify failure still blocks the build (and therefore
+  # the publish) on tag pushes; publish itself is tag-push-only, so a PR run stops here.
   build:
     name: build (${{ matrix.os }}, ${{ matrix.features }})
     needs: verify
@@ -124,7 +140,12 @@ jobs:
       && needs.verify.result != 'failure'
       && needs.verify.result != 'cancelled'
       && needs.verify.outputs.release_exists != 'true'
-      && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v'))
+      && (
+        github.event_name == 'workflow_dispatch'
+        || startsWith(github.ref, 'refs/tags/v')
+        || (github.event_name == 'pull_request'
+            && contains(github.event.pull_request.labels.*.name, 'ci:build'))
+      )
     strategy:
       fail-fast: false
       matrix:
@@ -177,6 +198,10 @@ jobs:
           # GGML_NATIVE=OFF build below; "no-openssl" is CMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON
           # (without the bump, cached llama dylibs still link Homebrew's openssl@4).
           key: ${{ matrix.features }}-native-off-no-openssl
+          # PR runs only restore the cache. A PR's caches are scoped to its merge ref, but they
+          # still consume the repository's cache quota, and evicting the entry the next release
+          # build restores would turn every release into a from-scratch C/C++ rebuild.
+          save-if: ${{ github.event_name != 'pull_request' }}
 
       # The cached target dir also holds the installers of the run that saved the cache
       # (target/release/bundle, C:\t\release\bundle on Windows). They are named after the app
@@ -305,7 +330,8 @@ jobs:
           name: overlaysubs-windows-dist
           path: dist/
           if-no-files-found: error
-          retention-days: 7
+          # PR builds are disposable test installers, so they expire sooner than a dry run's.
+          retention-days: ${{ github.event_name == 'pull_request' && 3 || 7 }}
 
       # The ScreenCaptureKit bindings statically link a Swift bridge (via apple-metal) whose
       # sources reference Metal APIs that only exist in the macOS 26 SDK (MTLTensor*,
@@ -664,9 +690,10 @@ jobs:
           name: overlaysubs-macos-dist
           path: dist/
           if-no-files-found: error
-          retention-days: 7
+          # Same 3-day retention as the Windows artifact on pull_request runs.
+          retention-days: ${{ github.event_name == 'pull_request' && 3 || 7 }}
 
-  # Tag pushes only: a workflow_dispatch dry run stops after the builds.
+  # Tag pushes only: a dry run (workflow_dispatch or a pull_request) stops after the builds.
   publish:
     name: publish GitHub release
     needs: [verify, build]

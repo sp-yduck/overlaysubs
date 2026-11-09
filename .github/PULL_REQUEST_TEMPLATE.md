@@ -18,6 +18,7 @@
 
 - [ ] `cargo test -p overlaysubs-core` が通る
 - [ ] `cargo build -p overlaysubs`（または `npx --yes @tauri-apps/cli@^2 dev`）で起動を確認した
+- [ ] インストーラのビルド確認が必要な場合、`ci:build` ラベルでのビルド実行を PR 本文で依頼した
 - [ ] 手動で確認した操作:
 
 ```text

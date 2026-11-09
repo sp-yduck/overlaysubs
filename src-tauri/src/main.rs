@@ -35,6 +35,7 @@ struct Settings {
     gpu_layers: u32,
     whisper_gpu: bool,
     hotkey: String,
+    /// Empty until the UI picks one from the OS languages on first launch.
     ui_lang: String,
     /// Opaque to Rust: owned by the overlay/settings UI.
     overlay: serde_json::Value,
@@ -51,7 +52,7 @@ impl Default for Settings {
             gpu_layers: 999,
             whisper_gpu: true,
             hotkey: "CmdOrCtrl+Shift+T".into(),
-            ui_lang: "ja".into(),
+            ui_lang: String::new(),
             overlay: serde_json::json!({}),
         }
     }

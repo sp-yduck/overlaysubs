@@ -131,6 +131,20 @@ Fix Windows bundle paths exceeding MAX_PATH
 4. **CI（`cargo test -p overlaysubs-core`）が通ることが必須です。**
 5. レビューでの指摘に対応します。
 
+`src-tauri/` やネイティブ依存（whisper.cpp / llama.cpp）、バンドル設定に触る変更では、
+レビュー時にメンテナが **`ci:build` ラベル** を付けて Windows / macOS のリリースビルド
+（`.github/workflows/release.yml` の `build` ジョブ）を回すことがあります。fork からの PR でも
+動き、インストーラがその run の artifact として残るので、マージ前に実機でインストールして
+確認できます（`verify` / `publish` はスキップされ、Release は作られません）。ビルドを回して
+ほしい場合は、PR の本文にその旨を書いてください。
+
+自分の fork で先に確かめたい場合は、fork 側で同じドライランを実行できます（成果物は fork に
+残り、上流リポジトリからは見えません）。
+
+```bash
+gh workflow run release.yml --repo <自分のユーザー名>/overlaysubs --ref <作業ブランチ名>
+```
+
 PR を出す前に、次を確認してください。
 
 - `cargo test -p overlaysubs-core` が通る。
