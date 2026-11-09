@@ -1,43 +1,43 @@
-## 概要
+## Summary
 
-<!-- この PR で何をしたかを 1〜3 行で書いてください。 -->
+<!-- Describe what this pull request does in 1–3 lines. -->
 
-## 関連 Issue
+## Related issue
 
-<!-- 例: Closes #123 / Related to #456 -->
+<!-- e.g. Closes #123 / Related to #456 -->
 
-## 変更内容
+## Changes
 
-<!-- 主な変更点を箇条書きで。レビューで見てほしい箇所があれば明記してください。 -->
+<!-- List the main changes. Call out anything the reviewer should look at closely. -->
 
 -
 
-## 動作確認
+## Testing
 
-<!-- 実行したコマンドと結果を書いてください。 -->
+<!-- Describe the commands you ran and their results. -->
 
-- [ ] `cargo test -p overlaysubs-core` が通る
-- [ ] `cargo build -p overlaysubs`（または `npx --yes @tauri-apps/cli@^2 dev`）で起動を確認した
-- [ ] インストーラのビルド確認が必要な場合、`ci:build` ラベルでのビルド実行を PR 本文で依頼した
-- [ ] 手動で確認した操作:
+- [ ] `cargo test -p overlaysubs-core` passes
+- [ ] I confirmed that it starts with `cargo build -p overlaysubs` (or `npx --yes @tauri-apps/cli@^2 dev`)
+- [ ] If an installer build is needed, I asked for one with the `ci:build` label in the pull request description
+- [ ] Manual checks I performed:
 
 ```text
 $ cargo test -p overlaysubs-core
 ```
 
-## UI の変更
+## UI changes
 
-<!-- UI を変更した場合、Before / After のスクリーンショットや説明を添付してください。なければ「なし」と書いてください。 -->
+<!-- If you changed the UI, attach before / after screenshots or a description. If not, write "None". -->
 
 - Before:
 - After:
 
-## チェックリスト
+## Checklist
 
-- [ ] 秘密情報（API キー、トークン、個人情報、ローカルの絶対パス）を含めていない
-- [ ] UI の文言を変更した場合、`ui/i18n.js` の日本語（`ja`）と英語（`en`）の両方を更新した
-- [ ] 動作・インストール手順・必要環境が変わる場合、README.md（英語）/ README.ja.md（日本語）/ docs/index.html / docs/en/index.html を更新した
-- [ ] `models.json` を変更した場合、コミット固定 URL・サイズ・SHA-256 を実ファイルと一致させた（`/resolve/main/` を使っていない）
-- [ ] ライセンスや利用規約（`licenses/`、PLaMo 3 のライセンスへのリンク、`Built with PLaMo` 表記、同意フロー）に影響しない。影響する場合は理由を上に書いた
-- [ ] 大きな変更の場合、事前に Issue で方針を相談した
-- [ ] `cargo fmt` を実行した（推奨。CI では強制していません）
+- [ ] No secrets (API keys, tokens, personal information, local absolute paths) are included
+- [ ] If I changed UI text, I updated both English (`en`) and Japanese (`ja`) in `ui/i18n.js`
+- [ ] If behaviour, installation steps, or requirements change, I updated README.md (English) / README.ja.md (Japanese) / docs/index.html / docs/en/index.html
+- [ ] If I changed `models.json`, the pinned commit URLs, sizes, and SHA-256 values match the actual files (no `/resolve/main/`)
+- [ ] This does not affect licenses or the terms of use (`licenses/`, the link to the PLaMo 3 license, the `Built with PLaMo` credit, the consent flow). If it does, I explained why above
+- [ ] For large changes, I discussed the approach in an issue beforehand
+- [ ] I ran `cargo fmt` (recommended; CI does not enforce it)

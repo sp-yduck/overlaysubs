@@ -1,6 +1,6 @@
 [package]
 name = "overlaysubs-core"
-version = "0.3.0"
+version.workspace = true
 edition = "2021"
 license = "MIT"
 description = "Engine-agnostic core for OverlaySubs: tiers, model registry, prompts, segmentation and SRT export"

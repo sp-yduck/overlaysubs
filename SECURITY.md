@@ -1,65 +1,65 @@
-# Security Policy / セキュリティポリシー
+# Security Policy
 
-OverlaySubs のセキュリティに関心を持っていただきありがとうございます。このページでは、サポート対象のバージョンと、脆弱性の報告方法を説明します。
+Thanks for your interest in the security of OverlaySubs. This page describes the supported versions and how to report a vulnerability.
 
-## Supported versions / サポート対象バージョン
+## Supported versions
 
-最新のリリースのみをサポートします。修正は最新系列に対して行い、必要に応じて新しいリリースとして公開します。
+Only the latest release is supported. Fixes go to the latest series and are published as a new release when needed.
 
-| バージョン | サポート |
+| Version | Supported |
 |---|---|
-| 0.1.x（最新リリース） | ✅ サポート対象 |
-| それ以前 | ❌ サポート対象外 |
+| 0.1.x (latest release) | ✅ Supported |
+| Earlier | ❌ Not supported |
 
-## Reporting a vulnerability / 脆弱性の報告
+## Reporting a vulnerability
 
-**脆弱性は公開 Issue に書かないでください。** 次の非公開の窓口を使ってください。
+**Do not report vulnerabilities in a public issue.** Use the private channels below.
 
-1. リポジトリの **「Security」タブ** を開きます。
-2. **「Report a vulnerability」** をクリックします（GitHub Security Advisories の非公開レポート）。
-   - 直接のリンク: <https://github.com/sp-yduck/overlaysubs/security/advisories/new>
+1. Open the **Security** tab of the repository.
+2. Click **Report a vulnerability** (the private report form in GitHub Security Advisories).
+   - Direct link: <https://github.com/sp-yduck/overlaysubs/security/advisories/new>
 
-報告には、可能な範囲で次を含めてください。
+Include the following where possible:
 
-- 影響を受けるバージョンと OS（Windows 10/11 x64、macOS 13+ Apple Silicon など）
-- 問題の種類と影響（例: ローカルファイルの読み書き、モデル検証の回避、UI からの権限昇格）
-- 再現手順（最小限の手順で構いません）
-- 必要に応じてログ、スクリーンショット、PoC
+- Affected version and OS (Windows 10/11 x64, macOS 13+ Apple Silicon, and so on)
+- Type and impact of the issue (e.g. local file read/write, bypassing model verification, privilege escalation from the UI)
+- Reproduction steps (minimal steps are fine)
+- Logs, screenshots, or a PoC if needed
 
-**一次返信の目標は 3 営業日以内**です。修正方針と開示のタイミングは、報告者の方と相談して決めます。
+**Our target for the first response is within 3 business days.** We decide the fix and the disclosure timing together with the reporter.
 
-## Scope / 対象
+## Scope
 
-次の領域の脆弱性を対象とします。
+We consider vulnerabilities in the following areas:
 
-- **アプリ本体**（`src-tauri/` の Rust コード、`ui/` の HTML/JS）: 音声キャプチャ、Tauri の IPC コマンド、ウィンドウ設定、権限（capability）設定（`src-tauri/capabilities/`）など。
-- **モデルのダウンロードと完全性**: `models.json` の URL 固定、SHA-256 検証、再開処理（`.part` ファイル）、ダウンロード先のパス処理。
-- **ローカルデータのプライバシー**: 音声・文字起こし・翻訳が外部に送信されないこと、テレメトリがないこと、設定・履歴・`terms-accepted` の保存場所と内容。
-- **配布物**: インストーラ（NSIS / MSI）と `.dmg` の構成、バンドル設定。
-- **利用規約・同意フロー**: 同意の保存と再表示の条件（`terms-accepted` の版管理）。
+- **The app itself** (the Rust code in `src-tauri/`, the HTML/JS in `ui/`): audio capture, Tauri IPC commands, window settings, permission (capability) configuration in `src-tauri/capabilities/`, and so on.
+- **Model downloads and integrity**: URL pinning in `models.json`, SHA-256 verification, resume handling (`.part` files), path handling for download destinations.
+- **Local data privacy**: audio, transcripts, and translations are not sent anywhere; there is no telemetry; and the storage location and contents of settings, history, and `terms-accepted`.
+- **Distribution artifacts**: the layout of the installers (NSIS / MSI) and the `.dmg`, and bundle configuration.
+- **Terms of use and consent flow**: how consent is stored and when it is shown again (versioning of `terms-accepted`).
 
-## Out of scope / 対象外
+## Out of scope
 
-次のものは原則として対象外です。ただし、本アプリへの影響がある場合は報告歓迎します。
+The following are generally out of scope. If they affect this app, we still welcome a report.
 
-- モデル自体の品質・翻訳の誤り・幻覚（hallucination）。上流プロジェクト（whisper.cpp / Silero VAD / PLaMo）やモデルの提供元に報告してください。
-- 上流の依存ライブラリ（Tauri、cpal、whisper-rs、llama-cpp-2 など）の脆弱性そのもの。上流に報告してください（本アプリへの影響は歓迎します）。
-- **SmartScreen / Gatekeeper の警告**。配布ビルドが未署名・未公証であることによる既知の動作で、セキュリティ上の欠陥ではありません。手順は [公式サイトの「警告が表示されたとき」](https://sp-yduck.github.io/overlaysubs/#warning) に記載しています。
-- サードパーティ製のループバック（仮想オーディオ）デバイスやドライバの問題。
-- フィッシング、ソーシャルエンジニアリング、物理アクセス。
-- サービス妨害（DoS）や、非現実的なリソース消費を要求する攻撃。
-- 既に公開されている既知の問題で、修正済みのもの。
+- Model quality, translation errors, and hallucination. Report them to the upstream projects (whisper.cpp / Silero VAD / PLaMo) or the model providers.
+- Vulnerabilities in upstream dependencies (Tauri, cpal, whisper-rs, llama-cpp-2, and so on) themselves. Report them upstream (reports about their impact on this app are welcome).
+- **SmartScreen / Gatekeeper warnings.** This is expected behaviour because the distributed builds are unsigned and not notarized, and it is not a security defect. Instructions are in [Warnings on the official site](https://sp-yduck.github.io/overlaysubs/en/#warning).
+- Problems with third-party loopback (virtual audio) devices or drivers.
+- Phishing, social engineering, and physical access.
+- Denial of service (DoS) or attacks that require unrealistic resource consumption.
+- Already-public known issues that have been fixed.
 
-## Bounty / 報奨金
+## Bounty
 
-**報奨金（バグバウンティ）はありません。** このプロジェクトはボランティアで運営されています。報告への対応とクレジット（希望する場合）で感謝を表します。
+**There is no bug bounty.** This project is run by volunteers. We thank reporters with a response and credit (if desired).
 
-## Disclosure / 開示
+## Disclosure
 
-- 修正を含むリリースを公開した後、GitHub Security Advisories で内容を公開します。
-- 報告者のクレジットを希望する場合は、その旨を報告時に伝えてください。希望しない場合は匿名で扱います。
-- 修正前に詳細を公開することはお控えください。
+- After publishing a release with the fix, we publish the details in GitHub Security Advisories.
+- If you want credit, tell us when you report. Otherwise, we treat you anonymously.
+- Please do not publish details before the fix.
 
-## Contact / 連絡先
+## Contact
 
-上記の GitHub Security Advisories が**唯一の窓口**です。開発者の個人メールアドレスは公開していません。セキュリティに関係しない一般的な質問は、[公式サイトの FAQ](https://sp-yduck.github.io/overlaysubs/#faq) を確認したうえで Issue を作成してください。
+The GitHub Security Advisories above are the **only** channel. We do not publish the developer's personal email address. For general questions that are not security-related, check the [FAQ on the official site](https://sp-yduck.github.io/overlaysubs/en/#faq) and then open an issue.

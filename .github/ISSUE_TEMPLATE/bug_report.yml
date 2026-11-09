@@ -1,31 +1,31 @@
-name: バグ報告
-description: 不具合を報告する
+name: Bug report
+description: Report a problem
 title: "[Bug]: "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        バグ報告ありがとうございます。記入前に [公式サイトの FAQ](https://sp-yduck.github.io/overlaysubs/#faq) と既存の Issue を確認してください。
+        Thanks for reporting a bug. Before you start, check the [FAQ on the official site](https://sp-yduck.github.io/overlaysubs/en/#faq) and the existing issues.
 
-        **セキュリティ上の問題は公開 Issue に書かず、[SECURITY.md](https://github.com/sp-yduck/overlaysubs/blob/main/SECURITY.md) の手順で非公開で報告してください。**
+        **Do not report security issues as public issues. Report them privately following [SECURITY.md](https://github.com/sp-yduck/overlaysubs/blob/main/SECURITY.md).**
 
   - type: checkboxes
     id: preflight
     attributes:
-      label: 報告前の確認
+      label: Before you report
       options:
-        - label: 既存の Issue を検索して、同じ問題が報告されていないことを確認しました
+        - label: I searched the existing issues and this problem has not been reported
           required: true
-        - label: 初回起動時の利用規約に同意しています
+        - label: I have accepted the Terms of Use shown on first launch
           required: true
 
   - type: input
     id: version
     attributes:
-      label: OverlaySubs のバージョン
-      description: アプリの「情報」ページ、またはダウンロードしたファイル名から確認できます。
-      placeholder: "0.1.0"
+      label: OverlaySubs version
+      description: You can find it on the "About" page of the app or in the name of the file you downloaded.
+      placeholder: "0.3.0"
     validations:
       required: true
 
@@ -39,45 +39,45 @@ body:
         - macOS 15 (Apple Silicon)
         - macOS 14 (Apple Silicon)
         - macOS 13 (Apple Silicon)
-        - その他
+        - Other
     validations:
       required: true
 
   - type: textarea
     id: environment
     attributes:
-      label: CPU / GPU / VRAM / メモリ
-      description: 設定画面の「PC の性能を調べる」で表示される内容を貼ってください。わかる範囲で構いません。
+      label: CPU / GPU / VRAM / memory
+      description: Paste what "Check this PC" in the settings window shows. Partial information is fine.
       value: |
         - CPU:
         - GPU:
         - VRAM:
-        - メモリ:
-        - 入力元: システム音声 / マイク
+        - Memory:
+        - Audio source: System audio / Microphone
     validations:
       required: true
 
   - type: dropdown
     id: tier
     attributes:
-      label: ティア（設定画面に表示されるもの）
+      label: Tier (shown in the settings window)
       options:
         - High
         - Mid
         - Low
         - CPU
-        - わからない
+        - Not sure
     validations:
       required: true
 
   - type: textarea
     id: steps
     attributes:
-      label: 再現手順
-      description: 問題が起きるまでの手順を書いてください。
+      label: Steps to reproduce
+      description: Describe the steps that lead to the problem.
       placeholder: |
-        1. OverlaySubs を起動
-        2. 「...」を選ぶ
+        1. Start OverlaySubs
+        2. Select "..."
         3. ...
     validations:
       required: true
@@ -85,25 +85,25 @@ body:
   - type: textarea
     id: expected
     attributes:
-      label: 期待した動作
+      label: Expected behaviour
     validations:
       required: false
 
   - type: textarea
     id: actual
     attributes:
-      label: 実際の動作
-      description: 表示されたメッセージやトーストの文言があれば、そのまま貼ってください。
+      label: Actual behaviour
+      description: If a message or toast is shown, paste it verbatim.
     validations:
       required: true
 
   - type: textarea
     id: logs
     attributes:
-      label: ログ・エラーメッセージ・補足
+      label: Logs, error messages, and notes
       description: |
-        現行バージョンはログファイルを書き出しません。画面に表示されたエラーメッセージをそのまま貼ってください。
-        モデルの保存先は設定画面の「モデルの準備」→「保存先」で確認できます。
-        スクリーンショットや動画はこの欄にドラッグして添付できます。
+        The current version does not write log files. Paste any error message shown on screen verbatim.
+        You can find the model folder under "Set up models" → "Folder" in the settings window.
+        You can drag screenshots or videos into this field.
     validations:
       required: false

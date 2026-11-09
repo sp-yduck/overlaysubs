@@ -1,67 +1,67 @@
-name: 機能要望
-description: 新機能や改善の提案
+name: Feature request
+description: Suggest a new feature or an improvement
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        機能要望ありがとうございます。まず [README](https://github.com/sp-yduck/overlaysubs#readme) と既存の Issue で、同じ提案がないか確認してください。
+        Thanks for the suggestion. First check the [README](https://github.com/sp-yduck/overlaysubs#readme) and the existing issues to see whether the same proposal already exists.
 
-        **セキュリティ上の問題は公開 Issue に書かず、[SECURITY.md](https://github.com/sp-yduck/overlaysubs/blob/main/SECURITY.md) の手順で報告してください。**
+        **Do not report security issues as public issues. Report them privately following [SECURITY.md](https://github.com/sp-yduck/overlaysubs/blob/main/SECURITY.md).**
 
   - type: checkboxes
     id: preflight
     attributes:
-      label: 提案前の確認
+      label: Before you propose
       options:
-        - label: 既存の Issue を検索して、同じ提案がないことを確認しました
+        - label: I searched the existing issues and this proposal has not been made
           required: true
-        - label: この機能が公式サイトの「現状の制限」に記載されていないことを確認しました
+        - label: I checked that this feature is not listed under "Limitations" on the official site
           required: true
 
   - type: textarea
     id: problem
     attributes:
-      label: 解決したい課題
-      description: どのような場面で困っているか、なぜ必要かを書いてください。
-      placeholder: "例: 会議の録音を後から字幕ファイルにしたいが、履歴の書き出しでは発話ごとの時刻がわからない。"
+      label: Problem to solve
+      description: Describe the situation you are in and why you need this.
+      placeholder: "e.g. I want to turn a recorded meeting into subtitle files, but the history export does not include timestamps per utterance."
     validations:
       required: true
 
   - type: textarea
     id: proposal
     attributes:
-      label: 提案する機能
-      description: 具体的にどのような動作を期待するかを書いてください。
+      label: Proposed feature
+      description: Describe the behaviour you expect in concrete terms.
     validations:
       required: true
 
   - type: textarea
     id: alternatives
     attributes:
-      label: 検討した代替案
-      description: 別の方法や、今のバージョンで回避する方法があれば書いてください。
+      label: Alternatives considered
+      description: Describe any other approach or workaround with the current version.
     validations:
       required: false
 
   - type: dropdown
     id: platform
     attributes:
-      label: 関係するプラットフォーム
+      label: Related platforms
       multiple: true
       options:
         - Windows (x64)
         - macOS (Apple Silicon)
-        - 両方
-        - その他・わからない
+        - Both
+        - Other / not sure
     validations:
       required: true
 
   - type: textarea
     id: additional
     attributes:
-      label: 補足
-      description: 参考リンク、スクリーンショット、関連する Issue などがあれば添付してください。
+      label: Additional context
+      description: Add links, screenshots, related issues, and so on.
     validations:
       required: false

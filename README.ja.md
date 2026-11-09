@@ -150,9 +150,8 @@ OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
 
 ## 開発に参加する
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) — 開発環境、テスト、PR の流れ
+- [CONTRIBUTING.ja.md](CONTRIBUTING.ja.md) — 開発環境、テスト、PR の流れ
 - [SECURITY.md](SECURITY.md) — 脆弱性の報告方法（非公開で受け付けます）
-- [CHANGELOG.md](CHANGELOG.md) — 変更履歴
 - [RELEASING.md](RELEASING.md) — リリース手順（管理者向け）
 - [docs/index.html](docs/index.html) — 利用者向けドキュメント（GitHub Pages のソース。外部 CDN・フォント・JS は使わず単体で完結）
 - Issue テンプレート: [バグ報告](.github/ISSUE_TEMPLATE/bug_report.yml) / [機能要望](.github/ISSUE_TEMPLATE/feature_request.yml)
