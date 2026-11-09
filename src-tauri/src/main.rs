@@ -93,8 +93,8 @@ struct App {
     preview_prev_visible: AtomicBool,
     /// A stopped session is waiting out its grace period before hiding the overlay.
     overlay_hide_pending: AtomicBool,
-    /// Where tauri.conf.json put the overlay at launch, before a saved position was applied.
-    overlay_default_position: Mutex<Option<tauri::PhysicalPosition<i32>>>,
+    /// Where tauri.conf.json put the overlay at launch (logical points), before a saved position was applied.
+    overlay_default_position: Mutex<Option<(f64, f64)>>,
 }
 
 fn config_dir(app: &AppHandle) -> PathBuf {
@@ -536,40 +536,121 @@ fn set_click_through(app: AppHandle, on: bool) -> Result<(), String> {
     w.set_ignore_cursor_events(on).map_err(|e| e.to_string())
 }
 
-/// Where the overlay was last dragged. Kept out of settings.json, which the settings window rewrites whole.
+/// Where the overlay was last moved, as logical points `{"x": .., "y": ..}`. Kept out of settings.json, which the
+/// settings window rewrites whole. Physical pixels are not stored: on macOS they are converted with the scale of
+/// whichever display the window is on, so a spot saved on a 1x display would land elsewhere on a 2x one.
 const OVERLAY_POSITION: &str = "overlay-position.json";
 
-fn save_overlay_position(app: &AppHandle, p: tauri::PhysicalPosition<i32>) {
-    let dir = config_dir(app);
-    let res = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join(OVERLAY_POSITION), format!("[{}, {}]", p.x, p.y)));
-    if let Err(e) = res {
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum SavedPosition {
+    Logical { x: f64, y: f64 },
+    /// Physical pixels `[x, y]`, written by earlier builds of this feature.
+    Physical(i32, i32),
+}
+
+/// A display's bounds or work area, or the overlay's bounds, in logical points: x, y, width, height.
+type Rect = (f64, f64, f64, f64);
+
+/// A connected display: its whole bounds and its work area (without the menu bar and Dock or taskbar).
+struct Display {
+    bounds: Rect,
+    work_area: Rect,
+}
+
+fn save_overlay_position(w: &tauri::Window, p: tauri::PhysicalPosition<i32>) {
+    let Ok(scale) = w.scale_factor() else { return };
+    let l = p.to_logical::<f64>(scale);
+    let json = serde_json::to_string(&SavedPosition::Logical { x: l.x, y: l.y }).unwrap();
+    let dir = config_dir(w.app_handle());
+    if let Err(e) = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join(OVERLAY_POSITION), json)) {
         eprintln!("{OVERLAY_POSITION}: {e}");
     }
 }
 
-/// Back to where the overlay starts on first launch. The move is saved like a drag.
+/// Back to where the overlay started at launch, kept fully on a display; centered on the primary display when that
+/// spot is on no display any more (the display it was on was unplugged, say). The move is saved like a drag.
 /// `center()` is not used: it put the overlay higher than the launch position (measured on macOS).
 #[tauri::command]
 fn reset_overlay_position(app: AppHandle, st: State<App>) -> Result<(), String> {
     let w = app.get_webview_window("overlay").ok_or("no overlay")?;
-    let p = st.overlay_default_position.lock().unwrap().ok_or("no default overlay position")?;
-    w.set_position(p).map_err(|e| e.to_string())
+    let size = overlay_size(&w).ok_or("no overlay size")?;
+    let launch = *st.overlay_default_position.lock().unwrap();
+    let p = launch
+        .and_then(|(x, y)| fit_on_screen((x, y, size.0, size.1), &displays(&w)))
+        .or_else(|| w.primary_monitor().ok().flatten().map(|m| centered(size, display(&m).work_area)))
+        .ok_or("no display for the overlay")?;
+    w.set_position(tauri::LogicalPosition::new(p.0, p.1)).map_err(|e| e.to_string())
 }
 
-/// Skipped when the saved spot is on no connected display (an external monitor was unplugged, say),
-/// since the overlay would then sit out of sight.
+/// Applies the saved position, moved so the whole overlay is on a display. Left at the launch position when the saved
+/// spot overlaps no display (an external display was unplugged, say), since the overlay would then sit out of sight.
 fn restore_overlay_position(app: &AppHandle) {
     let Some(w) = app.get_webview_window("overlay") else { return };
-    *app.state::<App>().overlay_default_position.lock().unwrap() = w.outer_position().ok();
-    let Ok(j) = std::fs::read_to_string(config_dir(app).join(OVERLAY_POSITION)) else { return };
-    let Ok((x, y)) = serde_json::from_str::<(i32, i32)>(&j) else { return };
-    let on_screen = w.available_monitors().unwrap_or_default().iter().any(|m| {
-        let (o, s) = (m.position(), m.size());
-        x >= o.x && y >= o.y && x < o.x + s.width as i32 && y < o.y + s.height as i32
-    });
-    if on_screen {
-        let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
+    if let (Ok(p), Ok(scale)) = (w.outer_position(), w.scale_factor()) {
+        let l = p.to_logical::<f64>(scale);
+        *app.state::<App>().overlay_default_position.lock().unwrap() = Some((l.x, l.y));
     }
+    let Ok(j) = std::fs::read_to_string(config_dir(app).join(OVERLAY_POSITION)) else { return };
+    let saved = match serde_json::from_str::<SavedPosition>(&j) {
+        Ok(SavedPosition::Logical { x, y }) => (x, y),
+        Ok(SavedPosition::Physical(x, y)) => legacy_to_logical(&w, x, y),
+        Err(_) => return,
+    };
+    let Some(size) = overlay_size(&w) else { return };
+    if let Some((x, y)) = fit_on_screen((saved.0, saved.1, size.0, size.1), &displays(&w)) {
+        let _ = w.set_position(tauri::LogicalPosition::new(x, y));
+    }
+}
+
+/// Converts with the scale of the display that holds the point, falling back to the overlay's own.
+fn legacy_to_logical(w: &tauri::WebviewWindow, x: i32, y: i32) -> (f64, f64) {
+    let scale = w
+        .available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .find(|m| {
+            let (o, s) = (m.position(), m.size());
+            x >= o.x && y >= o.y && x < o.x + s.width as i32 && y < o.y + s.height as i32
+        })
+        .map(|m| m.scale_factor())
+        .or_else(|| w.scale_factor().ok())
+        .unwrap_or(1.0);
+    let l = tauri::PhysicalPosition::new(x, y).to_logical::<f64>(scale);
+    (l.x, l.y)
+}
+
+fn overlay_size(w: &tauri::WebviewWindow) -> Option<(f64, f64)> {
+    let s = w.outer_size().ok()?.to_logical::<f64>(w.scale_factor().ok()?);
+    Some((s.width, s.height))
+}
+
+fn displays(w: &tauri::WebviewWindow) -> Vec<Display> {
+    w.available_monitors().unwrap_or_default().iter().map(display).collect()
+}
+
+fn display(m: &tauri::Monitor) -> Display {
+    let scale = m.scale_factor();
+    let rect = |p: tauri::PhysicalPosition<i32>, s: tauri::PhysicalSize<u32>| {
+        let (p, s) = (p.to_logical::<f64>(scale), s.to_logical::<f64>(scale));
+        (p.x, p.y, s.width, s.height)
+    };
+    Display { bounds: rect(*m.position(), *m.size()), work_area: rect(m.work_area().position, m.work_area().size) }
+}
+
+/// Moves `win` into the work area of the display it overlaps most, so all of it shows (its top-left corner when it
+/// is larger than the area). A spot over the Dock or menu bar still counts as on that display. None when it overlaps
+/// no display.
+fn fit_on_screen(win: Rect, displays: &[Display]) -> Option<(f64, f64)> {
+    let (x, y, w, h) = win;
+    let overlap = |a: &Rect| ((x + w).min(a.0 + a.2) - x.max(a.0)).max(0.0) * ((y + h).min(a.1 + a.3) - y.max(a.1)).max(0.0);
+    let d = displays.iter().filter(|d| overlap(&d.bounds) > 0.0).max_by(|a, b| overlap(&a.bounds).total_cmp(&overlap(&b.bounds)))?;
+    let a = d.work_area;
+    Some((x.min(a.0 + a.2 - w).max(a.0), y.min(a.1 + a.3 - h).max(a.1)))
+}
+
+fn centered((w, h): (f64, f64), a: Rect) -> (f64, f64) {
+    (a.0 + (a.2 - w) / 2.0, a.1 + (a.3 - h) / 2.0)
 }
 
 /// Show or hide the overlay window from the settings UI.
@@ -669,7 +750,7 @@ fn main() {
             // Closing settings quits the app so the overlay does not linger.
             match e {
                 tauri::WindowEvent::CloseRequested { .. } if w.label() == "main" => w.app_handle().exit(0),
-                tauri::WindowEvent::Moved(p) if w.label() == "overlay" => save_overlay_position(w.app_handle(), *p),
+                tauri::WindowEvent::Moved(p) if w.label() == "overlay" => save_overlay_position(w, *p),
                 _ => {}
             }
         })
@@ -678,4 +759,69 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running overlaysubs");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A display whose work area is all of it.
+    const fn whole(r: Rect) -> Display {
+        Display { bounds: r, work_area: r }
+    }
+    const HD: Display = whole((0.0, 0.0, 1920.0, 1080.0));
+    const OVERLAY: (f64, f64) = (1100.0, 220.0);
+
+    fn fit(x: f64, y: f64, displays: &[Display]) -> Option<(f64, f64)> {
+        fit_on_screen((x, y, OVERLAY.0, OVERLAY.1), displays)
+    }
+
+    #[test]
+    fn overlay_inside_a_display_stays_put() {
+        assert_eq!(fit(400.0, 600.0, &[HD]), Some((400.0, 600.0)));
+    }
+
+    #[test]
+    fn overlay_past_an_edge_is_pulled_fully_on_screen() {
+        assert_eq!(fit(400.0, 1070.0, &[HD]), Some((400.0, 860.0)), "top-left on screen but the subtitles below the bottom edge");
+        assert_eq!(fit(1800.0, 300.0, &[HD]), Some((820.0, 300.0)), "right edge");
+        assert_eq!(fit(-500.0, -100.0, &[HD]), Some((0.0, 0.0)), "left and top edges");
+    }
+
+    #[test]
+    fn overlay_goes_to_the_display_it_overlaps_most() {
+        let displays = [HD, whole((1920.0, 0.0, 1440.0, 900.0))];
+        assert_eq!(fit(1800.0, 100.0, &displays), Some((1920.0, 100.0)));
+        assert_eq!(fit(1000.0, 100.0, &displays), Some((820.0, 100.0)));
+    }
+
+    #[test]
+    fn overlay_over_the_dock_is_pulled_into_the_work_area() {
+        // 1728x1117 MacBook display: menu bar above y = 33, Dock below y = 1036.
+        let mac = Display { bounds: (0.0, 0.0, 1728.0, 1117.0), work_area: (0.0, 33.0, 1728.0, 1003.0) };
+        assert_eq!(fit_on_screen((200.0, 1100.0, 1100.0, 221.0), &[mac]), Some((200.0, 815.0)));
+    }
+
+    #[test]
+    fn overlay_on_no_display_is_not_placed() {
+        assert_eq!(fit(-50000.0, -50000.0, &[HD]), None);
+        assert_eq!(fit(2500.0, 100.0, &[HD]), None, "the display it was on was unplugged");
+    }
+
+    #[test]
+    fn overlay_larger_than_the_work_area_keeps_its_top_left_on_screen() {
+        assert_eq!(fit(100.0, 100.0, &[whole((0.0, 0.0, 800.0, 600.0))]), Some((0.0, 100.0)));
+    }
+
+    #[test]
+    fn centered_on_a_work_area() {
+        assert_eq!(centered(OVERLAY, (0.0, 25.0, 1920.0, 1055.0)), (410.0, 442.5));
+    }
+
+    #[test]
+    fn saved_position_reads_logical_and_earlier_physical_files() {
+        assert!(matches!(serde_json::from_str::<SavedPosition>(r#"{"x":200.5,"y":600}"#), Ok(SavedPosition::Logical { x, y }) if x == 200.5 && y == 600.0));
+        assert!(matches!(serde_json::from_str::<SavedPosition>("[400, 1200]"), Ok(SavedPosition::Physical(400, 1200))));
+        assert!(serde_json::from_str::<SavedPosition>("garbage").is_err());
+    }
 }
