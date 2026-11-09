@@ -400,6 +400,10 @@ document.addEventListener("click", async (ev) => {
 
 listen("download", (e) => {
   const p = e.payload;
+  // The last chunk is emitted before the checksum and the rename, so a late event can be delivered after a
+  // refresh already lists the model as downloaded. Keep that row's "Downloaded" state instead of replacing
+  // it with a progress bar that would stay until the next render.
+  if (snap?.downloaded.includes(p.id)) return;
   progress[p.id] = p;
   // Progress is shown only on the models page. Re-rendering other pages on every chunk replaces the nav
   // buttons between mousedown and mouseup, so clicks are lost until the download ends.
