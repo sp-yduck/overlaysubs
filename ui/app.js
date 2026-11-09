@@ -40,7 +40,9 @@ async function refresh() {
   snap.settings.overlay = { ...OVERLAY_DEFAULTS, ...snap.settings.overlay };
   if (!snap.settings.ui_lang) {
     snap.settings.ui_lang = detectUiLang(navigator.languages);
-    await invoke("save_settings", { settings: snap.settings });
+    // A failed save must not keep the first screen blank; the detected language still applies this session.
+    try { await invoke("save_settings", { settings: snap.settings }); }
+    catch (e) { toast(errText(e), "error"); }
   }
   if (snap.terms_accepted) checkUpdate();
   render();
