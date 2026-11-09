@@ -14,8 +14,10 @@
   .cap .src { display: block; font-size: 0.6em; color: #cfd6e2; }
   .cap.partial .tr, .cap.streaming .tr { opacity: 0.6; }
   #credit { position: fixed; right: 8px; bottom: 2px; font: 10px system-ui, sans-serif; color: #fff; opacity: 0.7; text-shadow: 0 1px 2px #000; }
-  #grip { position: fixed; left: 0; top: 0; right: 0; height: 18px; }
+  #grip { position: fixed; left: 0; top: 0; right: 0; height: 18px; font: 11px/18px system-ui, sans-serif; color: #fff; text-align: center; text-shadow: 0 1px 2px #000; }
   body:hover #grip { background: rgba(255,255,255,0.15); cursor: move; }
+  /* While the appearance settings are open, the grip stays visible with a hint so the overlay can be moved off them. */
+  body.preview #grip { background: rgba(255,255,255,0.25); cursor: move; }
 </style>
 </head>
 <body>

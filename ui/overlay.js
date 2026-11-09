@@ -14,6 +14,7 @@ const t = (k) => (I18N[uiLang] || I18N.ja)[k] || k;
 function apply(settings) {
   cfg = { ...OVERLAY_DEFAULTS, ...settings.overlay };
   uiLang = settings.ui_lang || detectUiLang(navigator.languages);
+  showGrip();
   const r = document.documentElement.style;
   r.setProperty("--size", cfg.fontSize + "px");
   r.setProperty("--font", cfg.font);
@@ -70,7 +71,14 @@ listen("overlay-hidden", () => { caps.clear(); draw(); });
 // The settings window turns the preview on while its appearance page is open and translation is stopped.
 listen("overlay-preview", (e) => {
   preview = !!e.payload;
+  showGrip();
   draw();
 });
+
+/** The hint is the grip's own text: a child element would not be part of the drag region. */
+function showGrip() {
+  document.body.classList.toggle("preview", preview);
+  document.getElementById("grip").textContent = preview ? `⠿ ${t("drag_hint")}` : "";
+}
 setInterval(draw, 500);
 invoke("snapshot").then((s) => apply(s.settings));
