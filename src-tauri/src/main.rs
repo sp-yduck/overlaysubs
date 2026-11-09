@@ -533,6 +533,32 @@ fn set_click_through(app: AppHandle, on: bool) -> Result<(), String> {
     w.set_ignore_cursor_events(on).map_err(|e| e.to_string())
 }
 
+/// Where the overlay was last dragged. Kept out of settings.json, which the settings window rewrites whole.
+const OVERLAY_POSITION: &str = "overlay-position.json";
+
+fn save_overlay_position(app: &AppHandle, p: tauri::PhysicalPosition<i32>) {
+    let dir = config_dir(app);
+    let res = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join(OVERLAY_POSITION), format!("[{}, {}]", p.x, p.y)));
+    if let Err(e) = res {
+        eprintln!("{OVERLAY_POSITION}: {e}");
+    }
+}
+
+/// Skipped when the saved spot is on no connected display (an external monitor was unplugged, say),
+/// since the overlay would then sit out of sight.
+fn restore_overlay_position(app: &AppHandle) {
+    let Some(w) = app.get_webview_window("overlay") else { return };
+    let Ok(j) = std::fs::read_to_string(config_dir(app).join(OVERLAY_POSITION)) else { return };
+    let Ok((x, y)) = serde_json::from_str::<(i32, i32)>(&j) else { return };
+    let on_screen = w.available_monitors().unwrap_or_default().iter().any(|m| {
+        let (o, s) = (m.position(), m.size());
+        x >= o.x && y >= o.y && x < o.x + s.width as i32 && y < o.y + s.height as i32
+    });
+    if on_screen {
+        let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
+    }
+}
+
 /// Show or hide the overlay window from the settings UI.
 #[tauri::command]
 fn show_overlay(app: AppHandle, st: State<App>, show: bool) {
@@ -600,6 +626,7 @@ fn main() {
                 eprintln!("hotkey {}: {e}", s.hotkey);
             }
             *app.state::<App>().settings.lock().unwrap() = s;
+            restore_overlay_position(&h);
 
             let toggle_i = MenuItem::with_id(app, "toggle", "Start / Stop", true, None::<&str>)?;
             let overlay_i = CheckMenuItem::with_id(app, "overlay", "Show subtitles", true, false, None::<&str>)?;
@@ -627,10 +654,10 @@ fn main() {
         })
         .on_window_event(|w, e| {
             // Closing settings quits the app so the overlay does not linger.
-            if let tauri::WindowEvent::CloseRequested { .. } = e {
-                if w.label() == "main" {
-                    w.app_handle().exit(0);
-                }
+            match e {
+                tauri::WindowEvent::CloseRequested { .. } if w.label() == "main" => w.app_handle().exit(0),
+                tauri::WindowEvent::Moved(p) if w.label() == "overlay" => save_overlay_position(w.app_handle(), *p),
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
