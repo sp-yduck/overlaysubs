@@ -36,8 +36,11 @@ function toast(msg, kind = "ok") {
 }
 
 async function refresh() {
+  // A live appearance drag may not have reached settings.json yet; save it first so the snapshot
+  // below does not revert the controls (for example when a hotkey starts translation mid-drag).
+  await settleAppearance();
   snap = await invoke("snapshot");
-  snap.settings.overlay = { ...OVERLAY_DEFAULTS, ...snap.settings.overlay };
+  snap.settings.overlay = overlayConfig(snap.settings.overlay);
   if (!snap.settings.ui_lang) {
     snap.settings.ui_lang = detectUiLang(navigator.languages);
     // A failed save must not keep the first screen blank; the detected language still applies this session.
@@ -76,6 +79,24 @@ function field(label, path, kind = "text", extra = "") {
 }
 function select(label, path, options, type = "str") {
   return `<label class="f"><span>${esc(label)}</span><select data-k="${path}" data-t="${type}">${options}</select></label>`;
+}
+/** A slider whose value is shown next to it. `fmt` picks the readout: "pct" (0-1 -> %), "px", or plain. */
+function rangeField(label, path, min, max, step, fmt = "") {
+  const v = get(snap.settings, path);
+  const id = `ov-${path.replace(/\W/g, "-")}`;
+  const shown = esc(fmtValue(fmt, v));
+  return `<label class="f"><span>${esc(label)}</span><span class="ctl"><input id="${id}" type="range" data-k="${path}" data-t="range" data-live="1" data-fmt="${fmt}" min="${min}" max="${max}" step="${step}" value="${esc(v)}" aria-valuetext="${shown}"><output for="${id}" aria-hidden="true">${shown}</output></span></label>`;
+}
+/** A color picker with the hex value next to it. */
+function colorField(label, path) {
+  const v = get(snap.settings, path);
+  const id = `ov-${path.replace(/\W/g, "-")}`;
+  return `<label class="f"><span>${esc(label)}</span><span class="ctl"><input id="${id}" type="color" data-k="${path}" data-t="color" data-live="1" value="${esc(v)}"><code>${esc(v)}</code></span></label>`;
+}
+function fmtValue(fmt, v) {
+  if (fmt === "pct") return `${Math.round(v * 100)}%`;
+  if (fmt === "px") return `${v}px`;
+  return String(v);
 }
 /** Every action button goes through here so it shows a spinner and is disabled while its action runs. */
 function btn(act, label, { cls = "", disabled = false, id = "" } = {}) {
@@ -180,16 +201,29 @@ function homePage() {
 }
 
 function overlayPage() {
+  const s = snap.settings;
   return `<h2>${t("overlay")}</h2>
   <p class="muted small">${t("overlay_preview_note")}</p>
-  <div class="row">${btn("overlay-reset", t("reset_position"))}</div>
-  ${card("", `${field(t("show_source"), "overlay.showSource", "check")}
-    ${field(t("click_through"), "overlay.clickThrough", "check")}
-    ${field(t("font_size"), "overlay.fontSize", "number", 'min="12" max="96"')}
-    ${field(t("font"), "overlay.font")}
-    ${field(t("bg"), "overlay.bg", "number", 'min="0" max="1" step="0.05"')}
-    ${field(t("lines"), "overlay.lines", "number", 'min="1" max="50"')}
-    ${field(t("linger"), "overlay.linger", "number", 'min="1" max="60"')}`)}
+  <div class="row">${btn("overlay-reset", t("reset_position"))}${btn("overlay-reset-appearance", t("reset_appearance"))}</div>
+  <div class="grid2">
+    ${card(t("group_overlay"), `${colorField(t("overlay_bg_color"), "overlay.bgColor")}
+      ${rangeField(t("overlay_bg_opacity"), "overlay.bgOpacity", 0, 1, 0.01, "pct")}`)}
+    ${card(t("group_caption"), `${colorField(t("cap_bg_color"), "overlay.capBgColor")}
+      ${rangeField(t("cap_bg_opacity"), "overlay.capOpacity", 0, 1, 0.01, "pct")}`)}
+    ${card(t("group_text"), `${rangeField(t("font_size"), "overlay.fontSize", 12, 96, 1, "px")}
+      ${colorField(t("text_color"), "overlay.color")}
+      ${field(t("font"), "overlay.font")}
+      ${select(t("font_weight"), "overlay.fontWeight", opts([[400, t("weight_normal")], [500, t("weight_medium")], [600, t("weight_semibold")], [700, t("weight_bold")]], s.overlay.fontWeight), "number")}
+      ${rangeField(t("line_height"), "overlay.lineHeight", 0.8, 2.2, 0.05)}`)}
+    ${card(t("group_source"), `${field(t("show_source"), "overlay.showSource", "check")}
+      ${rangeField(t("src_size"), "overlay.srcSize", 8, 48, 1, "px")}
+      ${colorField(t("src_color"), "overlay.srcColor")}`)}
+  </div>
+  ${card(t("group_layout"), `${rangeField(t("lines"), "overlay.lines", 1, 50, 1)}
+    ${select(t("align"), "overlay.align", opts([["center", t("align_center")], ["left", t("align_left")], ["right", t("align_right")]], s.overlay.align))}
+    ${select(t("valign"), "overlay.vAlign", opts([["bottom", t("valign_bottom")], ["center", t("valign_center")], ["top", t("valign_top")]], s.overlay.vAlign))}
+    ${field(t("linger"), "overlay.linger", "number", 'min="1" max="60"')}
+    ${field(t("click_through"), "overlay.clickThrough", "check")}`)}
   ${card("", field(t("hotkey"), "hotkey"))}`;
 }
 
@@ -297,11 +331,68 @@ async function loadHistory() {
 }
 
 // --- events ---
+/**
+ * Appearance sliders and color pickers emit an `input` event for every step of a drag. A full
+ * refresh there would drop the control and a toast for every step would bury the screen, so they
+ * are saved quietly at most once per interval; the overlay applies them live through the
+ * `settings` event save_settings emits. The final value is flushed on `change`.
+ */
+const APPEARANCE_SAVE_MS = 80;
+let appearanceTimer = null;
+let appearanceSavedAt = 0;
+let appearanceErrorShown = false;
+// Saves are chained so two invokes cannot land out of order and leave an older snapshot on disk.
+let appearanceSave = Promise.resolve();
+function saveAppearance() {
+  if (!snap) return;
+  appearanceSavedAt = Date.now();
+  appearanceSave = appearanceSave
+    .catch(() => {})
+    .then(() => invoke("save_settings", { settings: snap.settings }))
+    .then(
+      () => { appearanceErrorShown = false; },
+      (e) => {
+        // One toast per failure streak: a drag would otherwise bury the screen in errors.
+        if (appearanceErrorShown) return;
+        appearanceErrorShown = true;
+        toast(errText(e), "error");
+      },
+    );
+}
+function saveAppearanceSoon() {
+  if (appearanceTimer) return;
+  appearanceTimer = setTimeout(() => { appearanceTimer = null; saveAppearance(); }, Math.max(0, APPEARANCE_SAVE_MS - (Date.now() - appearanceSavedAt)));
+}
+function flushAppearance() {
+  if (appearanceTimer) { clearTimeout(appearanceTimer); appearanceTimer = null; }
+  if (snap) saveAppearance();
+}
+/** Saves and waits for a pending appearance change, so a snapshot cannot overwrite a drag in progress. */
+async function settleAppearance() {
+  if (appearanceTimer) { clearTimeout(appearanceTimer); appearanceTimer = null; saveAppearance(); }
+  await appearanceSave;
+}
+/** Applies one appearance control to the in-memory settings and updates its readout. */
+function applyAppearance(el) {
+  if (!snap) return;
+  const v = el.dataset.t === "range" ? Number(el.value) : el.value;
+  set(snap.settings, el.dataset.k, v);
+  const shown = fmtValue(el.dataset.fmt, v);
+  const out = el.closest(".ctl")?.querySelector("output, code");
+  if (out) out.textContent = shown;
+  if (el.type === "range") el.setAttribute("aria-valuetext", shown);
+  saveAppearanceSoon();
+}
+document.addEventListener("input", (ev) => {
+  const el = ev.target;
+  if (el.dataset.live) applyAppearance(el);
+});
 document.addEventListener("change", (ev) => {
   const el = ev.target;
   if (el.id === "agree") return ((agreed = el.checked), ($('[data-act="accept"]').disabled = !agreed));
   const k = el.dataset.k;
   if (!k) return;
+  if (el.dataset.live) { applyAppearance(el); flushAppearance(); return; }
   const type = el.dataset.t;
   let v = el.value;
   if (type === "check") v = el.checked;
@@ -312,6 +403,9 @@ document.addEventListener("change", (ev) => {
   else if (type === "glossary") v = v.split("\n").map((l) => l.split("=").map((x) => x.trim())).filter((p) => p.length === 2 && p[0] && p[1]);
   if (k === "source.kind") snap.settings.source = { kind: v, device: null };
   else set(snap.settings, k, v);
+  // Number inputs accept typed values outside their min/max; normalize before saving so the file
+  // holds the same values the overlay clamps to.
+  if (k.startsWith("overlay.")) snap.settings.overlay = overlayConfig(snap.settings.overlay);
   persist();
 });
 
@@ -339,6 +433,13 @@ async function act(name, id, el) {
   if (name === "overlay-reset") {
     await invoke("reset_overlay_position");
     toast(t("position_reset"));
+  }
+  if (name === "overlay-reset-appearance") {
+    // Click-through is an interaction setting, not a look, so resetting the appearance keeps it.
+    const { clickThrough } = snap.settings.overlay;
+    snap.settings.overlay = { ...OVERLAY_DEFAULTS, clickThrough };
+    await invoke("save_settings", { settings: snap.settings });
+    toast(t("appearance_reset"));
   }
   if (name === "bench") {
     const b = await invoke("benchmark");

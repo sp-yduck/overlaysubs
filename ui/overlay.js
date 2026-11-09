@@ -1,7 +1,7 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
-let cfg = { ...OVERLAY_DEFAULTS };
+let cfg = overlayConfig();
 let uiLang = "en";
 // Set while the appearance settings are open, so changes can be checked with translation stopped.
 let preview = false;
@@ -28,18 +28,42 @@ let lastUpdate = 0;
 // exact target so slow trackpad deltas are not lost, and drop it when something else moves the view.
 let wheelTarget = null;
 
+/** "#rrggbb" and an opacity -> "rgba(r,g,b,a)", so colors and opacity are separate settings. */
+function rgba(hex, alpha) {
+  const h = String(hex || "").replace("#", "");
+  const n = h.length === 3 ? [...h].map((c) => c + c).join("") : h;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16) || 0);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/** The overlay's vertical anchor, as a flex `justify-content` value. */
+const VALIGN = { top: "flex-start", center: "center", bottom: "flex-end" };
+/** The caption plate follows the text alignment, so left-aligned captions sit at the left edge. */
+const ALIGN = { left: "flex-start", center: "center", right: "flex-end" };
+
 function apply(settings) {
   // A font change reflows the lines even when their text does not change, so remember the line
   // being read before the styles change and put it back afterwards.
   const anchor = follow ? null : visibleAnchor();
-  cfg = { ...OVERLAY_DEFAULTS, ...settings.overlay };
+  cfg = overlayConfig(settings.overlay);
   uiLang = settings.ui_lang || detectUiLang(navigator.languages);
   document.documentElement.lang = uiLang || "en";
   showGrip();
   const r = document.documentElement.style;
-  r.setProperty("--size", cfg.fontSize + "px");
+  r.setProperty("--size", `${cfg.fontSize}px`);
   r.setProperty("--font", cfg.font);
-  r.setProperty("--bg", cfg.bg);
+  r.setProperty("--weight", String(cfg.fontWeight));
+  r.setProperty("--line-height", String(cfg.lineHeight));
+  r.setProperty("--align", cfg.align);
+  r.setProperty("--cap-align", ALIGN[cfg.align] || "center");
+  r.setProperty("--valign", VALIGN[cfg.vAlign] || "flex-end");
+  r.setProperty("--fg", cfg.color);
+  r.setProperty("--src-size", `${cfg.srcSize}px`);
+  r.setProperty("--src-color", cfg.srcColor);
+  r.setProperty("--cap-bg", rgba(cfg.capBgColor, cfg.capOpacity));
+  r.setProperty("--overlay-bg", rgba(cfg.bgColor, cfg.bgOpacity));
+  // Top-aligned captions would sit under the drag grip, so they start below it (see overlay.html).
+  document.body.classList.toggle("top", cfg.vAlign === "top");
   invoke("set_click_through", { on: !!cfg.clickThrough }).catch(() => {});
   draw();
   restoreAnchor(anchor);
