@@ -5,7 +5,7 @@ let cfg = { ...OVERLAY_DEFAULTS };
 let uiLang = "en";
 // Set while the appearance settings are open, so changes can be checked with translation stopped.
 let preview = false;
-const caps = new Map(); // id -> {caption, at}
+const caps = new Map(); // id -> caption
 const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
 /** False for text made only of punctuation and spaces, such as "…" or "". */
 const hasWords = (s) => /[\p{L}\p{N}]/u.test(s || "");
@@ -16,12 +16,13 @@ const linesEl = document.getElementById("lines");
 const WHEEL_STEP = 40;
 // Whether the newest caption stays in view. It turns false when the reader scrolls up.
 let follow = true;
-// Captions kept on screen while the reader is scrolled up, so new ones do not push out the lines
-// being read and the display time does not remove them mid-read.
+// Captions kept on screen while the reader is scrolled up, so new ones do not push out the lines being read.
 let frozen = null;
 let shownIds = [];
 let lastHtml = "";
 let wheelDelta = 0;
+// When the subtitles were last emitted or updated, used to clear the overlay after a pause.
+let lastUpdate = 0;
 
 function apply(settings) {
   // A font change reflows the lines even when their text does not change, so remember the line
@@ -53,25 +54,31 @@ function previewHtml() {
 }
 
 /** Captions with a readable translation, in arrival order. */
-const readable = () => [...caps.values()].filter(({ caption: c }) => hasWords(c.translation));
-
-/** Ids of the newest captions, which are the ones the live view at the bottom shows. */
-const newestIds = () => readable().slice(-cfg.lines).map(({ caption: c }) => c.id);
+const readable = () => [...caps.values()].filter((c) => hasWords(c.translation));
 
 function draw() {
   const now = Date.now();
-  // While the reader is scrolled up, keep the lines they are reading and the newest captions, so
-  // returning to the live view shows what arrived meanwhile instead of older lines. Older hidden
-  // captions can still expire, which keeps the map bounded.
-  const keep = frozen ? new Set([...frozen, ...newestIds()]) : null;
-  for (const [id, c] of caps)
-    if (!keep?.has(id) && c.caption.stage === "final" && now - c.at > cfg.linger * 1000) caps.delete(id);
+  // Captions do not expire one by one: that removed older lines before the reader could scroll
+  // back to them. Instead clear the whole stack once the subtitles have not been updated for the
+  // configured time (a pause in speech).
+  if (caps.size && now - lastUpdate > cfg.linger * 1000) {
+    caps.clear();
+    frozen = null;
+    follow = true;
+  }
+  // Only the newest captions can be shown or scrolled back to, so a long session does not need to
+  // keep all of them; the frozen lines stay while they are on screen.
+  const limit = Math.max(4 * cfg.lines, 40);
+  for (const id of caps.keys()) {
+    if (caps.size <= limit) break;
+    if (!frozen?.includes(id)) caps.delete(id);
+  }
 
   const entries = readable();
   const shown = frozen
-    ? frozen.map((id) => caps.get(id)).filter((c) => c && hasWords(c.caption.translation))
+    ? frozen.map((id) => caps.get(id)).filter((c) => c && hasWords(c.translation))
     : entries.slice(-cfg.lines);
-  const html = shown.length ? shown.map(({ caption: c }) => captionHtml(c)).join("") : preview ? previewHtml() : "";
+  const html = shown.length ? shown.map((c) => captionHtml(c)).join("") : preview ? previewHtml() : "";
   if (html !== lastHtml) {
     // Replacing the HTML resets the scroll position, so keep the reader where they were.
     const anchor = follow ? null : visibleAnchor();
@@ -84,22 +91,14 @@ function draw() {
     // The same captions at a larger font size can be taller than the overlay again.
     linesEl.scrollTop = linesEl.scrollHeight;
   }
-  shownIds = shown.map(({ caption: c }) => c.id).filter((id) => id != null);
-  // No caption is hidden above the overlay any more (the last ones expired or the font shrank),
-  // so there is nothing left to scroll; go back to the newest captions.
+  shownIds = shown.map((c) => c.id).filter((id) => id != null);
+  // The frozen lines no longer overflow (the font shrank), so there is nothing left to scroll;
+  // go back to the newest captions.
   if (frozen && linesEl.scrollHeight <= linesEl.clientHeight + 1) unfreeze();
 }
 
-/**
- * Back to the live view: draw the newest captions and start their display time from here, so the
- * captions held back while the reader scrolled up do not flash and vanish (or leave older lines
- * behind) a moment after they appear.
- */
+/** Back to the live view: draw the newest captions again. */
 function unfreeze() {
-  for (const { caption: c } of readable().slice(-cfg.lines)) {
-    const cap = caps.get(c.id);
-    if (cap) cap.at = Date.now();
-  }
   frozen = null;
   follow = true;
   draw();
@@ -205,8 +204,8 @@ function merge(prev, next) {
 }
 
 listen("caption", (e) => {
-  const prev = caps.get(e.payload.id)?.caption;
-  caps.set(e.payload.id, { caption: merge(prev, e.payload), at: Date.now() });
+  lastUpdate = Date.now();
+  caps.set(e.payload.id, merge(caps.get(e.payload.id), e.payload));
   draw();
 });
 listen("settings", (e) => apply(e.payload));
@@ -214,6 +213,7 @@ listen("settings", (e) => apply(e.payload));
 // rather than when it is shown again (that could discard a caption emitted in between).
 listen("overlay-hidden", () => {
   caps.clear();
+  lastUpdate = 0;
   follow = true;
   frozen = null;
   draw();
