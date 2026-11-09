@@ -14,9 +14,9 @@ OverlaySubs の配布経路は **GitHub Releases のみ** です。`v*` タグ�
 
 | ジョブ | 条件 | 内容 |
 |---|---|---|
-| `verify` | タグ push のみ | タグ名 `vX.Y.Z` が `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `crates/core/Cargo.toml` の version と一致するか検証。`productName` が `OverlaySubs` であることも確認 |
+| `verify` | タグ push のみ | タグ名 `vX.Y.Z` が root `Cargo.toml` の `[workspace.package] version` と一致するか検証。両クレートが `version.workspace = true` で継承していること、`src-tauri/tauri.conf.json` に `version` が無いことも確認。`productName` が `OverlaySubs` であることも確認 |
 | `build` | タグ push、手動実行、ラベル `ci:build` 付き PR | `windows-latest`（Vulkan）と `macos-15`（Metal、ad-hoc 署名）でビルドし、**固定名にリネームしてから** artifact にアップロード |
-| `publish` | タグ push のみ | `SHA256SUMS.txt` を生成し、Release を最新として公開。本文はダウンロード表・警告の回避手順・CHANGELOG の該当セクション |
+| `publish` | タグ push のみ | `SHA256SUMS.txt` を生成し、Release を最新として公開。本文はダウンロード表・警告の回避手順・`## Changes`（前回リリース以降の PR タイトルから自動生成） |
 
 Release に添付される固定名アセット（README やランディングページが参照する契約）:
 
@@ -126,7 +126,7 @@ gh repo edit sp-yduck/overlaysubs \
 
 ```bash
 gh repo edit sp-yduck/overlaysubs \
-  --description "PC の音声をリアルタイムで文字起こし・翻訳し、字幕としてオーバーレイ表示するオフライン・デスクトップアプリ（Tauri / whisper.cpp / PLaMo 3 Translate）" \
+  --description "Offline desktop app that transcribes and translates PC audio in real time and shows it as a subtitle overlay (Tauri / whisper.cpp / PLaMo 3 Translate)" \
   --homepage "https://sp-yduck.github.io/overlaysubs/" \
   --add-topic tauri --add-topic rust --add-topic whisper-cpp --add-topic llama-cpp \
   --add-topic plamo --add-topic speech-recognition --add-topic realtime-translation \
@@ -204,32 +204,35 @@ curl -sIL -o /dev/null -w '%{http_code}\n' https://sp-yduck.github.io/overlaysub
 
 ## 3. 2 回目以降のリリース
 
-1. **バージョンを 3 箇所で上げる**（`verify` がこの 3 つの一致を要求します）
-   - `src-tauri/tauri.conf.json` の `version`
-   - `src-tauri/Cargo.toml` の `[package] version`
-   - `crates/core/Cargo.toml` の `[package] version`
-2. **`Cargo.lock` を更新**（`version` がロックにも入っているため）
+バージョンは root `Cargo.toml` の `[workspace.package] version` の 1 箇所だけです。両クレートは
+`version.workspace = true` で継承し、`src-tauri/tauri.conf.json` には `version` を置かないため、
+Tauri は Cargo の版を使います。
+
+1. **バージョンを 1 箇所で上げる**（スクリプトが `Cargo.lock` も更新します）
 
    ```bash
-   cargo metadata --format-version 1 > /dev/null   # Cargo.lock を更新
-   git diff --stat Cargo.lock
+   scripts/set-version.sh X.Y.Z
+   git diff --stat
    ```
-3. **`CHANGELOG.md` に `## [X.Y.Z] - YYYY-MM-DD` を追記**。Release 本文に自動で取り込まれます
-   （見出しの書式 `## [X.Y.Z] - YYYY-MM-DD` を変えないこと）。
-4. テストとビルド確認
+
+2. テストとビルド確認
 
    ```bash
    cargo test -p overlaysubs-core
    gh workflow run release.yml --ref <ブランチ名>   # ドライラン（Release は作られない）
    ```
 
-5. PR を作って `main` にマージしたあと、タグを push
+3. PR を作って `main` にマージしたあと、タグを push
 
    ```bash
    git switch main && git pull
    git tag -a vX.Y.Z -m "OverlaySubs vX.Y.Z"
    git push origin vX.Y.Z
    ```
+
+> `CHANGELOG.md` はありません。Release 本文の `## Changes` は、前回のリリース以降にマージされた
+> PR のタイトルから自動生成されます（`chore(release)` は除く）。利用者に伝わるよう、PR タイトルは
+> 英語で付けてください。
 
 ---
 
@@ -368,7 +371,7 @@ PR に **`ci:build` ラベル** を付けると、`release.yml` の `build` ジ�
 
 ```bash
 gh label create "ci:build" -R sp-yduck/overlaysubs \
-  --color 1d76db --description "この PR で Windows / macOS のリリースビルドを実行する"
+  --color 1d76db --description "Run the Windows / macOS release build for this PR"
 ```
 
 ### 6.2 実行する

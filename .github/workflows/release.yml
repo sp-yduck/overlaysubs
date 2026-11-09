@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check tag, tauri.conf.json and crate versions agree
+      - name: Check the tag against the single-source workspace version
         env:
           TAG: ${{ github.ref_name }}
         run: |
@@ -63,33 +63,27 @@ jobs:
           fi
           version="${TAG#v}"
 
-          # First `version =` in the [package] section of each manifest.
-          pkg_version() {
-            awk -F'"' '
-              /^\[package\]/ { inpkg = 1; next }
-              /^\[/          { inpkg = 0 }
-              inpkg && /^[[:space:]]*version[[:space:]]*=/ { print $2; exit }
-            ' "$1"
-          }
+          # The version lives only in [workspace.package] of the root Cargo.toml.
+          got=$(sh scripts/version.sh)
+          if [ "$got" != "$version" ]; then
+            echo "::error file=Cargo.toml::workspace version is '$got' but tag '$TAG' implies '$version'. Run scripts/set-version.sh $version before tagging."
+            exit 1
+          fi
+          echo "OK Cargo.toml: $got"
 
-          conf_version=$(jq -r '.version' src-tauri/tauri.conf.json)
-          tauri_version=$(pkg_version src-tauri/Cargo.toml)
-          core_version=$(pkg_version crates/core/Cargo.toml)
-
-          failed=0
-          check_version() {
-            file="$1"; got="$2"
-            if [ "$got" != "$version" ]; then
-              echo "::error file=$file::version is '$got' but tag '$TAG' implies '$version'."
-              failed=1
-            else
-              echo "OK $file: $got"
+          # Both crates must inherit the workspace version instead of pinning their own.
+          for manifest in src-tauri/Cargo.toml crates/core/Cargo.toml; do
+            if ! grep -Eq '^version\.workspace[[:space:]]*=[[:space:]]*true' "$manifest"; then
+              echo "::error file=$manifest::use 'version.workspace = true' so Cargo.toml stays the only version source."
+              exit 1
             fi
-          }
-          check_version src-tauri/tauri.conf.json "$conf_version"
-          check_version src-tauri/Cargo.toml "$tauri_version"
-          check_version crates/core/Cargo.toml "$core_version"
-          [ "$failed" -eq 0 ] || exit 1
+          done
+
+          # Tauri reads Cargo.toml when the config has no version, so a leftover field would drift.
+          if jq -e 'has("version")' src-tauri/tauri.conf.json > /dev/null; then
+            echo '::error file=src-tauri/tauri.conf.json::remove the "version" field; the version comes from Cargo.toml.'
+            exit 1
+          fi
 
           # The stable asset names are hard-coded, so the product name is part of the contract.
           product=$(jq -r '.productName' src-tauri/tauri.conf.json)
@@ -301,7 +295,8 @@ jobs:
           $nsis = $nsisAll[0]
           $msi = $msiAll[0]
           # The installers carry the app version in their names; it must be the version being built.
-          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          # The version lives only in [workspace.package] of the root Cargo.toml (see scripts/version.sh).
+          $version = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
           foreach ($f in @($nsis, $msi)) {
             if ($f.Name -notlike "*_${version}_*") { throw "$($f.Name) is not an installer for version $version" }
           }
@@ -655,7 +650,7 @@ jobs:
             exit 1
           fi
           dmg=$dmgs
-          version=$(jq -r .version src-tauri/tauri.conf.json)
+          version=$(sh scripts/version.sh)
           case "$(basename "$dmg")" in
             *"_${version}_"*) ;;
             *) echo "::error::$dmg is not a dmg for version $version"; exit 1 ;;
@@ -764,6 +759,7 @@ jobs:
 
       - name: Generate release notes
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
@@ -781,110 +777,105 @@ jobs:
           # Quoted heredoc: no shell expansion, so backticks, $ and quotes stay literal.
           # @@MARKERS@@ are substituted afterwards with sed.
           cat > dist/release-body.md.tmpl <<'BODY'
-          このリリースのバージョン: **@@TAG@@**
+          Released version: **@@TAG@@**
 
-          PC の音声をリアルタイムで文字起こし・翻訳し、字幕として重ねて表示するアプリです。
-          インストーラをダウンロードして実行するだけで使えます。API キーは不要で、音声が外部に送信されることはありません。
+          OverlaySubs transcribes and translates any audio playing on your PC in real time and shows the result as an overlay of subtitles. Download an installer and run it — no API key is required, and no audio is sent anywhere.
 
-          ## ダウンロード
+          ## Download
 
-          | ファイル | 対象 | 種類 | サイズ |
+          | File | Platform | Type | Size |
           |---|---|---|---|
-          | [overlaysubs-windows-x64-setup.exe](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe) | Windows 10/11 (64bit) | インストーラ（推奨） | @@SIZE_EXE@@ |
-          | [overlaysubs-windows-x64.msi](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64.msi) | Windows 10/11 (64bit) | MSI（管理者配布向け） | @@SIZE_MSI@@ |
-          | [overlaysubs-macos-arm64.dmg](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg) | macOS 13 以降（Apple Silicon） | ディスクイメージ | @@SIZE_DMG@@ |
-          | [SHA256SUMS.txt](https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt) | すべて | SHA-256 チェックサム | - |
+          | [overlaysubs-windows-x64-setup.exe](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe) | Windows 10/11 (64-bit) | Installer (recommended) | @@SIZE_EXE@@ |
+          | [overlaysubs-windows-x64.msi](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64.msi) | Windows 10/11 (64-bit) | MSI (for managed deployment) | @@SIZE_MSI@@ |
+          | [overlaysubs-macos-arm64.dmg](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg) | macOS 13 or later (Apple Silicon) | Disk image | @@SIZE_DMG@@ |
+          | [SHA256SUMS.txt](https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt) | All | SHA-256 checksums | - |
 
-          - Windows は 64bit (x64) のみです。Windows 10 / 11 に対応しています。
-          - macOS は Apple Silicon（M1 以降）のみです。macOS 13 以降が必要です。Intel Mac 用のビルドはありません。
-          - GitHub アカウントは不要です。上のリンクから直接ダウンロードできます。
+          - Windows x64 only; Windows 10 and 11 are supported.
+          - macOS on Apple Silicon (M1 or later) only; macOS 13 or later is required. There is no Intel Mac build.
+          - No GitHub account is needed. You can download directly from the links above.
 
-          ## インストール
+          ## Install
 
           ### Windows
 
-          1. `overlaysubs-windows-x64-setup.exe` をダウンロードして実行します（MSI 版が必要な場合は `overlaysubs-windows-x64.msi`）。
-          2. 「Windows によって PC が保護されました」と表示されたら、**[詳細情報]** をクリックし、**[実行]** を選びます。このアプリはコード署名を行っていないため、初回のみこの警告が表示されます。
-          3. 画面の指示に従ってインストールします。初回起動時に利用規約への同意を求められます。
+          1. Download `overlaysubs-windows-x64-setup.exe` and run it (use `overlaysubs-windows-x64.msi` if you need the MSI).
+          2. If Windows shows “Windows protected your PC”, click **[More info]** and then **[Run anyway]**. This warning appears only on the first run because the app is not code-signed.
+          3. Follow the on-screen instructions. You will be asked to accept the Terms of Use on first launch.
 
           ### macOS
 
-          1. `overlaysubs-macos-arm64.dmg` をダウンロードして開き、`OverlaySubs` を「Applications」フォルダにドラッグします。
-          2. 初回起動時に「開発元を検証できません」と表示されたら、アプリを **右クリック →［開く］** を選び、確認ダイアログで **［開く］** を押します。
-             うまくいかない場合は、**[システム設定] → [プライバシーとセキュリティ]** を開き、「セキュリティ」の項目にある **[このまま開く]** を押してください。
-          3. 2 回目以降は通常どおり起動できます。
+          1. Download `overlaysubs-macos-arm64.dmg`, open it, and drag `OverlaySubs` into the Applications folder.
+          2. If macOS says it cannot verify the developer on first launch, **right-click (or Control-click) the app → [Open]** and click **[Open]** in the confirmation dialog.
+             If that does not work, open **[System Settings] → [Privacy & Security]** and click **[Open Anyway]** in the Security section.
+          3. After the first launch, the app opens normally.
 
           > [!IMPORTANT]
-          > 本アプリは ad-hoc 署名のみ（公証なし）です。そのため macOS では、初回のみ上記の「右クリック→開く」または「システム設定→プライバシーとセキュリティ→このまま開く」の操作が必要です。
-          > Gatekeeper を無効化する必要はありません（セキュリティ上、無効化は推奨しません）。
+          > The app is ad-hoc signed only (not notarized). On macOS you therefore need the right-click → Open, or System Settings → Privacy & Security → Open Anyway, step on first launch only.
+          > You do not need to disable Gatekeeper (disabling it is not recommended for security reasons).
 
-          ## 初回起動時のモデルダウンロード
+          ## Model download on first launch
 
-          初回起動時、音声認識モデルと翻訳モデル（合計で数 GB）を Hugging Face から自動ダウンロードします。回線によっては数分〜十数分かかります。ダウンロードは中断しても再開でき、SHA-256 で検証されます。アカウントやトークンは不要です。2 回目以降はモデルを再利用するため短時間で起動します。
-          モデル用に数 GB 以上の空き容量を確保してください。
+          On first launch the app automatically downloads the speech-recognition and translation models (several GB in total) from Hugging Face. Depending on your connection this takes a few to a dozen or so minutes. Downloads resume if interrupted and are verified with SHA-256. No account or token is required. After the first launch the models are reused, so startup is fast.
+          Make sure you have several GB of free space for the models.
 
-          ## チェックサムの確認（任意）
+          ## Verifying the checksum (optional)
 
-          ダウンロードしたファイルが壊れていないか、`SHA256SUMS.txt` と照合できます。
+          You can compare a downloaded file against `SHA256SUMS.txt` to check that it is intact.
 
-          **Windows（PowerShell）**
+          **Windows (PowerShell)**
 
           ```powershell
           Get-FileHash .\overlaysubs-windows-x64-setup.exe -Algorithm SHA256
           Get-FileHash .\overlaysubs-windows-x64.msi -Algorithm SHA256
           ```
 
-          **macOS（ターミナル）**
+          **macOS (Terminal)**
 
           ```bash
           cd ~/Downloads
           shasum -a 256 overlaysubs-macos-arm64.dmg
           ```
 
-          表示された値が `SHA256SUMS.txt` の該当行と一致すれば正常です。
+          If the value matches the corresponding line in `SHA256SUMS.txt`, the file is intact.
 
-          ## リンク
+          @@CHANGES@@
+          ## Links
 
-          - [公式サイト（インストール・使い方・FAQ）](https://sp-yduck.github.io/overlaysubs/)
-          - [README（日本語・仕組みとビルド方法）](https://github.com/sp-yduck/overlaysubs/blob/main/README.ja.md)
-          - [README (English)](https://github.com/sp-yduck/overlaysubs#readme)
-          - [OverlaySubs 利用規約（日本語）](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt) / [English](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt)
-          - [PLaMo 3 のライセンス](https://plamo.preferredai.jp/info/plamo-community-license-ja)
-          - [リリース一覧](https://github.com/sp-yduck/overlaysubs/releases)
+          - [Official site (install, usage, FAQ)](https://sp-yduck.github.io/overlaysubs/en/)
+          - [README (English: how it works and how to build)](https://github.com/sp-yduck/overlaysubs#readme)
+          - [README (Japanese)](https://github.com/sp-yduck/overlaysubs/blob/main/README.ja.md)
+          - [OverlaySubs Terms of Use (English)](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt) / [Japanese](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt)
+          - [PLaMo 3 license](https://plamo.preferredai.jp/info/plamo-community-license-en)
+          - [All releases](https://github.com/sp-yduck/overlaysubs/releases)
 
-          アプリのコードは MIT ライセンスです。翻訳には Preferred Networks の PLaMo 3 Translate を使用しています（**Built with PLaMo**）。
+          The app code is MIT licensed. Translation uses Preferred Networks' PLaMo 3 Translate (**Built with PLaMo**).
           BODY
+
+          # The change list is generated from the PR titles merged since the previous release, so
+          # there is no CHANGELOG.md to maintain. An empty file means the section is omitted.
+          : > dist/changes.md
+          prev=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
+            --json tagName,isDraft,isPrerelease 2>/dev/null \
+            | jq -r --arg tag "$TAG" '[.[] | select((.isDraft|not) and (.isPrerelease|not) and .tagName != $tag)][0].tagName // empty' \
+            2>/dev/null || true)
+          if [ -n "$prev" ]; then
+            bullets=$(gh api "repos/$GITHUB_REPOSITORY/compare/$prev...$TAG" 2>/dev/null \
+              | jq -r '.commits[] | .commit.message | split("\n")[0] | select(test("^chore\\(release\\):") | not) | "- " + .' \
+              2>/dev/null || true)
+            if [ -n "$bullets" ]; then
+              { printf '## Changes\n\n%s\n\n' "$bullets"; } > dist/changes.md
+              echo "Change list from $prev..$TAG appended."
+            fi
+          fi
 
           sed -e "s|@@TAG@@|${TAG}|g" \
               -e "s|@@SIZE_EXE@@|${size_exe}|g" \
               -e "s|@@SIZE_MSI@@|${size_msi}|g" \
               -e "s|@@SIZE_DMG@@|${size_dmg}|g" \
+              -e '/@@CHANGES@@/r dist/changes.md' \
+              -e '/@@CHANGES@@/d' \
               dist/release-body.md.tmpl > dist/release-body.md
 
-          # Release notes: append the CHANGELOG section for this tag's version
-          # ("## [x.y.z] - ..."), but never fail the release because of it.
-          version="${TAG#v}"
-          version_re=$(printf '%s' "$version" | sed 's/\./\\./g')
-          if [ -f CHANGELOG.md ]; then
-            awk -v ver="$version_re" '
-              $0 ~ "^##[[:space:]]*\\[?" ver "\\]?([[:space:]]|$)" { in_section = 1 }
-              in_section && /^##[[:space:]]/ && $0 !~ "^##[[:space:]]*\\[?" ver "\\]?([[:space:]]|$)" { exit }
-              in_section && /^\[[^]]+\]:[[:space:]]/ { exit }
-              in_section { print }
-            ' CHANGELOG.md > dist/changelog-section.md || true
-            if [ -s dist/changelog-section.md ]; then
-              {
-                printf '\n---\n\n## 変更履歴\n\n'
-                cat dist/changelog-section.md
-                printf '\n'
-              } >> dist/release-body.md
-              echo "Appended the CHANGELOG.md [$version] section."
-            else
-              echo "CHANGELOG.md exists but has no [$version] section; skipping it."
-            fi
-          else
-            echo "No CHANGELOG.md in this commit; release notes omit the changelog."
-          fi
           echo "----- release body -----"
           cat dist/release-body.md
 

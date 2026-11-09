@@ -152,7 +152,6 @@ Pushing a `v*` tag makes the release workflow build the bundles and publish them
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) — dev environment, tests, PR flow
 - [SECURITY.md](SECURITY.md) — how to report vulnerabilities privately
-- [CHANGELOG.md](CHANGELOG.md) — release history
 - [RELEASING.md](RELEASING.md) — release process (maintainers)
 - [docs/index.html](docs/index.html) — end-user documentation (the GitHub Pages source; self-contained, no external CDN, fonts, or JS)
 - Issue templates: [bug report](.github/ISSUE_TEMPLATE/bug_report.yml) / [feature request](.github/ISSUE_TEMPLATE/feature_request.yml)
