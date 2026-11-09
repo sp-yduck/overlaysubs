@@ -404,6 +404,27 @@ mod tests {
     }
 
     #[test]
+    fn config_edited_between_utterances_applies_to_the_next_one() {
+        let mut s = Session::new(SessionConfig::default());
+        let (mut a, mut mt, mut caps) = (asr(vec!["Hello there.", "The dots connect."]), FakeMt(vec![]), vec![]);
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        // The settings UI saves while a session runs and the session is not rebuilt, so the next
+        // utterance must use the new values and the entries recorded so far must be kept.
+        s.cfg = SessionConfig {
+            target_lang: "en".into(),
+            alt_target_lang: "ko".into(),
+            use_context: false,
+            glossary: vec![("dots".into(), "点".into())],
+            topic: "a lecture".into(),
+            ..Default::default()
+        };
+        fin(&mut s, &mut a, &mut mt, &mut caps);
+        assert_eq!(mt.0[0], r#"en>ja h0 Hello there. [] """#, "the first utterance uses the old settings");
+        assert_eq!(mt.0[1], r#"en>ko h0 The dots connect. ["dots"] "a lecture""#, "the new alternate language, context flag, glossary and topic apply right away");
+        assert_eq!(s.entries.len(), 2, "the entries recorded before the change are kept");
+    }
+
+    #[test]
     fn asr_prompt_keeps_the_tail_and_respects_use_context() {
         let mut s = Session::new(SessionConfig { glossary: vec![("x".repeat(200), "y".into())], ..Default::default() });
         let (mut a, mut mt, mut caps) = (asr(vec!["Done."]), FakeMt(vec![]), vec![]);

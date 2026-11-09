@@ -186,7 +186,8 @@ function homePage() {
   ${ready ? "" : `<div class="banner"><span>${t("need_setup_long")}</span>${btn("goto-models", t("goto_models"), { cls: "primary" })}</div>`}
   <div class="grid2">
     ${card(t("input"), `${select(t("source"), "source.kind", opts([["system", t("system")], ["mic", t("mic")]], s.source.kind))}
-      ${macSystem ? `<p class="muted small">${t("system_audio_note")}</p>` : select(t("device"), "source.device", opts([["", t("default_dev")], ...devs.map((d) => [d, d])], s.source.device), "nullable")}`)}
+      ${macSystem ? `<p class="muted small">${t("system_audio_note")}</p>` : select(t("device"), "source.device", opts([["", t("default_dev")], ...devs.map((d) => [d, d])], s.source.device), "nullable")}
+      ${snap.running ? `<p class="muted small">${t("input_restart_note")}</p>` : ""}`)}
     ${card(t("languages"), `${select(t("src_lang"), "session.source_lang", langOpts(s.session.source_lang, [["", t("auto")]]), "nullable")}
       ${select(t("tgt_lang"), "session.target_lang", langOpts(s.session.target_lang, [], TARGET_LANGS))}
       ${select(t("alt_lang"), "session.alt_target_lang", langOpts(s.session.alt_target_lang, [], TARGET_LANGS))}`)}
