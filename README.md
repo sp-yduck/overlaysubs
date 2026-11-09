@@ -75,7 +75,7 @@ WASAPI loopback (Windows) / ScreenCaptureKit system audio (macOS) / microphone â
 - `ui` is the settings window and overlay: plain HTML/JS/CSS with no build step; `ui/i18n.js` holds the Japanese, English and Chinese (Traditional and Simplified) strings.
 - The ASR and translation engines sit behind the `session::Asr` / `session::Translator` traits and can be swapped.
 - `models.json` defines the models (URL, size, SHA-256, tier). URLs are pinned to Hugging Face commits (using `main` would break the hash when upstream re-uploads). Placing a `models.json` in the config folder overrides the bundled one without an app update.
-- `licenses/` ships the OverlaySubs Terms of Use (English and Japanese); `THIRD_PARTY_NOTICES.md` lists the bundled libraries' licenses. The PLaMo 3 license is not bundled; the app and docs link to the official page instead.
+- `licenses/` ships the OverlaySubs Terms of Use (English and Japanese); `THIRD_PARTY_NOTICES.md` lists the bundled libraries' licenses. The PLaMo Community License (revised November 9, 2026) is not bundled; the app and docs link to the official page instead.
 
 ## Features
 
@@ -160,7 +160,9 @@ Pushing a `v*` tag makes the release workflow build the bundles and publish them
 
 - **The app code is MIT licensed** ([LICENSE](LICENSE)).
 - Use of the app is governed by the [OverlaySubs Terms of Use](licenses/overlaysubs-terms.en.txt) ([Japanese](licenses/overlaysubs-terms.ja.txt)). You accept them on first launch, and they are also available from "About" in the app.
-- Use of the PLaMo 3 Translate translation model is governed by the [PLaMo 3 license](https://plamo.preferredai.jp/info/plamo-community-license-en).
+- Use of the PLaMo 3 Translate translation model is governed by the [PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license-en), revised by Preferred Networks on November 9, 2026. The license is not bundled; the app and docs link to the official text.
+- Personal and academic use of the model is free. Commercial use, including use inside a company or other organization, requires prior registration with Preferred Networks; it is free while your or your affiliates' most recent fiscal year revenue or sales is 1 billion yen or less, and a separate license agreement is required above that.
+- The revised license does not require attribution when you publish translated subtitles. For books, papers and similar long-form publications, state that PLaMo was used for translation; if you distribute subtitle data (for example as a dataset), state that the license applies to any model trained on it.
 - If you publish subtitles for streams or videos, mind the copyright of the source content.
 - Whisper models (MIT) and Silero VAD (MIT) follow their own licenses.
 - Third-party licenses for the bundled whisper.cpp / llama.cpp / ggml are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

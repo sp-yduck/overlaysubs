@@ -75,7 +75,7 @@ WASAPI loopback（Windows）/ ScreenCaptureKit のシステム音声（macOS）/
 - `ui` は設定画面とオーバーレイです。ビルド不要の素の HTML/JS/CSS で、`ui/i18n.js` に日本語・英語・中国語（繁体字・簡体字）の文言があります。
 - 翻訳エンジンと音声認識は `session::Translator` / `session::Asr` トレイトの裏にあり、差し替えられます。
 - `models.json` がモデル定義（URL、サイズ、SHA-256、ティア）です。URL は Hugging Face のコミットに固定しています（`main` だと上流の再アップロードでハッシュが合わなくなるため）。設定フォルダに `models.json` を置くと、アプリを更新せずに上書きできます。
-- `licenses/` に OverlaySubs 利用規約（日英）、`THIRD_PARTY_NOTICES.md` に同梱ライブラリのライセンスを置いています。PLaMo 3 のライセンスは同梱せず、公式ページへのリンクのみを掲載します。
+- `licenses/` に OverlaySubs 利用規約（日英）、`THIRD_PARTY_NOTICES.md` に同梱ライブラリのライセンスを置いています。PLaMo コミュニティライセンス（2026年11月9日改定）は同梱せず、公式ページへのリンクのみを掲載します。
 
 ## 機能
 
@@ -160,7 +160,9 @@ OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
 
 - **アプリのコードは MIT ライセンスです**（[LICENSE](LICENSE)）。
 - アプリの利用条件は [OverlaySubs 利用規約](licenses/overlaysubs-terms.ja.txt)（[English](licenses/overlaysubs-terms.en.txt)）です。初回起動時に同意を求め、アプリの「情報」からも参照できます。
-- 翻訳モデル PLaMo 3 Translate の利用条件は [PLaMo 3 のライセンス](https://plamo.preferredai.jp/info/plamo-community-license-ja) に従います。
+- 翻訳モデル PLaMo 3 Translate の利用条件は、Preferred Networks が 2026年11月9日に改定した [PLaMo コミュニティライセンス](https://plamo.preferredai.jp/info/plamo-community-license-ja) に従います。ライセンス本文は同梱せず、アプリとドキュメントから公式ページへのリンクのみを掲載します。
+- 個人利用・学術利用は無償です。企業その他の組織内での利用を含む商業目的の利用には、Preferred Networks への事前登録が必要です。直近事業年度の収入または売上が10億円以下の場合は無償で、これを超える場合は別途のライセンス契約が必要です。
+- 改定後のライセンスでは、翻訳した字幕の公開にクレジット表示は必須ではありません。書籍・論文その他これらに類する長文の公表物では、PLaMo を翻訳に利用した旨を明示してください。字幕データをデータセット等として配布する場合は、そのデータで学習したモデルに本ライセンスが適用される旨を明示してください。
 - 配信や動画の字幕を公開する場合は、元コンテンツの著作権にも注意してください。
 - Whisper モデル（MIT）と Silero VAD（MIT）は、それぞれのライセンスに従います。
 - 同梱している whisper.cpp / llama.cpp / ggml などのサードパーティライセンスは [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にまとめています。
