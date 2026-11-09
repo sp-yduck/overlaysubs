@@ -663,16 +663,22 @@ fn display_in_desktop(bounds: Rect, work_area: Rect, scale: f64, in_points: bool
     Display { bounds: r(bounds), work_area: r(work_area), size_scale: if in_points { 1.0 } else { scale } }
 }
 
-/// Moves the overlay at `(x, y)` with logical `size` into the work area of the display it overlaps most, so all of it
-/// shows (its top-left corner when it is larger than the area). Each display is measured with the overlay's size on
-/// that display. A spot over the Dock or menu bar still counts as on that display. None when it overlaps no display.
+/// Where the overlay at `(x, y)` with logical `size` goes so all of it shows. It stays put when it is fully inside the
+/// work area of the display that holds its top-left corner, measured with its size on that display. Otherwise it moves
+/// into the work area of the display it overlaps most (its top-left corner when it is larger than the area), measured
+/// with its size there. Overlaps are compared with one rectangle, the logical size, because sizes scaled per display
+/// would make a larger-scale neighbour look like it holds more of the overlay. A spot over the Dock or menu bar still
+/// counts as on that display. None when it overlaps no display.
 fn fit_on_screen((x, y): (f64, f64), size: (f64, f64), displays: &[Display]) -> Option<(f64, f64)> {
-    let overlap = |d: &Display| {
-        let (w, h, a) = (size.0 * d.size_scale, size.1 * d.size_scale, d.bounds);
-        ((x + w).min(a.0 + a.2) - x.max(a.0)).max(0.0) * ((y + h).min(a.1 + a.3) - y.max(a.1)).max(0.0)
-    };
-    let d = displays.iter().filter(|d| overlap(d) > 0.0).max_by(|a, b| overlap(a).total_cmp(&overlap(b)))?;
-    let (w, h, a) = (size.0 * d.size_scale, size.1 * d.size_scale, d.work_area);
+    let on = |d: &Display| (size.0 * d.size_scale, size.1 * d.size_scale);
+    let inside = |a: Rect, (w, h): (f64, f64)| x >= a.0 && y >= a.1 && x + w <= a.0 + a.2 && y + h <= a.1 + a.3;
+    let holds_corner = |a: Rect| x >= a.0 && y >= a.1 && x < a.0 + a.2 && y < a.1 + a.3;
+    if displays.iter().any(|d| holds_corner(d.bounds) && inside(d.work_area, on(d))) {
+        return Some((x, y));
+    }
+    let overlap = |a: &Rect| ((x + size.0).min(a.0 + a.2) - x.max(a.0)).max(0.0) * ((y + size.1).min(a.1 + a.3) - y.max(a.1)).max(0.0);
+    let d = displays.iter().filter(|d| overlap(&d.bounds) > 0.0).max_by(|a, b| overlap(&a.bounds).total_cmp(&overlap(&b.bounds)))?;
+    let ((w, h), a) = (on(d), d.work_area);
     Some((x.min(a.0 + a.2 - w).max(a.0), y.min(a.1 + a.3 - h).max(a.1)))
 }
 
@@ -855,6 +861,12 @@ mod tests {
             display_in_desktop((0.0, 0.0, 3840.0, 2160.0), (0.0, 0.0, 3840.0, 2080.0), 2.0, false),
             display_in_desktop((3840.0, 0.0, 1920.0, 1080.0), (3840.0, 0.0, 1920.0, 1040.0), 1.0, false),
         ]
+    }
+
+    #[test]
+    fn overlay_fully_on_a_display_stays_next_to_a_larger_scale_one() {
+        // At 2200x440, the 2x neighbour would cover more of the overlay than the 1x display that really holds it.
+        assert_eq!(fit_on_screen((800.0, 200.0), OVERLAY, &mixed_scale(false)), Some((800.0, 200.0)));
     }
 
     #[test]
