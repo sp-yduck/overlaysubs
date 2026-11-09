@@ -170,5 +170,15 @@ const I18N = {
     err_macos_audio: "无法开始采集系统音频",
   },
 };
+/** UI language for the OS's preferred languages (`navigator.languages`): the first supported one, else English. */
+function detectUiLang(langs) {
+  for (const l of (langs || []).map((x) => x.toLowerCase())) {
+    if (l.startsWith("ja")) return "ja";
+    if (l.startsWith("en")) return "en";
+    if (/^zh-(hant|tw|hk|mo)\b/.test(l)) return "zh-hant";
+    if (l.startsWith("zh")) return "zh-hans";
+  }
+  return "en";
+}
 const LANGS = { en: "English", ja: "日本語", ko: "한국어", zh: "中文", es: "Español", fr: "Français", de: "Deutsch", it: "Italiano", pt: "Português", ru: "Русский", vi: "Tiếng Việt", th: "ไทย", id: "Indonesia", ar: "العربية", hi: "हिन्दी", nl: "Nederlands", pl: "Polski" };
 const OVERLAY_DEFAULTS = { showSource: true, fontSize: 28, font: "system-ui, sans-serif", bg: 0.55, lines: 2, linger: 8, clickThrough: false, showCredit: true };

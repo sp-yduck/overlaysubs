@@ -38,6 +38,10 @@ function toast(msg, kind = "ok") {
 async function refresh() {
   snap = await invoke("snapshot");
   snap.settings.overlay = { ...OVERLAY_DEFAULTS, ...snap.settings.overlay };
+  if (!snap.settings.ui_lang) {
+    snap.settings.ui_lang = detectUiLang(navigator.languages);
+    await invoke("save_settings", { settings: snap.settings });
+  }
   if (snap.terms_accepted) checkUpdate();
   render();
 }
