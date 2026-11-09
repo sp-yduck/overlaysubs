@@ -676,6 +676,13 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, reset_overlay_position, open_url, show_overlay, set_overlay_preview, check_update
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running overlaysubs");
+        .build(tauri::generate_context!())
+        .expect("error while building overlaysubs")
+        .run(|app, event| {
+            // Free the models before the process exits. ggml's Metal backend aborts in its exit-time cleanup
+            // (ggml_metal_rsets_free) while a loaded model still holds GPU buffers, so every quit crashed.
+            if let tauri::RunEvent::Exit = event {
+                app.state::<App>().engines.lock().unwrap().take();
+            }
+        });
 }
