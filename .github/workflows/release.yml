@@ -307,6 +307,39 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      # The ScreenCaptureKit bindings statically link a Swift bridge (via apple-metal) whose
+      # sources reference Metal APIs that only exist in the macOS 26 SDK (MTLTensor*,
+      # MTLSamplerReductionMode, lodBias). The macos-15 image defaults to Xcode 16.4 with the
+      # macOS 15.5 SDK, so select a preinstalled Xcode 26 instead of switching runner images.
+      # tauri-cli still sets MACOSX_DEPLOYMENT_TARGET to minimumSystemVersion (13.0), so the
+      # produced app keeps its macOS 13 deployment target.
+      - name: Select Xcode 26 for the ScreenCaptureKit Swift bridge
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcode=$(python3 - <<'PY'
+          import glob
+          import re
+
+          versions = []
+          for path in glob.glob("/Applications/Xcode_26*.app"):
+              match = re.search(r"Xcode_(\d+(?:\.\d+)*)\.app$", path)
+              if match:
+                  versions.append((tuple(int(part) for part in match.group(1).split(".")), path))
+          print(max(versions)[1] if versions else "")
+          PY
+          )
+          if [ -z "$xcode" ]; then
+            echo "::error::No Xcode 26 is installed, but the ScreenCaptureKit Swift bridge needs the macOS 26 SDK."
+            ls -d /Applications/Xcode*.app 2>/dev/null || true
+            exit 1
+          fi
+          echo "Selecting $xcode"
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+
       # --- macOS ---
       # Tauri does not ad-hoc sign by default. On Apple Silicon an unsigned .app downloaded
       # from the internet is rejected as "damaged", so unless a real Developer ID is configured
