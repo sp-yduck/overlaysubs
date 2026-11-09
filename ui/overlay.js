@@ -11,18 +11,22 @@ const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<"
 const hasWords = (s) => /[\p{L}\p{N}]/u.test(s || "");
 const t = (k) => (I18N[uiLang] || I18N.en)[k] || k;
 const linesEl = document.getElementById("lines");
-// Wheel movement that steps one caption line. A mouse notch is usually 100 or 120px, while a
-// trackpad sends many small deltas, so they accumulate until this much has been scrolled.
-const WHEEL_STEP = 40;
+// Wheel delta treated as one mouse-wheel notch (Chromium and WebView2 send about 100 px per notch).
+const WHEEL_NOTCH = 100;
+// How much of a caption line one notch moves. Half a line lets the reader stop between lines
+// instead of jumping a whole large caption per notch.
+const WHEEL_LINES = 0.5;
 // Whether the newest caption stays in view. It turns false when the reader scrolls up.
 let follow = true;
 // Captions kept on screen while the reader is scrolled up, so new ones do not push out the lines being read.
 let frozen = null;
 let shownIds = [];
 let lastHtml = "";
-let wheelDelta = 0;
 // When the subtitles were last emitted or updated, used to clear the overlay after a pause.
 let lastUpdate = 0;
+// The wheel moves by fractions of a pixel, but scrollTop rounds every assignment down; keep the
+// exact target so slow trackpad deltas are not lost, and drop it when something else moves the view.
+let wheelTarget = null;
 
 function apply(settings) {
   // A font change reflows the lines even when their text does not change, so remember the line
@@ -124,72 +128,58 @@ function restoreAnchor(anchor) {
   return true;
 }
 
-/**
- * Scroll positions that put each caption's bottom at the bottom of the overlay, plus the very top.
- * Stepping between them moves a whole line, so a wheel notch never leaves a caption cut in half.
- */
-function lineStops() {
-  const max = linesEl.scrollHeight - linesEl.clientHeight;
-  if (max <= 0) return [];
-  const pad = parseFloat(getComputedStyle(linesEl).paddingBottom) || 0;
-  const view = linesEl.getBoundingClientRect();
-  const stops = [0, max];
-  for (const el of linesEl.children) {
-    const rect = el.getBoundingClientRect();
-    stops.push(Math.min(max, Math.max(0, Math.round(linesEl.scrollTop + rect.bottom - view.bottom + pad))));
-  }
-  return [...new Set(stops)].sort((a, b) => a - b);
+/** Average height of one caption line in the current view, so a notch can move half a line of it. */
+function captionLineHeight() {
+  const caps = linesEl.children;
+  const gap = parseFloat(getComputedStyle(linesEl).rowGap) || 0;
+  if (!caps.length) return cfg.fontSize * 1.3 + gap;
+  let total = 0;
+  for (const el of caps) total += el.offsetHeight;
+  return total / caps.length + gap;
 }
 
-/** Index of the stop closest to the current scroll position. */
-function nearestStop(stops) {
-  let best = 0;
-  for (let i = 1; i < stops.length; i++)
-    if (Math.abs(stops[i] - linesEl.scrollTop) < Math.abs(stops[best] - linesEl.scrollTop)) best = i;
-  return best;
-}
-
-/**
- * Vertical scrolling for lines taller than the overlay: one caption line per wheel notch. The
- * newest captions stay at the bottom by default; scrolling up freezes the lines being read and
- * scrolling back down to the bottom resumes the live view.
- */
-window.addEventListener(
-  "wheel",
-  (e) => {
-    const stops = lineStops();
-    if (stops.length < 2) return;
-    e.preventDefault();
-    const delta = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
-    if (Math.sign(delta) !== Math.sign(wheelDelta)) wheelDelta = 0;
-    wheelDelta += delta;
-    if (Math.abs(wheelDelta) < WHEEL_STEP) return;
-    const dir = wheelDelta > 0 ? 1 : -1;
-    wheelDelta = 0;
-    const next = nearestStop(stops) + dir;
-    if (next < 0 || next >= stops.length) return;
-    linesEl.scrollTop = stops[next];
-    follow = next === stops.length - 1;
-    if (follow) unfreeze();
-    else if (!preview && !frozen && shownIds.length) {
-      // Freeze the lines being read, so new captions do not push them out.
-      frozen = [...shownIds];
-    }
-  },
-  { passive: false },
-);
-
-/**
- * The scrollbar can also move the view (drag, track click or keyboard). Keep the live/frozen
- * state in step with where it was left, so new captions do not yank the view back to the bottom.
- */
-linesEl.addEventListener("scroll", () => {
-  if (linesEl.scrollHeight - linesEl.scrollTop - linesEl.clientHeight > 1) {
+/** Keeps the live view in step with where the view is: frozen while scrolled up, live at the bottom. */
+function syncFollow() {
+  if (linesEl.scrollHeight - linesEl.scrollTop - linesEl.clientHeight > 0.5) {
     if (follow) {
       follow = false;
       if (!preview && !frozen && shownIds.length) frozen = [...shownIds];
     }
-  } else if (!follow || frozen) unfreeze();
+  } else if (!follow || frozen) {
+    unfreeze();
+  }
+}
+
+/**
+ * Vertical scrolling for lines taller than the overlay. One wheel notch moves half a caption line,
+ * so large captions do not jump a whole screen at a time; the scrollbar on the right shows the
+ * position and can set it too.
+ */
+window.addEventListener(
+  "wheel",
+  (e) => {
+    const max = linesEl.scrollHeight - linesEl.clientHeight;
+    if (max <= 0) return;
+    e.preventDefault();
+    const delta = e.deltaMode === 1 ? e.deltaY * WHEEL_NOTCH : e.deltaY;
+    const step = (delta / WHEEL_NOTCH) * WHEEL_LINES * captionLineHeight();
+    wheelTarget = Math.max(0, Math.min(max, (wheelTarget ?? linesEl.scrollTop) + step));
+    // Reach the ends exactly even though scrollTop itself is rounded down.
+    if (max > 0.5) {
+      if (wheelTarget > max - 0.5) wheelTarget = max;
+      else if (wheelTarget < 0.5) wheelTarget = 0;
+    }
+    linesEl.scrollTop = wheelTarget;
+    syncFollow();
+  },
+  { passive: false },
+);
+
+// The scrollbar can also move the view (drag, track click or keyboard); keep the state in step with it.
+linesEl.addEventListener("scroll", () => {
+  // A scroll from elsewhere (scrollbar, re-render, anchor restore) wins over the pending wheel target.
+  if (wheelTarget != null && Math.abs(linesEl.scrollTop - wheelTarget) > 1) wheelTarget = null;
+  syncFollow();
 });
 
 /**
@@ -216,6 +206,7 @@ listen("overlay-hidden", () => {
   lastUpdate = 0;
   follow = true;
   frozen = null;
+  wheelTarget = null;
   draw();
 });
 // The settings window turns the preview on while its appearance page is open and translation is stopped.
@@ -223,6 +214,7 @@ listen("overlay-preview", (e) => {
   preview = !!e.payload;
   follow = true;
   frozen = null;
+  wheelTarget = null;
   showGrip();
   draw();
 });
