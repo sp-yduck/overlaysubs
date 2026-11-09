@@ -6,7 +6,7 @@ let snap, page, progress = {}, benchMsg = "", hist = [], termsLang, agreed = fal
 let updateInfo = null, updateChecked = false;
 const busy = new Set();
 const $ = (s) => document.querySelector(s);
-const t = (k) => (I18N[snap?.settings.ui_lang] || I18N.ja)[k] || k;
+const t = (k) => (I18N[snap?.settings.ui_lang] || I18N.en)[k] || k;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 /** Backend errors may be codes such as E_MACOS_PERMISSION or E_MACOS_AUDIO|detail; localize known codes and keep unknown ones verbatim. */
 function errText(e) {
@@ -99,7 +99,7 @@ function termsView() {
     <h2>${t("terms_title")}</h2>
     <p>${t("terms_intro")}</p>
     <p class="muted">${t("about_plamo_license")}</p>
-    <div class="seg">${btn("terms-ja", "日本語", { cls: termsLang === "ja" ? "on" : "" })}${btn("terms-en", "English", { cls: termsLang === "en" ? "on" : "" })}</div>
+    <div class="seg">${btn("terms-en", "English", { cls: termsLang === "en" ? "on" : "" })}${btn("terms-ja", "日本語", { cls: termsLang === "ja" ? "on" : "" })}</div>
     <pre class="license" id="terms"></pre>
     <label class="chk"><input type="checkbox" id="agree" ${agreed ? "checked" : ""}> ${t("terms_agree")}</label>
     ${btn("accept", t("accept"), { cls: "primary big", disabled: !agreed })}
@@ -128,7 +128,7 @@ function modelsPage() {
   const total = missing.reduce((a, id) => a + model(id).size, 0);
   const cached = snap.hardware;
   const hw = cached?.hardware;
-  const checked = cached?.detected_at > 0 ? `${t("last_checked")} ${new Date(cached.detected_at * 1000).toLocaleDateString(s.ui_lang)} · ` : "";
+  const checked = cached?.detected_at > 0 ? `${t("last_checked")} ${new Date(cached.detected_at * 1000).toLocaleDateString(s.ui_lang || "en")} · ` : "";
   const step = (n, done, locked, title, body) =>
     `<div class="step ${done ? "done" : ""} ${locked ? "locked" : ""}"><div class="num">${done ? "✓" : n}</div><div class="body"><h3>${esc(title)}</h3>${body}</div></div>`;
   return `<h2>${t("models")}</h2><p class="muted">${t("models_intro")}</p>
@@ -170,7 +170,7 @@ function homePage() {
     ${select(t("form"), "session.form", opts([["", t("form_default")], ["plain", t("plain")], ["polite", t("polite")]], s.session.form), "nullable")}
     ${field(t("context"), "session.use_context", "check")}
     ${field(t("topic"), "session.topic", "text", `placeholder="${esc(t("topic_ph"))}"`)}
-    <label class="f top"><span>${t("glossary")}</span><textarea data-k="session.glossary" data-t="glossary" placeholder="OpenAI=オープンAI">${esc(glossary)}</textarea></label>
+    <label class="f top"><span>${t("glossary")}</span><textarea data-k="session.glossary" data-t="glossary" placeholder="source=target">${esc(glossary)}</textarea></label>
   </details>
   ${card(t("recent"), `<div class="hist" data-hist="6"></div>`)}`;
 }
@@ -212,7 +212,7 @@ function aboutPage() {
   return `<h2>${t("about")}</h2>
   ${card("", `<p>OverlaySubs · MIT License. Translation: <b>Built with PLaMo</b> (PLaMo 3 Translate, Preferred Networks). Speech: whisper.cpp. VAD: Silero.</p>
     <p class="muted">${t("about_plamo_license")}</p>`)}
-  ${card(t("terms_title"), `<div class="seg">${btn("terms-ja", "日本語", { cls: termsLang === "ja" ? "on" : "" })}${btn("terms-en", "English", { cls: termsLang === "en" ? "on" : "" })}</div>
+  ${card(t("terms_title"), `<div class="seg">${btn("terms-en", "English", { cls: termsLang === "en" ? "on" : "" })}${btn("terms-ja", "日本語", { cls: termsLang === "ja" ? "on" : "" })}</div>
     <pre class="license" id="terms"></pre>`)}`;
 }
 
@@ -235,6 +235,7 @@ const PAGES = { home: homePage, models: modelsPage, overlay: overlayPage, histor
 
 function render() {
   const s = snap.settings;
+  document.documentElement.lang = s.ui_lang || "en";
   // The terms exist only in Japanese and English.
   termsLang ??= s.ui_lang === "ja" ? "ja" : "en";
   if (!snap.terms_accepted) {
@@ -255,7 +256,7 @@ function render() {
     <button id="overlay-toggle" class="ovtoggle${snap.overlay_visible ? " on" : ""}" role="switch" aria-checked="${snap.overlay_visible ? "true" : "false"}" title="${esc(snap.overlay_visible ? t("hide_overlay") : t("show_overlay"))}"><span class="lbl">${t("overlay_toggle")}</span><span class="track"><span class="knob"></span></span></button>
     ${btn("toggle", snap.running ? t("stop") : t("start"), { cls: `start ${snap.running ? "running" : "primary"}`, disabled: !ready })}
     <p class="hint">${snap.running ? `<span class="dot live"></span>${t("live")}` : ready ? `${t("hotkey")}: <code>${esc(s.hotkey)}</code>` : t("need_setup")}</p>
-    <select data-k="ui_lang" data-t="str" aria-label="${t("ui_lang")}">${opts([["ja", "日本語"], ["en", "English"], ["zh-hant", "繁體中文"], ["zh-hans", "简体中文"]], s.ui_lang)}</select>
+    <select data-k="ui_lang" data-t="str" aria-label="${t("ui_lang")}">${opts([["en", "English"], ["ja", "日本語"], ["zh-hant", "繁體中文"], ["zh-hans", "简体中文"]], s.ui_lang)}</select>
   </aside>
   <section id="page" data-page="${page}">${updateBanner()}${PAGES[page]()}</section>`;
   $("#page").scrollTop = keep;
