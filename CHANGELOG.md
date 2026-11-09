@@ -8,6 +8,10 @@ OverlaySubs の主な変更点を記録します。
 
 次のリリースに向けた変更点をここに追記します。
 
+## [0.3.0] - 2026-11-09
+
+macOS 版で「システム音声」を取り込めるようにしました。ScreenCaptureKit を使って Mac で再生中の音声を直接キャプチャするため、BlackHole などのループバック（仮想オーディオ）デバイスは不要です。初回は「画面収録とシステム音声録音」の許可とアプリの再起動が必要です。あわせて、macOS でマイク入力を使うとアプリがクラッシュする問題も修正しました。
+
 ### Added
 
 - macOS 13 以降で、Mac で再生中のシステム音声を ScreenCaptureKit 経由で直接取り込めるようにしました。すべてのアプリの音声をまとめてキャプチャします。Windows はこれまでどおり WASAPI loopback、マイク入力は Windows・macOS の両方で使えます。BlackHole などのループバック（仮想オーディオ）デバイスを用意する必要はありません。
@@ -98,7 +102,8 @@ v0.2.1 の Windows 版として配布していたインストーラーが古い�
 - プロジェクト名を OverlaySubs に変更しました（旧名: floatsubs。リポジトリ名・配布ファイル名は overlaysubs）。
 - 利用者向けのドキュメント（インストール・使い方・FAQ・ライセンス）を公式サイト（GitHub Pages）に移し、README は開発者向けに整理しました。
 
-[Unreleased]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/sp-yduck/overlaysubs/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/sp-yduck/overlaysubs/compare/v0.2.1...v0.2.2
