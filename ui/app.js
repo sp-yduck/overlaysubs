@@ -188,7 +188,7 @@ function overlayPage() {
     ${field(t("font_size"), "overlay.fontSize", "number", 'min="12" max="96"')}
     ${field(t("font"), "overlay.font")}
     ${field(t("bg"), "overlay.bg", "number", 'min="0" max="1" step="0.05"')}
-    ${field(t("lines"), "overlay.lines", "number", 'min="1" max="6"')}
+    ${field(t("lines"), "overlay.lines", "number", 'min="1" max="50"')}
     ${field(t("linger"), "overlay.linger", "number", 'min="1" max="60"')}`)}
   ${card("", field(t("hotkey"), "hotkey"))}`;
 }
