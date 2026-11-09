@@ -9,7 +9,13 @@
   /* faint tint so the overlay area can be found without hovering over it */
   body { background: rgba(128,128,128,0.12); border-radius: 8px; }
   body { display: flex; flex-direction: column; justify-content: flex-end; font-family: var(--font); cursor: default; user-select: none; }
-  #lines { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; }
+  /* Taller than the overlay: the lines scroll instead of being clipped at the top. The thin,
+     translucent scrollbar shows how much of the caption stack is above or below the view. */
+  #lines { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; max-height: 100%; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.5) transparent; }
+  #lines::-webkit-scrollbar { width: 8px; }
+  #lines::-webkit-scrollbar-track { background: transparent; }
+  #lines::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.5); border-radius: 4px; }
+  #lines::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.75); }
   .cap { align-self: center; max-width: 100%; text-align: center; padding: 4px 14px; border-radius: 8px; background: rgba(0,0,0,var(--bg)); color: #fff; font-size: var(--size); line-height: 1.3; text-shadow: 0 1px 3px #000; }
   .cap .src { display: block; font-size: 0.6em; color: #cfd6e2; }
   .cap.partial .tr, .cap.streaming .tr { opacity: 0.6; }
