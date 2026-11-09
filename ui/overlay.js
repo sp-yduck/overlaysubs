@@ -20,7 +20,6 @@ function apply(settings) {
   r.setProperty("--size", cfg.fontSize + "px");
   r.setProperty("--font", cfg.font);
   r.setProperty("--bg", cfg.bg);
-  document.getElementById("credit").hidden = !cfg.showCredit;
   invoke("set_click_through", { on: !!cfg.clickThrough }).catch(() => {});
   draw();
 }

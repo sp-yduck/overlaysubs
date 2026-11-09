@@ -118,7 +118,7 @@ You can also `cargo install tauri-cli --version "^2" --locked` and use `cargo ta
 
 - `ui/i18n.js` contains English (`en`) and Japanese (`ja`). When you add or change UI text, update **both**.
 - When you add a setting, update the matching page in `ui/app.js` and, if needed, `Settings` in `src-tauri/src/main.rs`.
-- Do not remove the terms of use or the link to the PLaMo Community License; they have licensing significance. Keep the overlay credit (`Built with PLaMo`) as the default: the revised license does not require it for published subtitles, but it is how the project credits PFN.
+- Do not remove the terms of use or the link to the PLaMo Community License; they have licensing significance. The overlay itself no longer shows a credit; the project credits PFN as "Built with PLaMo" on the About screen, in the README and on the site, so keep those mentions.
 
 ## Commit messages
 
