@@ -16,7 +16,7 @@ OverlaySubs の主な変更点を記録します。
 
 ### Changed
 
-- macOS のソースビルドに Swift ツールチェーンが必要になりました。ScreenCaptureKit の Rust バインディングがビルド時に小さな Swift ブリッジをコンパイルするため、Xcode、または macOS 13 以降の SDK を含む Command Line Tools が必要です。リリース CI は `macos-15` ランナーでビルドするため影響はありません。
+- macOS のソースビルドには Xcode 26（macOS 26 SDK）が必要になりました。ScreenCaptureKit の Rust バインディングがビルド時に小さな Swift ブリッジをコンパイルし、その依存クレート（apple-metal）が macOS 26 SDK の Metal API を参照するためです。リリース CI は `macos-15` ランナー上の Xcode 26 を選択してビルドします。
 
 ### Fixed
 

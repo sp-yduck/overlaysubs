@@ -109,7 +109,7 @@ The tier is decided when you run "Check this PC" in first-run setup, and the mod
 
 ## Build
 
-Prerequisites: Rust stable (edition 2021). On Windows, MSVC + Windows SDK, CMake, LLVM / libclang (for bindgen), the Vulkan SDK, and WebView2. On macOS, a Swift toolchain: Xcode, or Xcode Command Line Tools with the macOS 13+ SDK. The ScreenCaptureKit bindings compile a small Swift bridge at build time, so source builds need Swift. Release CI builds on the `macos-15` runner and is unaffected. Node.js is only needed to run the Tauri CLI through `npx` (not for the app itself).
+Prerequisites: Rust stable (edition 2021). On Windows, MSVC + Windows SDK, CMake, LLVM / libclang (for bindgen), the Vulkan SDK, and WebView2. On macOS, Xcode 26 or Command Line Tools with the macOS 26 SDK: the ScreenCaptureKit bindings compile a small Swift bridge at build time, and the Metal dependency they link needs the macOS 26 SDK. Source builds need a Swift toolchain. Release CI selects the preinstalled Xcode 26 on the `macos-15` runner. Node.js is only needed to run the Tauri CLI through `npx` (not for the app itself).
 
 ```bash
 # Windows (Vulkan, same as the official build)

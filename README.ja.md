@@ -109,7 +109,7 @@ WASAPI loopback（Windows）/ ScreenCaptureKit のシステム音声（macOS）/
 
 ## ビルド
 
-必要なもの: Rust stable（edition 2021）。Windows は MSVC + Windows SDK、CMake、LLVM / libclang（bindgen 用）、Vulkan SDK、WebView2。macOS は Swift ツールチェーン（Xcode、または macOS 13 以降の SDK を含む Command Line Tools）が必要です。ScreenCaptureKit の Rust バインディングがビルド時に小さな Swift ブリッジをコンパイルするためです。リリース CI は `macos-15` ランナーでビルドするため影響はありません。Node.js は Tauri CLI を `npx` で動かすためだけに使います（アプリ本体には不要）。
+必要なもの: Rust stable（edition 2021）。Windows は MSVC + Windows SDK、CMake、LLVM / libclang（bindgen 用）、Vulkan SDK、WebView2。macOS は Xcode 26（または macOS 26 SDK を含む Command Line Tools）が必要です。ScreenCaptureKit の Rust バインディングがビルド時に小さな Swift ブリッジをコンパイルし、その依存クレート（apple-metal）が macOS 26 SDK の Metal API を参照するためです。リリース CI は `macos-15` ランナー上の Xcode 26 を選択してビルドします。Node.js は Tauri CLI を `npx` で動かすためだけに使います（アプリ本体には不要）。
 
 ```bash
 # Windows（Vulkan。公式ビルドと同じ）
