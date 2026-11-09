@@ -36,7 +36,7 @@ $ cargo test -p overlaysubs-core
 
 - [ ] No secrets (API keys, tokens, personal information, local absolute paths) are included
 - [ ] If I changed UI text, I updated both English (`en`) and Japanese (`ja`) in `ui/i18n.js`
-- [ ] If behaviour, installation steps, or requirements change, I updated README.md (English) / README.ja.md (Japanese) / docs/index.html / docs/en/index.html
+- [ ] If behaviour, installation steps, or requirements change, I updated README.md (English) / README.ja.md (Japanese) / docs/index.html / docs/ja/index.html
 - [ ] If I changed `models.json`, the pinned commit URLs, sizes, and SHA-256 values match the actual files (no `/resolve/main/`)
 - [ ] This does not affect licenses or the terms of use (`licenses/`, the link to the PLaMo 3 license, the `Built with PLaMo` credit, the consent flow). If it does, I explained why above
 - [ ] For large changes, I discussed the approach in an issue beforehand

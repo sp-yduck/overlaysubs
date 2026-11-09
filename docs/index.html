@@ -1,39 +1,44 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OverlaySubs — PC の音声をリアルタイムで翻訳する字幕オーバーレイ</title>
-<meta name="description" content="OverlaySubs は、PC で再生される音声をリアルタイムで文字起こし・翻訳し、字幕としてオーバーレイ表示する無料のデスクトップアプリです。API キー不要、データは端末内で処理。Windows 10/11 (x64) と macOS 13+ (Apple Silicon) に対応。ダウンロード・インストール・使い方・FAQ・アンインストール方法を掲載。GitHub アカウントは不要です。">
+<title>OverlaySubs — Real-time translated subtitles for any audio on your PC</title>
+<meta name="description" content="OverlaySubs is a free desktop app that transcribes and translates any audio playing on your PC in real time and shows it as a subtitle overlay. No API key, everything runs on your device. Windows 10/11 (x64) and macOS 13+ (Apple Silicon). Download, install, usage, FAQ and uninstall instructions. No GitHub account needed.">
 <meta name="color-scheme" content="light">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:url" content="https://sp-yduck.github.io/overlaysubs/">
+<meta property="og:title" content="OverlaySubs — Real-time translated subtitles for any audio on your PC">
+<meta property="og:description" content="A free desktop app that transcribes and translates any audio on your PC in real time and shows it as a subtitle overlay. No API key; everything runs on your device.">
+<meta property="og:image" content="https://sp-yduck.github.io/overlaysubs/images/overlay.jpg">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://sp-yduck.github.io/overlaysubs/">
-<link rel="alternate" hreflang="ja" href="https://sp-yduck.github.io/overlaysubs/">
-<link rel="alternate" hreflang="en" href="https://sp-yduck.github.io/overlaysubs/en/">
+<link rel="alternate" hreflang="ja" href="https://sp-yduck.github.io/overlaysubs/ja/">
+<link rel="alternate" hreflang="en" href="https://sp-yduck.github.io/overlaysubs/">
 <link rel="alternate" hreflang="x-default" href="https://sp-yduck.github.io/overlaysubs/">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<a class="skip" href="#download">ダウンロードへスキップ</a>
+<a class="skip" href="#download">Skip to download</a>
 
 <header class="dark">
   <div class="wrap">
     <div class="top">
-      <a class="brand" href="index.html" aria-label="OverlaySubs トップ">OverlaySubs</a>
-      <nav aria-label="ページ内メニュー">
+      <a class="brand" href="./" aria-label="OverlaySubs home">OverlaySubs</a>
+      <nav aria-label="On this page">
         <ul class="nav">
-          <li><a href="#download">ダウンロード</a></li>
-          <li><a href="#install">インストール</a></li>
-          <li><a href="#warning">警告が出たとき</a></li>
-          <li><a href="#usage">使い方</a></li>
-          <li><a href="#uninstall">アンインストール</a></li>
-          <li><a href="#requirements">動作環境</a></li>
-          <li><a href="#limits">現状の制限</a></li>
-          <li><a href="#license">ライセンス</a></li>
+          <li><a href="#download">Download</a></li>
+          <li><a href="#install">Install</a></li>
+          <li><a href="#warning">Warnings</a></li>
+          <li><a href="#usage">Usage</a></li>
+          <li><a href="#uninstall">Uninstall</a></li>
+          <li><a href="#requirements">Requirements</a></li>
+          <li><a href="#limits">Limitations</a></li>
+          <li><a href="#license">License</a></li>
           <li><a href="#faq">FAQ</a></li>
-          <li class="lang"><a href="en/" hreflang="en" lang="en">English</a></li>
+          <li class="lang"><a href="ja/" hreflang="ja" lang="ja">日本語</a></li>
         </ul>
       </nav>
     </div>
@@ -43,36 +48,36 @@
       <div class="win w2" aria-hidden="true"></div>
       <div class="win w3" aria-hidden="true"></div>
       <div class="win w4" aria-hidden="true"></div>
-      <h1><span class="src" lang="en">Everything playing on your PC, subtitled as it plays.</span><span class="seg">PC の音声を、</span><span class="seg">その場で字幕に。</span></h1>
+      <h1><span class="src" lang="ja">PC の音声を、その場で字幕に。</span><span class="seg">Everything playing on your PC,</span> <span class="seg">subtitled as it plays.</span></h1>
       <span class="plamo">Built with PLaMo</span>
     </div>
 
     <div class="hero-foot">
       <div>
         <p class="lead">
-          OverlaySubs（オーバーレイサブス）は、PC で再生されるあらゆる音声をリアルタイムで文字起こし・翻訳し、
-          最前面のオーバーレイに字幕として表示する無料のデスクトップアプリです。API キーは不要で、音声もテキストも端末の外に出ません。
+          OverlaySubs is a free desktop app that transcribes and translates any audio playing on your PC in real time
+          and shows it as subtitles in an always-on-top overlay. No API key is required, and neither audio nor text ever leaves your device.
         </p>
         <ul class="facts">
-          <li>API キー不要・無料</li>
-          <li>データは端末内で処理</li>
-          <li>テレメトリなし</li>
+          <li>Free, no API key</li>
+          <li>Runs on your device</li>
+          <li>No telemetry</li>
           <li>Windows 10/11 (x64)</li>
           <li>macOS 13+ (Apple Silicon)</li>
         </ul>
       </div>
       <div class="dl">
         <a class="btn" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe">
-          Windows 版をダウンロード
+          Download for Windows
           <small>overlaysubs-windows-x64-setup.exe</small>
         </a>
         <a class="btn alt" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg">
-          macOS 版をダウンロード
+          Download for macOS
           <small>overlaysubs-macos-arm64.dmg</small>
         </a>
         <p class="fine">
-          GitHub アカウントは不要です。ダウンロードして実行するだけ。ほかの形式は<a href="#download">下の一覧</a>から。
-          すべてのリリースは <a href="https://github.com/sp-yduck/overlaysubs/releases/latest">GitHub Releases</a> にあります。
+          No GitHub account needed. Just download and run. Other formats are in the <a href="#download">list below</a>.
+          All releases are on <a href="https://github.com/sp-yduck/overlaysubs/releases/latest">GitHub Releases</a>.
         </p>
       </div>
     </div>
@@ -82,51 +87,51 @@
 <main>
   <section id="download" aria-labelledby="download-h">
     <div class="wrap sec">
-      <h2 id="download-h">ダウンロード</h2>
+      <h2 id="download-h">Download</h2>
       <div class="sec-body">
         <p class="intro">
-          お使いの PC に合ったファイルを選んでください。<strong>GitHub のアカウントは不要です。</strong>
-          ボタンを押すと最新版のダウンロードがすぐに始まります。
+          Pick the file for your computer. <strong>You don't need a GitHub account.</strong>
+          The latest version starts downloading as soon as you click.
         </p>
         <ul class="releases">
           <li>
-            <div class="os">Windows 版（推奨）<span>Windows 10 / 11（64bit）</span></div>
+            <div class="os">Windows (recommended)<span>Windows 10 / 11 (64-bit)</span></div>
             <div>
-              <p>ダウンロードした <code>.exe</code> を実行するだけのインストーラです。通常はこちらを選んでください。</p>
+              <p>An installer: just run the downloaded <code>.exe</code>. Choose this one in most cases.</p>
               <p class="file">overlaysubs-windows-x64-setup.exe</p>
             </div>
-            <a class="btn solid" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe">ダウンロード（.exe）</a>
+            <a class="btn solid" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe">Download (.exe)</a>
           </li>
           <li>
-            <div class="os">macOS 版<span>macOS 13 Ventura 以降</span></div>
+            <div class="os">macOS<span>macOS 13 Ventura or later</span></div>
             <div>
-              <p>Apple Silicon（M1 / M2 / M3 / M4）用です。<code>.dmg</code> を開いてアプリケーションへドラッグします。Intel Mac 版はありません。</p>
+              <p>For Apple Silicon (M1 / M2 / M3 / M4). Open the <code>.dmg</code> and drag the app to Applications. There is no Intel Mac build.</p>
               <p class="file">overlaysubs-macos-arm64.dmg</p>
             </div>
-            <a class="btn solid" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg">ダウンロード（.dmg）</a>
+            <a class="btn solid" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg">Download (.dmg)</a>
           </li>
           <li>
-            <div class="os">Windows 版（MSI）<span>Windows 10 / 11（64bit）</span></div>
+            <div class="os">Windows (MSI)<span>Windows 10 / 11 (64-bit)</span></div>
             <div>
-              <p>MSI は管理者権限（全ユーザー向け）でインストールされます。社内配布などで MSI が必要な場合の代替形式です。通常は上の .exe を使ってください。</p>
+              <p>The MSI installs with administrator rights (for all users). It is an alternative for cases such as company-wide deployment that require MSI. Otherwise use the .exe above.</p>
               <p class="file">overlaysubs-windows-x64.msi</p>
             </div>
-            <a class="btn quiet" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64.msi">ダウンロード（.msi）</a>
+            <a class="btn quiet" href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64.msi">Download (.msi)</a>
           </li>
         </ul>
 
         <p class="muted">
-          チェックサム（SHA-256）: <a href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a>。
-          過去のバージョンを含むリリース一覧: <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a>
+          Checksums (SHA-256): <a href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a>.
+          All releases, including older versions: <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a>
         </p>
 
         <details class="sha">
-          <summary>SHA-256 を確認する（任意）</summary>
-          <p>ダウンロードしたファイルが壊れていないか確認できます。表示された値を
-            <a href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a> の値と比べてください。</p>
-          <p><strong>Windows（PowerShell）</strong></p>
+          <summary>Verify the SHA-256 (optional)</summary>
+          <p>This checks that the downloaded file is not corrupted. Compare the printed value with the one in
+            <a href="https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a>.</p>
+          <p><strong>Windows (PowerShell)</strong></p>
           <pre><code>Get-FileHash .\overlaysubs-windows-x64-setup.exe -Algorithm SHA256</code></pre>
-          <p><strong>macOS（ターミナル）</strong></p>
+          <p><strong>macOS (Terminal)</strong></p>
           <pre><code>shasum -a 256 overlaysubs-macos-arm64.dmg</code></pre>
         </details>
       </div>
@@ -135,24 +140,24 @@
 
   <section id="install" aria-labelledby="install-h">
     <div class="wrap sec">
-      <h2 id="install-h">インストールは 3 ステップ</h2>
+      <h2 id="install-h">Install in 3 steps</h2>
       <div class="sec-body">
-        <p class="intro">初回だけモデルのダウンロードに数分〜十数分かかります。2 回目以降はすぐに翻訳を始められます。</p>
+        <p class="intro">The first run takes a few minutes to a quarter of an hour to download models. After that, you can start translating right away.</p>
         <ol class="cues">
           <li>
             <span class="tc" aria-hidden="true">00:00:00,000 --&gt; 00:01:00,000</span>
-            <strong>ダウンロード</strong>
-            <p>上の一覧から、お使いの PC に合ったファイルをクリックします。</p>
+            <strong>Download</strong>
+            <p>Click the file for your computer in the list above.</p>
           </li>
           <li>
             <span class="tc" aria-hidden="true">00:01:00,000 --&gt; 00:02:00,000</span>
-            <strong>実行</strong>
-            <p>Windows は <code>.exe</code> を実行、macOS は <code>.dmg</code> を開いて「OverlaySubs」を「アプリケーション」にドラッグします。</p>
+            <strong>Run</strong>
+            <p>On Windows, run the <code>.exe</code>. On macOS, open the <code>.dmg</code> and drag OverlaySubs to Applications.</p>
           </li>
           <li>
             <span class="tc" aria-hidden="true">00:02:00,000 --&gt; 00:15:00,000</span>
-            <strong>初回セットアップ</strong>
-            <p>起動して利用規約に同意 →「PC の性能を調べる」→「モデルをダウンロード」。終われば準備完了です。</p>
+            <strong>First-run setup</strong>
+            <p>Launch it and accept the terms → "Check this PC" → "Download models". When that finishes, you're ready.</p>
           </li>
         </ol>
       </div>
@@ -161,30 +166,30 @@
 
   <section id="warning" aria-labelledby="warning-h">
     <div class="wrap sec">
-      <h2 id="warning-h">警告が表示されたとき</h2>
+      <h2 id="warning-h">If Gatekeeper or SmartScreen warns you</h2>
       <div class="sec-body">
         <p class="intro">
-          配布しているビルドは<strong>未署名・未公証</strong>です（Windows はコード署名なし、macOS は Developer ID 署名なし・公証なしで <strong>ad-hoc 署名のみ</strong>）。
-          そのため初回起動時に OS が警告（Windows の <strong>SmartScreen / スマートスクリーン</strong>、macOS の <strong>Gatekeeper / ゲートキーパー</strong>）を出しますが、アプリ自体に問題があるという意味ではありません。
-          次の手順で起動できます。
+          The builds are <strong>not signed and not notarized</strong> (no Windows code-signing certificate; on macOS no Developer ID signature or notarization, <strong>ad-hoc signed only</strong>).
+          So the OS warns you on first launch (<strong>SmartScreen</strong> on Windows, <strong>Gatekeeper</strong> on macOS). That does not mean the app is unsafe.
+          Use the steps below to open it.
         </p>
         <div class="notice">
-          <p><strong>重要:</strong> Gatekeeper（ゲートキーパー）や SmartScreen（スマートスクリーン）を<strong>システム全体で無効にしないでください</strong>。このアプリだけを個別に許可する、下記の手順を使ってください。</p>
-          <p>macOS 15 以降では右クリック →「開く」の回避操作が廃止されているため、システム設定からの操作が必要です。環境によっては「開発元を確認できません」と表示されます。</p>
+          <p><strong>Important:</strong> <strong>Never disable Gatekeeper or SmartScreen system-wide.</strong> Use the steps below to allow just this app.</p>
+          <p>On macOS 15 and later, the right-click → "Open" workaround has been removed, so you need to go through System Settings. Depending on your setup, the message may read "unidentified developer".</p>
         </div>
         <div class="two">
           <div>
-            <h3>Windows: 「Windows によって PC が保護されました」</h3>
+            <h3>Windows: "Windows protected your PC"</h3>
             <ol class="plain">
-              <li>青い画面の <strong>「詳細情報」</strong> をクリックします。</li>
-              <li>表示された <strong>「実行」</strong> ボタンをクリックします。</li>
+              <li>On the blue screen, click <strong>"More info"</strong>.</li>
+              <li>Click the <strong>"Run anyway"</strong> button that appears.</li>
             </ol>
           </div>
           <div>
-            <h3>macOS: 「開発元を検証できません」/「…は開いていません」</h3>
+            <h3>macOS: "cannot be verified" / "was not opened"</h3>
             <ol class="plain">
-              <li>Finder で OverlaySubs を<strong>右クリック（または Control キーを押しながらクリック）</strong> → <strong>「開く」</strong> → 確認ダイアログで <strong>「開く」</strong>。</li>
-              <li>それでも開かない場合は、<strong>システム設定</strong> → <strong>プライバシーとセキュリティ</strong> を開き、下部に出る「OverlaySubs は…ブロックされました」の横の <strong>「このまま開く」</strong> をクリックします。</li>
+              <li>In Finder, <strong>right-click (or Control-click)</strong> OverlaySubs → <strong>"Open"</strong> → <strong>"Open"</strong> in the confirmation dialog.</li>
+              <li>If it still won't open, go to <strong>System Settings</strong> → <strong>Privacy &amp; Security</strong> and click <strong>"Open Anyway"</strong> next to the "OverlaySubs was blocked…" message near the bottom.</li>
             </ol>
           </div>
         </div>
@@ -194,63 +199,63 @@
 
   <section id="usage" aria-labelledby="usage-h">
     <div class="wrap sec">
-      <h2 id="usage-h">使い方</h2>
+      <h2 id="usage-h">Usage</h2>
       <div class="sec-body">
-        <p class="intro">初回セットアップが終われば、あとはホットキーで開始・停止するだけです。</p>
+        <p class="intro">Once first-run setup is done, you just start and stop it with a hotkey.</p>
 
         <div class="block">
-          <h3>初回セットアップ</h3>
-          <p>起動して利用規約に同意し、「モデルの準備」で「PC の性能を調べる」→「モデルをダウンロード」の順に進めます（数 GB・数分〜十数分）。任意で「速度を測る」を実行できます。</p>
+          <h3>First-run setup</h3>
+          <p>Launch the app, accept the terms, then in "Set up models" go through "Check this PC" → "Download models" (several GB, a few minutes to a quarter of an hour). Optionally run "Measure speed".</p>
           <figure>
-            <img src="images/ui-model-setup.png" width="1960" height="1840" loading="lazy" alt="「モデルの準備」画面。「PC の性能を調べる」「モデルをダウンロード」「速度を確認（任意）」の 3 段階が並び、Whisper・PLaMo・VAD の各モデルが取得済みと表示されている。">
-            <figcaption>モデルの準備。ハードウェアを判定し、ティアに合ったモデルを自動で選びます。</figcaption>
+            <img src="images/ui-model-setup.png" width="1960" height="1840" loading="lazy" alt="The Set up models screen. Three steps are listed: check this PC, download models, and measure speed (optional). The Whisper, PLaMo and VAD models are shown as downloaded.">
+            <figcaption>Set up models. It detects your hardware and picks models that fit your tier.</figcaption>
           </figure>
         </div>
 
         <div class="block">
-          <h3>開始と停止</h3>
-          <p><strong>Ctrl+Shift+T</strong>（macOS は <strong>Cmd+Shift+T</strong>）で翻訳を開始・停止します。ホットキーは設定画面で変更できます。</p>
-          <p>オーバーレイはアプリの起動直後は表示されません。翻訳を開始すると表示され、停止すると最後の字幕を少し表示したあとで自動的に隠れます。トレイメニューの「Show subtitles」または設定画面の翻訳開始ボタンの上にあるトグルから、翻訳していないときでも手動で表示・非表示を切り替えられます。</p>
-          <p>音声入力は「システム音声」で PC の再生音をそのまま取り込めます。Windows は WASAPI loopback、macOS 13 以降は ScreenCaptureKit で、すべてのアプリの音声をまとめてキャプチャします（BlackHole などの仮想オーディオデバイスは不要です）。初めて使うときは、システム設定 → プライバシーとセキュリティの「画面収録とシステム音声録音」（macOS 15 以降。macOS 13〜14 は「画面収録」）で OverlaySubs を許可し、アプリを再起動してください。マイク入力は Windows・macOS の両方で使えます。</p>
+          <h3>Start and stop</h3>
+          <p><strong>Ctrl+Shift+T</strong> (<strong>Cmd+Shift+T</strong> on macOS) starts and stops translation. You can change the hotkey in Settings.</p>
+          <p>The overlay is hidden right after launch. It appears when translation starts and hides automatically after translation stops, leaving the last subtitle on screen briefly. You can also show or hide it manually, even while not translating, from "Show subtitles" in the tray menu or from the switch above the Start button in Settings.</p>
+          <p>Audio input: "System audio" captures whatever your PC is playing. Windows uses WASAPI loopback; on macOS 13+ all apps' audio is captured together via ScreenCaptureKit (no virtual audio device such as BlackHole is needed). The first time, allow OverlaySubs under System Settings → Privacy &amp; Security → "Screen &amp; System Audio Recording" (macOS 15+) or "Screen Recording" (macOS 13–14), then restart the app. Microphone input works on both platforms.</p>
           <figure>
-            <img src="images/overlay.jpg" width="1920" height="630" loading="lazy" alt="字幕オーバーレイ。他のアプリの上に、英語の原文（小）と日本語の訳文（大）が 2 行で表示されている。右下に Built with PLaMo の表記。">
-            <figcaption>字幕オーバーレイ。他のアプリの上に重ねて表示されます（背景はイメージ）。</figcaption>
+            <img src="images/overlay.jpg" width="1920" height="630" loading="lazy" alt="The subtitle overlay. On top of other apps, the English source (small) and the Japanese translation (large) are shown on two lines, with Built with PLaMo in the bottom-right corner.">
+            <figcaption>The subtitle overlay, shown on top of other apps (background is illustrative).</figcaption>
           </figure>
         </div>
 
         <div class="block">
-          <h3>トレイ常駐と終了</h3>
-          <p>アプリの実行中は、タスクトレイ / メニューバーのアイコンから「Start / Stop」「Show subtitles」「Settings」「Quit」を選べます。設定画面を閉じるとアプリは終了します。</p>
+          <h3>Tray icon and quitting</h3>
+          <p>While the app runs, the system tray / menu bar icon offers "Start / Stop", "Show subtitles", "Settings" and "Quit". Closing the settings window quits the app.</p>
         </div>
 
         <div class="block">
-          <h3>設定できること</h3>
+          <h3>What you can configure</h3>
           <ul class="settings">
-            <li><strong>音声入力</strong>: システム音声 / マイクと、使用するデバイス</li>
-            <li><strong>言語</strong>: 話されている言語（自動判定または固定）、訳す言語、「すでにその言語のとき」の言語</li>
-            <li><strong>翻訳の調整</strong>: 日本語の文体（敬体 / 常体）、用語集（1行に「原語=訳語」）、話題（翻訳のヒント）、直前の発話を文脈として使う</li>
-            <li><strong>字幕の表示</strong>: 原文も表示、文字サイズ、フォント、背景の不透明度、表示行数、表示時間、「Built with PLaMo」表記の有無。翻訳を停止中にこの画面を開くと、オーバーレイを表示してサンプル字幕を出し、変更をその場で確認できます</li>
-            <li><strong>クリック透過</strong>: 既定はオフ。オンにするとマウス操作が下の画面に通ります（オンの間はオーバーレイ自体は操作できません）</li>
-            <li><strong>履歴</strong>: 最近の字幕をテキスト / SRT で保存</li>
-            <li><strong>表示言語</strong>: 日本語 / English</li>
-            <li><strong>詳細設定</strong>: 翻訳モデルの GPU レイヤー数（0 で CPU）、音声認識に GPU を使うか、モデルの保存先</li>
+            <li><strong>Audio input</strong>: system audio / microphone, and which device</li>
+            <li><strong>Languages</strong>: the spoken language (auto-detect or fixed), the target language, and the language to use when the speech is already in the target language</li>
+            <li><strong>Translation tuning</strong>: Japanese politeness (polite / plain), glossary (one "source=translation" per line), topic (a hint for the translator), use the previous utterance as context</li>
+            <li><strong>Subtitles</strong>: show the source text, font size, font, background opacity, number of lines, display duration, whether to show "Built with PLaMo". While translation is stopped, opening this page shows the overlay with a sample caption so you can check your changes live</li>
+            <li><strong>Click-through</strong>: off by default. When on, mouse input passes to the window underneath (you can't interact with the overlay itself while it's on)</li>
+            <li><strong>History</strong>: save recent subtitles as text / SRT</li>
+            <li><strong>Interface language</strong>: English / Japanese / Chinese (Traditional and Simplified)</li>
+            <li><strong>Advanced</strong>: GPU layers for the translation model (0 = CPU), whether speech recognition uses the GPU, model folder</li>
           </ul>
           <figure>
-            <img src="images/ui-settings.png" width="1960" height="1508" loading="lazy" alt="設定画面の「翻訳」タブ。音声入力、言語、翻訳の調整の各設定と、最近の字幕（原文と訳文）の一覧が表示されている。">
-            <figcaption>設定画面（翻訳）。言語・翻訳の調整・最近の字幕。</figcaption>
+            <img src="images/ui-settings.png" width="1960" height="1508" loading="lazy" alt="The Translation tab of Settings, showing audio input, language and translation tuning settings, and a list of recent subtitles (source and translation).">
+            <figcaption>Settings (Translation): languages, translation tuning and recent subtitles.</figcaption>
           </figure>
         </div>
 
         <div class="block">
-          <h3>新しいバージョンのお知らせ</h3>
-          <p>起動時に新しいバージョンがあるかを一度だけ確認し、あれば設定画面の上部に「新しいバージョンがあります」という通知を表示します。「リリースページを開く」でリリースページを開くか、「後で」で閉じられます（閉じると次回起動時までは再表示されません）。ダウンロード・インストールは自動では行いません。</p>
+          <h3>New version notifications</h3>
+          <p>At startup the app checks once for a newer version and, if there is one, shows an "Update available" banner at the top of Settings with the latest and current version. Click "Open release page" to open the release page, or "Later" to dismiss it (it stays hidden until the next launch). Nothing is downloaded or installed automatically.</p>
         </div>
 
         <div class="block">
           <p>
-            音声・文字起こし・翻訳データは外部に送信されません。テレメトリはありません。
-            通信はモデルのダウンロードと、起動時に新しいリリースがあるかを確認する GitHub API への匿名のリクエスト 1 回だけです（アカウント・トークン・個人データは送信しません。失敗しても何も起きません）。
-            モデルをダウンロードした後はオフラインでも動作します。
+            Audio, transcripts and translations are never sent anywhere. There is no telemetry.
+            The only network access is the model download and one anonymous GitHub API request at startup to check for a newer release (it sends no account, token or personal data; if it fails, nothing happens).
+            Once the models are downloaded, the app works offline.
           </p>
         </div>
       </div>
@@ -259,27 +264,27 @@
 
   <section id="uninstall" aria-labelledby="uninstall-h">
     <div class="wrap sec">
-      <h2 id="uninstall-h">アンインストール</h2>
+      <h2 id="uninstall-h">Uninstall</h2>
       <div class="sec-body">
-        <p class="intro">アプリ本体を削除しても、ダウンロード済みのモデルと設定はフォルダに残ります。</p>
+        <p class="intro">Removing the app leaves downloaded models and settings in a folder.</p>
         <div class="two">
           <div>
             <h3>Windows</h3>
-            <p>設定 → アプリ → インストールされているアプリ →「OverlaySubs」→ アンインストール。</p>
+            <p>Settings → Apps → Installed apps → "OverlaySubs" → Uninstall.</p>
           </div>
           <div>
             <h3>macOS</h3>
-            <p>「アプリケーション」フォルダの「OverlaySubs」をゴミ箱に入れます。</p>
+            <p>Move "OverlaySubs" from the Applications folder to the Trash.</p>
           </div>
         </div>
 
         <div class="block" style="margin-top: 24px;">
-          <h3>残るデータと完全削除</h3>
+          <h3>Leftover data and full removal</h3>
           <div class="table-scroll">
             <table>
-              <caption>アンインストール後に残るフォルダ（アプリの識別子は io.github.overlaysubs）</caption>
+              <caption>Folder left after uninstalling (app identifier: io.github.overlaysubs)</caption>
               <thead>
-                <tr><th scope="col">OS</th><th scope="col">場所</th></tr>
+                <tr><th scope="col">OS</th><th scope="col">Location</th></tr>
               </thead>
               <tbody>
                 <tr><th scope="row">Windows</th><td><code>%APPDATA%\io.github.overlaysubs</code></td></tr>
@@ -288,8 +293,8 @@
             </table>
           </div>
           <p>
-            このフォルダには、モデル（<code>models</code>）、設定（<code>settings.json</code>）、利用規約への同意（<code>terms-accepted</code>）、検出したハードウェア（<code>hardware.json</code>）が保存されます。
-            再インストール時にモデルを再ダウンロードしたくない場合は残しておき、完全に削除する場合はフォルダごと削除してください。
+            This folder holds the models (<code>models</code>), settings (<code>settings.json</code>), your acceptance of the terms (<code>terms-accepted</code>) and the detected hardware (<code>hardware.json</code>).
+            Keep it if you don't want to download the models again when reinstalling; delete the whole folder to remove everything.
           </p>
         </div>
       </div>
@@ -298,55 +303,55 @@
 
   <section id="requirements" aria-labelledby="requirements-h">
     <div class="wrap sec">
-      <h2 id="requirements-h">動作環境</h2>
+      <h2 id="requirements-h">Requirements</h2>
       <div class="sec-body">
-        <p class="intro">Windows x64 と macOS Apple Silicon のみに対応しています。32bit Windows、Windows on ARM、Intel Mac 版はありません。</p>
+        <p class="intro">Only Windows x64 and macOS on Apple Silicon are supported. There are no builds for 32-bit Windows, Windows on ARM or Intel Macs.</p>
         <div class="table-scroll">
           <table>
-            <caption>対応 OS とハードウェア</caption>
+            <caption>Supported OS and hardware</caption>
             <thead>
-              <tr><th scope="col">項目</th><th scope="col">Windows</th><th scope="col">macOS</th></tr>
+              <tr><th scope="col">Item</th><th scope="col">Windows</th><th scope="col">macOS</th></tr>
             </thead>
             <tbody>
-              <tr><th scope="row">OS</th><td>Windows 10 / 11（64bit）</td><td>macOS 13 Ventura 以降</td></tr>
-              <tr><th scope="row">CPU</th><td>x64（Intel / AMD）</td><td>Apple Silicon（M1 以降）</td></tr>
-              <tr><th scope="row">GPU</th><td>Vulkan 対応 GPU + 最新の GPU ドライバ</td><td>内蔵 GPU（Metal）</td></tr>
-              <tr><th scope="row">メモリ</th><td>8GB 以上</td><td>8GB 以上</td></tr>
-              <tr><th scope="row">空き容量</th><td>初回のモデルダウンロード分（下表）</td><td>同左</td></tr>
+              <tr><th scope="row">OS</th><td>Windows 10 / 11 (64-bit)</td><td>macOS 13 Ventura or later</td></tr>
+              <tr><th scope="row">CPU</th><td>x64 (Intel / AMD)</td><td>Apple Silicon (M1 or later)</td></tr>
+              <tr><th scope="row">GPU</th><td>Vulkan-capable GPU + latest GPU driver</td><td>Integrated GPU (Metal)</td></tr>
+              <tr><th scope="row">Memory</th><td>8 GB or more</td><td>8 GB or more</td></tr>
+              <tr><th scope="row">Free space</th><td>Enough for the first-run model download (table below)</td><td>Same</td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          Windows 版は <strong>Vulkan 対応の GPU と最新ドライバ</strong>が必要です。ドライバが古いと GPU が使われず、実用的な速度が出ません。
-          配布は <strong>GitHub Releases のみ</strong>です。自動アップデート機能はありません（起動時に新しいリリースがあるかを確認して通知しますが、ダウンロード・インストールは自動では行いません）。
+          The Windows build needs a <strong>Vulkan-capable GPU and an up-to-date driver</strong>. With an old driver the GPU isn't used and the app is too slow to be practical.
+          It is distributed <strong>only via GitHub Releases</strong>. There is no auto-update: the app checks at startup whether a newer release exists and notifies you, but never downloads or installs it automatically.
         </p>
 
         <div class="block">
-          <h3 id="models-h">初回起動時のモデルダウンロード（数 GB）</h3>
+          <h3 id="models-h">Model download on first launch (several GB)</h3>
           <p>
-            初回セットアップで、PC の性能に合わせたモデルを Hugging Face から自動でダウンロードします。
-            <strong>Hugging Face のアカウントもトークンも不要です。</strong> 中断しても続きから再開でき、SHA-256 で検証されます。
-            モデルをダウンロードした後はオフラインでも動作します。
+            First-run setup downloads models that fit your PC from Hugging Face automatically.
+            <strong>No Hugging Face account or token is needed.</strong> Interrupted downloads resume, and files are verified with SHA-256.
+            Once the models are downloaded, the app works offline.
           </p>
           <div class="table-scroll">
             <table>
-              <caption>ティアごとのダウンロード量と空き容量の目安</caption>
+              <caption>Download size and recommended free space per tier</caption>
               <thead>
-                <tr><th scope="col">ティア</th><th scope="col">自動で選ばれる構成</th><th scope="col">ダウンロード量</th><th scope="col">空き容量の目安</th></tr>
+                <tr><th scope="col">Tier</th><th scope="col">Models picked automatically</th><th scope="col">Download</th><th scope="col">Free space</th></tr>
               </thead>
               <tbody>
-                <tr><th scope="row">High</th><td>Whisper large-v3-turbo + PLaMo 3 Translate 8B</td><td class="num">約 6.9GB</td><td class="num">10GB 以上</td></tr>
-                <tr><th scope="row">Mid</th><td>Whisper large-v3-turbo (Q5_0) + PLaMo 3 Translate 2B</td><td class="num">約 2.4GB</td><td class="num">5GB 以上</td></tr>
-                <tr><th scope="row">Low</th><td>Whisper small + PLaMo 3 Translate 2B</td><td class="num">約 2.3GB</td><td class="num">5GB 以上</td></tr>
-                <tr><th scope="row">CPU</th><td>Whisper base + PLaMo 3 Translate 0.8B</td><td class="num">約 0.7GB</td><td class="num">2GB 以上</td></tr>
+                <tr><th scope="row">High</th><td>Whisper large-v3-turbo + PLaMo 3 Translate 8B</td><td class="num">~6.9 GB</td><td class="num">10 GB+</td></tr>
+                <tr><th scope="row">Mid</th><td>Whisper large-v3-turbo (Q5_0) + PLaMo 3 Translate 2B</td><td class="num">~2.4 GB</td><td class="num">5 GB+</td></tr>
+                <tr><th scope="row">Low</th><td>Whisper small + PLaMo 3 Translate 2B</td><td class="num">~2.3 GB</td><td class="num">5 GB+</td></tr>
+                <tr><th scope="row">CPU</th><td>Whisper base + PLaMo 3 Translate 0.8B</td><td class="num">~0.7 GB</td><td class="num">2 GB+</td></tr>
               </tbody>
             </table>
           </div>
           <p class="muted">
-            数値は <code>models.json</code> の宣言サイズの合計（Silero VAD の約 0.9MB を含む）です。初回セットアップで「PC の性能を調べる」を実行すると、ハードウェアからティアが決まりモデルが自動選択されます。設定画面では使用するモデル（Whisper / PLaMo）を個別に変更できます。検出結果は設定フォルダの <code>hardware.json</code> に保存され、次回起動時は再調査せずに表示されます。ハードウェアを変更したときは「もう一度調べる」を実行してください。
+            Sizes are the sum of the sizes declared in <code>models.json</code> (including Silero VAD, about 0.9 MB). Running "Check this PC" during first-run setup determines your tier from the hardware and picks the models. You can change the Whisper / PLaMo models individually in Settings. The result is cached in <code>hardware.json</code> in the config folder, so later launches show it without probing again; run "Check again" after changing the hardware.
           </p>
           <p class="muted">
-            ティアの目安: High は VRAM 12GB 以上、Mid は VRAM 8GB、Low は VRAM 4〜6GB、CPU は GPU がない場合または VRAM 4GB 未満です（Apple Silicon はメモリ量で判定）。
+            Tier guide: High is 12 GB+ VRAM, Mid is 8 GB VRAM, Low is 4–6 GB VRAM, and CPU is for no GPU or under 4 GB VRAM (Apple Silicon is judged by memory size).
           </p>
         </div>
       </div>
@@ -355,16 +360,16 @@
 
   <section id="limits" aria-labelledby="limits-h">
     <div class="wrap sec">
-      <h2 id="limits-h">現状の制限</h2>
+      <h2 id="limits-h">Known limitations</h2>
       <div class="sec-body">
-        <p class="intro">現在のバージョンで分かっている制約です。今後のリリースで改善する可能性があります。</p>
+        <p class="intro">Known constraints of the current version. Future releases may improve them.</p>
         <ul class="plain">
-          <li>配布ビルドは<strong>未署名・未公証</strong>です（Windows はコード署名なし、macOS は Developer ID 署名なし・公証なしで <strong>ad-hoc 署名のみ</strong>）。SmartScreen / Gatekeeper の警告が出ます（<a href="#warning">警告が表示されたとき</a>）。</li>
-          <li><strong>Intel Mac 版はありません。</strong>macOS は Apple Silicon（M1 以降）かつ macOS 13 以降のみです。</li>
-          <li>Windows は <strong>Vulkan 対応 GPU と最新ドライバが必須</strong>です。対応していない環境では実用的な速度が出ません。</li>
-          <li>macOS のシステム音声は ScreenCaptureKit で取り込みます。初回は「画面収録とシステム音声録音」（macOS 15 以降。macOS 13〜14 は「画面収録」）の許可とアプリの再起動が必要です（<a href="#faq">FAQ</a>）。</li>
-          <li>特定のアプリだけをキャプチャする機能、システム音声とマイクを同時に処理する機能は未実装です。</li>
-          <li><strong>自動アップデートはありません。</strong>起動時に新しいリリースがあるかを確認して通知しますが、ダウンロードとインストールは自動では行いません。新しいバージョンは <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> から手動でダウンロードしてください（配布は GitHub Releases のみです）。</li>
+          <li>The builds are <strong>not signed and not notarized</strong> (no Windows code-signing certificate; on macOS no Developer ID signature or notarization, <strong>ad-hoc signed only</strong>). SmartScreen / Gatekeeper will warn you (see <a href="#warning">Warnings</a>).</li>
+          <li><strong>There is no Intel Mac build.</strong> macOS requires Apple Silicon (M1 or later) and macOS 13 or later.</li>
+          <li>Windows <strong>requires a Vulkan-capable GPU and an up-to-date driver</strong>. Without them the app is too slow to be practical.</li>
+          <li>On macOS, system audio is captured with ScreenCaptureKit. The first use requires the "Screen &amp; System Audio Recording" (macOS 15+) or "Screen Recording" (macOS 13–14) permission and an app restart (see <a href="#faq">FAQ</a>).</li>
+          <li>Capturing a single app only, or processing system audio and the microphone at the same time, is not implemented yet.</li>
+          <li><strong>There is no auto-update.</strong> The app checks for a newer release at startup and notifies you, but it never downloads or installs one. Download new versions manually from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> (the only distribution channel).</li>
         </ul>
       </div>
     </div>
@@ -372,24 +377,24 @@
 
   <section id="license" aria-labelledby="license-h">
     <div class="wrap sec">
-      <h2 id="license-h">ライセンスと利用規約</h2>
+      <h2 id="license-h">License and terms</h2>
       <div class="sec-body">
-        <p class="intro">アプリのコードは MIT ライセンスです。翻訳モデル PLaMo 3 Translate の利用条件は PLaMo 3 のライセンスに従います。</p>
+        <p class="intro">The app's code is MIT licensed. The PLaMo 3 Translate translation model is governed by the PLaMo 3 license.</p>
         <div class="two">
           <div>
-            <h3>アプリのコード</h3>
-            <p><strong>MIT ライセンス</strong>です。全文は <a href="https://github.com/sp-yduck/overlaysubs/blob/main/LICENSE">LICENSE</a> にあります。</p>
-            <p>同梱している whisper.cpp / llama.cpp / ggml などのサードパーティライセンスは
-              <a href="https://github.com/sp-yduck/overlaysubs/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にまとめています。
-              Whisper モデル（MIT）と Silero VAD（MIT）は、それぞれのライセンスに従います。</p>
+            <h3>App code</h3>
+            <p><strong>MIT License</strong>. The full text is in <a href="https://github.com/sp-yduck/overlaysubs/blob/main/LICENSE">LICENSE</a>.</p>
+            <p>Licenses for bundled third-party software such as whisper.cpp / llama.cpp / ggml are collected in
+              <a href="https://github.com/sp-yduck/overlaysubs/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.
+              The Whisper models (MIT) and Silero VAD (MIT) follow their own licenses.</p>
           </div>
           <div>
-            <h3>利用規約</h3>
-            <p>初回起動時に同意が必要です。全文は
-              <a href="https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt">OverlaySubs 利用規約</a>
-              （<a href="https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt">English</a>）にあり、アプリの「情報」からも参照できます。</p>
-            <p>翻訳モデル PLaMo 3 Translate の利用条件は
-              <a href="https://plamo.preferredai.jp/info/plamo-community-license-ja">PLaMo 3 のライセンス</a>（Preferred Networks）に従います。</p>
+            <h3>Terms of use</h3>
+            <p>You must accept them on first launch. The full text is in the
+              <a href="https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt">OverlaySubs terms of use</a>
+              (<a href="https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt">日本語</a>), and you can also view them from "About" in the app.</p>
+            <p>The PLaMo 3 Translate translation model is governed by the
+              <a href="https://plamo.preferredai.jp/info/plamo-community-license-en">PLaMo 3 license</a> (Preferred Networks).</p>
           </div>
         </div>
       </div>
@@ -398,83 +403,82 @@
 
   <section id="faq" aria-labelledby="faq-h">
     <div class="wrap sec">
-      <h2 id="faq-h">よくある質問</h2>
+      <h2 id="faq-h">FAQ</h2>
       <div class="sec-body faq">
         <details>
-          <summary>GitHub を使ったことがありません。それでも入れられますか？</summary>
-          <p>入れられます。このページのダウンロードボタンからファイルを保存して実行するだけで、アカウント登録も git も Rust も必要ありません。</p>
+          <summary>I've never used GitHub. Can I still install it?</summary>
+          <p>Yes. Just save the file from the download buttons on this page and run it. No account, git or Rust is needed.</p>
         </details>
         <details>
-          <summary>Windows で「Windows によって PC が保護されました」と出て実行できません。</summary>
-          <p>未署名のビルドのため表示されます。「詳細情報」→「実行」で起動できます（<a href="#warning">警告が表示されたとき</a>）。</p>
+          <summary>Windows says "Windows protected your PC" and won't run it.</summary>
+          <p>This appears because the build is unsigned. Click "More info" → "Run anyway" to start it (see <a href="#warning">Warnings</a>).</p>
         </details>
         <details>
-          <summary>macOS で「開発元を検証できません」と出て開けません。</summary>
-          <p>右クリック →「開く」を試してください。開けない場合は システム設定 → プライバシーとセキュリティ →「このまま開く」を使います（<a href="#warning">警告が表示されたとき</a>）。</p>
+          <summary>macOS says the app "cannot be verified" and won't open it.</summary>
+          <p>Try right-click → "Open". If that doesn't work, use System Settings → Privacy &amp; Security → "Open Anyway" (see <a href="#warning">Warnings</a>).</p>
         </details>
         <details>
-          <summary>起動したのに翻訳を開始できません。</summary>
-          <p>初回セットアップが完了していません。「モデルの準備」で「PC の性能を調べる」→「モデルをダウンロード」まで進めてください。ダウンロードが終わるまで開始ボタンは使えません。手順は<a href="#usage">使い方</a>を参照してください。</p>
+          <summary>The app launched but I can't start translating.</summary>
+          <p>First-run setup isn't finished. In "Set up models", go through "Check this PC" → "Download models". The start button stays disabled until the download completes. See <a href="#usage">Usage</a>.</p>
         </details>
         <details>
-          <summary>ホットキーが効きません。</summary>
-          <p>ほかのアプリが同じキーを使っている可能性があります。設定画面で既定の <code>Ctrl+Shift+T</code>（macOS は <code>Cmd+Shift+T</code>）を別の組み合わせに変更してください（<a href="#usage">使い方</a>）。</p>
+          <summary>The hotkey doesn't work.</summary>
+          <p>Another app may be using the same keys. Change the default <code>Ctrl+Shift+T</code> (<code>Cmd+Shift+T</code> on macOS) to another combination in Settings (see <a href="#usage">Usage</a>).</p>
         </details>
         <details>
-          <summary>GPU が使われていない / 動作が遅いです。</summary>
-          <p>Windows では Vulkan 対応の最新 GPU ドライバが必要です（<a href="#requirements">動作環境</a>）。それでも遅い場合は、設定画面で使用するモデル（Whisper / PLaMo）を軽いものに変更するか、「速度を測る」を実行して 1 段下げたモデルに切り替えてください。CPU 向けのモデルでも動作しますが遅くなります。</p>
+          <summary>The GPU isn't used / it's slow.</summary>
+          <p>Windows needs an up-to-date Vulkan-capable GPU driver (see <a href="#requirements">Requirements</a>). If it's still slow, switch to lighter Whisper / PLaMo models in Settings, or run "Measure speed" and drop one model size. The CPU models work too, but more slowly.</p>
         </details>
         <details>
-          <summary>macOS でシステム音声を取り込めません。</summary>
-          <p>macOS 13 以降は ScreenCaptureKit でシステム音声を取り込めます。最初にシステム設定 → プライバシーとセキュリティ →「画面収録とシステム音声録音」（macOS 15 以降。macOS 13〜14 は「画面収録」）で OverlaySubs をオンにし、OverlaySubs を再起動してください。オンのまま取り込めない場合は、アプリを再起動したかどうか、別の画面で許可を求められていないかを確認してください。許可しなかった場合や利用できない場合は、アプリにその旨の通知が表示されます。BlackHole などの仮想オーディオデバイスは不要です。</p>
+          <summary>I can't capture system audio on macOS.</summary>
+          <p>macOS 13+ can capture system audio with ScreenCaptureKit. First open System Settings → Privacy &amp; Security → "Screen &amp; System Audio Recording" (macOS 15+) or "Screen Recording" (macOS 13–14), turn on OverlaySubs, and restart the app. If it is already on but capture still fails, check that you restarted the app and that macOS didn't prompt you from another screen. If you denied the permission or it is unavailable, the app shows a notification saying so. No virtual audio device such as BlackHole is needed.</p>
         </details>
         <details>
-          <summary>オフラインでも使えますか？</summary>
-          <p>使えます。モデルのダウンロードが終わった後は、ネットワークがなくても文字起こし・翻訳が動作します。起動時のバージョン確認だけはネットワークを使いますが、確認できない場合は何も表示されず、アプリの動作に影響しません。音声・文字起こし・翻訳データは外部に送信されません。</p>
+          <summary>Does it work offline?</summary>
+          <p>Yes. Once the models are downloaded, transcription and translation work without a network. The startup version check does use the network, but if it can't reach GitHub nothing is shown and nothing else is affected. Audio, transcripts and translations are never sent anywhere.</p>
         </details>
         <details>
-          <summary>商用利用できますか？</summary>
-          <p>アプリのコードは MIT ライセンスです。翻訳モデル PLaMo 3 Translate の利用条件は<a href="https://plamo.preferredai.jp/info/plamo-community-license-ja">PLaMo 3 のライセンス</a>に従います。詳細は<a href="#license">ライセンスと利用規約</a>を参照してください。</p>
+          <summary>Can I use it commercially?</summary>
+          <p>The app's code is MIT licensed. The PLaMo 3 Translate translation model is governed by the <a href="https://plamo.preferredai.jp/info/plamo-community-license-en">PLaMo 3 license</a>. See <a href="#license">License and terms</a>.</p>
         </details>
         <details>
-          <summary>アンインストール方法を教えてください。</summary>
-          <p>Windows は 設定 → アプリ → インストールされているアプリ →「OverlaySubs」→ アンインストール。macOS は「アプリケーション」フォルダの OverlaySubs をゴミ箱に入れます。モデルと設定はフォルダに残るため、完全に削除する場合は手動で削除してください。詳しくは<a href="#uninstall">アンインストール</a>を参照してください。</p>
+          <summary>How do I uninstall it?</summary>
+          <p>On Windows, Settings → Apps → Installed apps → "OverlaySubs" → Uninstall. On macOS, move OverlaySubs from the Applications folder to the Trash. Models and settings stay in a folder, so delete it manually to remove everything. See <a href="#uninstall">Uninstall</a>.</p>
         </details>
         <details>
-          <summary>クリック透過をオンにしたらオーバーレイを操作できなくなりました。</summary>
-          <p>クリック透過がオンの間は、マウス操作が下の画面に通るためオーバーレイ自体は操作できません。設定画面の「字幕の表示」でクリック透過をオフにし、翻訳開始ボタンの上のトグルでオーバーレイを表示してからドラッグして位置を調整してください（<a href="#usage">使い方</a>）。</p>
+          <summary>I turned on click-through and now I can't interact with the overlay.</summary>
+          <p>While click-through is on, mouse input passes to the window underneath, so you can't interact with the overlay itself. Turn click-through off under "Subtitles" in Settings, turn the overlay on with the switch above the Start button if it is hidden, then drag it into place (see <a href="#usage">Usage</a>).</p>
         </details>
         <details>
-          <summary>新しいバージョンに更新するには？</summary>
-          <p>自動アップデートはありません。設定画面に新しいバージョンの通知が表示されたときは「リリースページを開く」から、またはこのページのダウンロードリンクや <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> から最新版をダウンロードしてインストールしてください。設定とモデルはそのまま引き継がれます（<a href="#limits">現状の制限</a>）。</p>
+          <summary>How do I update to a new version?</summary>
+          <p>There is no auto-update. When Settings shows a new-version banner, use "Open release page", or download the latest version from the links on this page or from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> and install it. Your settings and models are kept (see <a href="#limits">Limitations</a>).</p>
         </details>
       </div>
     </div>
   </section>
-
 </main>
 
 <footer class="dark">
   <div class="wrap">
     <ul class="foot-links">
-      <li><a href="https://github.com/sp-yduck/overlaysubs">GitHub リポジトリ</a></li>
-      <li><a href="https://github.com/sp-yduck/overlaysubs/blob/main/README.ja.md">README（日本語）</a></li>
+      <li><a href="https://github.com/sp-yduck/overlaysubs">GitHub repository</a></li>
       <li><a href="https://github.com/sp-yduck/overlaysubs#readme">README (English)</a></li>
-      <li><a href="https://github.com/sp-yduck/overlaysubs/releases">リリース一覧</a></li>
-      <li><a href="https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt">利用規約</a></li>
+      <li><a href="https://github.com/sp-yduck/overlaysubs/blob/main/README.ja.md">README (日本語)</a></li>
+      <li><a href="https://github.com/sp-yduck/overlaysubs/releases">Releases</a></li>
+      <li><a href="https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt">Terms of use</a></li>
       <li><a href="https://github.com/sp-yduck/overlaysubs/blob/main/LICENSE">MIT License</a></li>
-      <li><a href="https://github.com/sp-yduck/overlaysubs/blob/main/RELEASING.md">リリース手順（管理者向け）</a></li>
-      <li><a href="https://github.com/sp-yduck/overlaysubs/blob/main/THIRD_PARTY_NOTICES.md">サードパーティライセンス</a></li>
+      <li><a href="https://github.com/sp-yduck/overlaysubs/blob/main/RELEASING.md">Release process (maintainers)</a></li>
+      <li><a href="https://github.com/sp-yduck/overlaysubs/blob/main/THIRD_PARTY_NOTICES.md">Third-party licenses</a></li>
     </ul>
     <p class="credit">Built with PLaMo.</p>
     <p>
-      アプリのコードは MIT ライセンスです。翻訳モデル PLaMo 3 Translate は
-      <a href="https://plamo.preferredai.jp/info/plamo-community-license-ja">PLaMo 3 のライセンス</a>
-      （Preferred Networks）に従います。
-      同梱している whisper.cpp / llama.cpp / ggml などのサードパーティライセンスは
-      <a href="https://github.com/sp-yduck/overlaysubs/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にまとめています。
+      The app's code is MIT licensed. The PLaMo 3 Translate translation model is governed by the
+      <a href="https://plamo.preferredai.jp/info/plamo-community-license-en">PLaMo 3 license</a>
+      (Preferred Networks).
+      Licenses for bundled third-party software such as whisper.cpp / llama.cpp / ggml are collected in
+      <a href="https://github.com/sp-yduck/overlaysubs/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.
     </p>
-    <p>OverlaySubs 0.1.0。© 2026 OverlaySubs contributors。配布は GitHub Releases のみです。</p>
+    <p>OverlaySubs 0.3.0. © 2026 OverlaySubs contributors. Distributed only via GitHub Releases.</p>
   </div>
 </footer>
 </body>

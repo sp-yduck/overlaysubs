@@ -841,7 +841,8 @@ jobs:
           @@CHANGES@@
           ## Links
 
-          - [Official site (install, usage, FAQ)](https://sp-yduck.github.io/overlaysubs/en/)
+          - [Official site (install, usage, FAQ)](https://sp-yduck.github.io/overlaysubs/)
+          - [Japanese site (install, usage, FAQ)](https://sp-yduck.github.io/overlaysubs/ja/)
           - [README (English: how it works and how to build)](https://github.com/sp-yduck/overlaysubs#readme)
           - [README (Japanese)](https://github.com/sp-yduck/overlaysubs/blob/main/README.ja.md)
           - [OverlaySubs Terms of Use (English)](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.en.txt) / [Japanese](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/overlaysubs-terms.ja.txt)

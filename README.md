@@ -15,10 +15,10 @@ A desktop app that transcribes and translates any audio playing on your PC in re
 ## Screenshots
 
 **Settings** — translation options, languages and recent subtitles.
-[![Settings screen](docs/images/ui-settings-en.png)](docs/images/ui-settings-en.png)
+[![Settings screen](docs/images/ui-settings.png)](docs/images/ui-settings.png)
 
 **Model setup** — on first run the app detects your hardware, picks a tier and downloads the matching models.
-[![Model setup screen](docs/images/ui-model-setup-en.png)](docs/images/ui-model-setup-en.png)
+[![Model setup screen](docs/images/ui-model-setup.png)](docs/images/ui-model-setup.png)
 
 **Subtitle overlay** — drawn on top of other apps; click-through is available in the settings (background is illustrative).
 [![Subtitle overlay](docs/images/overlay.jpg)](docs/images/overlay.jpg)
@@ -27,16 +27,16 @@ A desktop app that transcribes and translates any audio playing on your PC in re
 
 **You do not need a GitHub account.** If you just want to use the app, follow the instructions on the official site.
 
-- Official site (download, install, usage, FAQ, uninstall, license): <https://sp-yduck.github.io/overlaysubs/en/>
+- Official site (download, install, usage, FAQ, uninstall, license): <https://sp-yduck.github.io/overlaysubs/>
 - Windows 10 / 11 (x64): [overlaysubs-windows-x64-setup.exe](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64-setup.exe) (recommended)
 - Windows (MSI): [overlaysubs-windows-x64.msi](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-windows-x64.msi) (installs per-machine and asks for Administrator; the `.exe` is recommended)
 - macOS 13+ (Apple Silicon): [overlaysubs-macos-arm64.dmg](https://github.com/sp-yduck/overlaysubs/releases/latest/download/overlaysubs-macos-arm64.dmg) (no Intel Mac build)
 - Checksums: [SHA256SUMS.txt](https://github.com/sp-yduck/overlaysubs/releases/latest/download/SHA256SUMS.txt) / releases: <https://github.com/sp-yduck/overlaysubs/releases/latest>
 
 Install steps, what to do when Windows SmartScreen or macOS Gatekeeper warns you, SHA-256 verification, usage, the FAQ, and uninstalling are all on the official site:
-[Install](https://sp-yduck.github.io/overlaysubs/en/#install) / [Warnings](https://sp-yduck.github.io/overlaysubs/en/#warning) / [Usage](https://sp-yduck.github.io/overlaysubs/en/#usage) / [FAQ](https://sp-yduck.github.io/overlaysubs/en/#faq) / [Uninstall](https://sp-yduck.github.io/overlaysubs/en/#uninstall) / [License and terms](https://sp-yduck.github.io/overlaysubs/en/#license)
+[Install](https://sp-yduck.github.io/overlaysubs/#install) / [Warnings](https://sp-yduck.github.io/overlaysubs/#warning) / [Usage](https://sp-yduck.github.io/overlaysubs/#usage) / [FAQ](https://sp-yduck.github.io/overlaysubs/#faq) / [Uninstall](https://sp-yduck.github.io/overlaysubs/#uninstall) / [License and terms](https://sp-yduck.github.io/overlaysubs/#license)
 
-> The builds are **not signed with an Apple Developer ID or a Windows code-signing certificate, and not notarized** (the macOS app is ad-hoc signed only), so SmartScreen / Gatekeeper warn on first launch. That does not mean the app is unsafe. See [Warnings](https://sp-yduck.github.io/overlaysubs/en/#warning) on the site, and never disable Gatekeeper or SmartScreen system-wide.
+> The builds are **not signed with an Apple Developer ID or a Windows code-signing certificate, and not notarized** (the macOS app is ad-hoc signed only), so SmartScreen / Gatekeeper warn on first launch. That does not mean the app is unsafe. See [Warnings](https://sp-yduck.github.io/overlaysubs/#warning) on the site, and never disable Gatekeeper or SmartScreen system-wide.
 
 ## Contents
 
@@ -75,7 +75,7 @@ WASAPI loopback (Windows) / ScreenCaptureKit system audio (macOS) / microphone �
 - `ui` is the settings window and overlay: plain HTML/JS/CSS with no build step; `ui/i18n.js` holds the Japanese, English and Chinese (Traditional and Simplified) strings.
 - The ASR and translation engines sit behind the `session::Asr` / `session::Translator` traits and can be swapped.
 - `models.json` defines the models (URL, size, SHA-256, tier). URLs are pinned to Hugging Face commits (using `main` would break the hash when upstream re-uploads). Placing a `models.json` in the config folder overrides the bundled one without an app update.
-- `licenses/` ships the OverlaySubs Terms of Use (Japanese and English); `THIRD_PARTY_NOTICES.md` lists the bundled libraries' licenses. The PLaMo 3 license is not bundled; the app and docs link to the official page instead.
+- `licenses/` ships the OverlaySubs Terms of Use (English and Japanese); `THIRD_PARTY_NOTICES.md` lists the bundled libraries' licenses. The PLaMo 3 license is not bundled; the app and docs link to the official page instead.
 
 ## Features
 
@@ -88,7 +88,7 @@ WASAPI loopback (Windows) / ScreenCaptureKit system audio (macOS) / microphone �
 - Partial results are dimmed; final translations stream in and replace them.
 - Always-on-top, semi-transparent overlay (click-through can be enabled in settings). Original text, font size, font, background opacity, line count, display time, and the "Built with PLaMo" credit are configurable. The overlay appears while translating and hides when translation stops; you can also toggle it from "Show subtitles" in the tray menu or with the switch above the Start button. While translation is stopped, opening "Subtitles" shows the overlay with a sample caption so you can tune the appearance live.
 - Export history as text or SRT.
-- Tray/menu-bar resident, global hotkey (default `CmdOrCtrl+Shift+T`; `Ctrl+Shift+T` on Windows, `Cmd+Shift+T` on macOS) to start/stop. UI in Japanese, English and Chinese (Traditional and Simplified); the first launch picks one from the OS language settings, and falls back to English. The Terms of Use exist only in Japanese and English, so the Chinese UI shows the English version.
+- Tray/menu-bar resident, global hotkey (default `CmdOrCtrl+Shift+T`; `Ctrl+Shift+T` on Windows, `Cmd+Shift+T` on macOS) to start/stop. UI in English, Japanese and Chinese (Traditional and Simplified); the first launch picks one from the OS language settings, and falls back to English. The Terms of Use exist only in Japanese and English, so the Chinese UI shows the English version.
 - At startup the app makes one anonymous request to the GitHub Releases API to check for a newer version; if there is one, a dismissible banner in the settings window shows the latest and current version with "Open release page" and "Later" buttons. Nothing is downloaded or installed automatically, and if the check fails (offline, API error) nothing is shown. Dismissing the banner lasts until the app restarts.
 - Audio, transcripts, and translations are never sent anywhere. No telemetry. The only network access is the model download and one anonymous GitHub API request at startup to check for a newer release (it sends no account, token, or personal data; if it fails, nothing happens). The app works offline once the models are downloaded.
 
@@ -153,13 +153,13 @@ Pushing a `v*` tag makes the release workflow build the bundles and publish them
 - [CONTRIBUTING.md](CONTRIBUTING.md) — dev environment, tests, PR flow
 - [SECURITY.md](SECURITY.md) — how to report vulnerabilities privately
 - [RELEASING.md](RELEASING.md) — release process (maintainers)
-- [docs/index.html](docs/index.html) — end-user documentation (the GitHub Pages source; self-contained, no external CDN, fonts, or JS)
+- [docs/index.html](docs/index.html) — end-user documentation (the GitHub Pages source: English `docs/index.html`, Japanese `docs/ja/index.html`, shared CSS `docs/style.css`; `docs/en/index.html` is a redirect stub for old links). The English page is self-contained with no external CDN, fonts, or JS.
 - Issue templates: [bug report](.github/ISSUE_TEMPLATE/bug_report.yml) / [feature request](.github/ISSUE_TEMPLATE/feature_request.yml)
 
 ## License
 
 - **The app code is MIT licensed** ([LICENSE](LICENSE)).
-- Use of the app is governed by the [OverlaySubs Terms of Use](licenses/overlaysubs-terms.ja.txt) ([English](licenses/overlaysubs-terms.en.txt)). You accept them on first launch, and they are also available from "About" in the app.
+- Use of the app is governed by the [OverlaySubs Terms of Use](licenses/overlaysubs-terms.en.txt) ([Japanese](licenses/overlaysubs-terms.ja.txt)). You accept them on first launch, and they are also available from "About" in the app.
 - Use of the PLaMo 3 Translate translation model is governed by the [PLaMo 3 license](https://plamo.preferredai.jp/info/plamo-community-license-en).
 - If you publish subtitles for streams or videos, mind the copyright of the source content.
 - Whisper models (MIT) and Silero VAD (MIT) follow their own licenses.

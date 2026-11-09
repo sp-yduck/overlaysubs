@@ -103,7 +103,7 @@ You can also `cargo install tauri-cli --version "^2" --locked` and use `cargo ta
 | `models.json` | Model definitions (URL, size, SHA-256, tier). |
 | `licenses/` | OverlaySubs Terms of Use (Japanese and English). The PLaMo 3 license is linked, not bundled. |
 | `scripts/` | Helper scripts for releases and bundling (`version.sh` prints the version, `set-version.sh` updates it). |
-| `docs/` | End-user documentation (the GitHub Pages source: Japanese `docs/index.html`, English `docs/en/index.html`, shared CSS `docs/style.css`). Installation, usage, FAQ, and licenses are collected here. Keep the pages self-contained and free of external CDNs and fonts. |
+| `docs/` | End-user documentation (the GitHub Pages source: English `docs/index.html`, Japanese `docs/ja/index.html`, shared CSS `docs/style.css`; `docs/en/index.html` is a redirect stub for old links). Installation, usage, FAQ, and licenses are collected here. Keep the English page self-contained; the Japanese page currently loads Google Fonts. |
 
 ## Changing model definitions
 
@@ -112,7 +112,7 @@ You can also `cargo install tauri-cli --version "^2" --locked` and use `cargo ta
 - Pin URLs to a **Hugging Face commit**. Do not use `/resolve/main/` (an upstream re-upload would break the hash). A test in `crates/core` enforces this rule.
 - Make `size` and `sha256` match the actual files. Downloads delete the partial file when hash verification fails.
 - Every tier needs a default ASR and translation model (VAD is shared by all tiers). `Registry::parse` validates this at startup.
-- If you change a size, also update the download-size tables in `docs/index.html` and `docs/en/index.html` (for users) and the tier table in the READMEs.
+- If you change a size, also update the download-size tables in `docs/index.html` and `docs/ja/index.html` (for users) and the tier table in the READMEs.
 
 ## UI and language
 
@@ -158,7 +158,7 @@ Before opening a pull request, check the following.
 - `cargo test -p overlaysubs-core` passes.
 - No secrets (API keys, tokens, personal information, local paths) are included.
 - If you changed UI text, you updated both English and Japanese in `ui/i18n.js`.
-- If behaviour or installation steps change, you updated the end-user docs (`docs/index.html` / `docs/en/index.html`) and `README.md` (English) / `README.ja.md` (Japanese) (for developers).
+- If behaviour or installation steps change, you updated the end-user docs (`docs/index.html` / `docs/ja/index.html`) and `README.md` (English) / `README.ja.md` (Japanese) (for developers).
 - If your change affects licenses or the terms of use (`licenses/`, the link to the PLaMo 3 license), you explained why in the pull request.
 - There is no changelog file to update: the release notes are generated from the pull request titles.
 
