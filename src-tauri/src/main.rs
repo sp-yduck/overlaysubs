@@ -75,7 +75,9 @@ struct Running {
 
 #[derive(Default)]
 struct App {
-    settings: Mutex<Settings>,
+    /// Shared with the session thread, which copies `session` from it before every utterance so
+    /// that edits made on the Translate page apply without stopping and starting again.
+    settings: Arc<Mutex<Settings>>,
     engines: Arc<Mutex<Option<Engines>>>,
     running: Mutex<Option<Running>>,
     history: Arc<Mutex<Vec<Entry>>>,
@@ -269,6 +271,10 @@ async fn benchmark(app: AppHandle) -> Result<Bench, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let st = app.state::<App>();
         ensure_engines(&app, &st)?;
+        // Read the tier before locking the engines. The session thread takes the settings lock and
+        // then the engines lock, so keeping that order here avoids an inversion if a session starts
+        // while the benchmark runs.
+        let cur = st.settings.lock().unwrap().tier.unwrap_or(Tier::Mid);
         let mut eng = st.engines.lock().unwrap();
         let e = eng.as_mut().unwrap();
         let secs = 5.0;
@@ -283,7 +289,6 @@ async fn benchmark(app: AppHandle) -> Result<Bench, String> {
         };
         e.mt.translate(&req, &mut |_| {})?;
         let took = t0.elapsed().as_secs_f32();
-        let cur = st.settings.lock().unwrap().tier.unwrap_or(Tier::Mid);
         let downgraded_to = match (tier::too_slow(took, secs), cur.lower()) {
             (true, Some(t)) => Some(Detected { hardware: hw::cached_or_detect(&config_dir(&app)), tier: t, selection: registry(&app)?.defaults(t).unwrap() }),
             _ => None,
@@ -329,6 +334,7 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     });
     let engines = st.engines.clone();
     let history = st.history.clone();
+    let live_settings = st.settings.clone();
     history.lock().unwrap().clear();
     let emit_app = app.clone();
     let session_id = st.session_seq.fetch_add(1, Ordering::SeqCst) + 1;
@@ -347,6 +353,13 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
                 }
                 continue;
             };
+            // The Translate page saves settings while translating. Copy them before the engines
+            // are locked below so a language, style, topic or glossary change applies to the next
+            // utterance without a restart. The guard is a temporary of the statement, so the
+            // settings lock is never held while waiting for the engines (the order ensure_engines
+            // and the benchmark use). A poisoned lock must not freeze the settings for the rest of
+            // the session either.
+            session.cfg = live_settings.lock().unwrap_or_else(|e| e.into_inner()).session.clone();
             // Under load, skip stale partials: keep every final and only the newest partial.
             let batch: Vec<_> = std::iter::once(first).chain(ev_rx.try_iter()).collect();
             let n = batch.len();
