@@ -152,6 +152,13 @@ The end-to-end test with real models is `#[ignore]`d by default (it needs a 16 k
 OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
 ```
 
+To measure what a change does to speed and quality, run the benchmark on the same clips before and after it. It replays the clips as live audio and reports the engine load, the caption delay and the character error rates; `scripts/bench.sh` documents the inputs.
+
+```bash
+scripts/bench.sh clips/                              # on main: writes target/bench/<commit>.json
+scripts/bench.sh clips/ target/bench/<commit>.json   # on your branch: compares with that report
+```
+
 Pushing a `v*` tag makes the release workflow build the bundles and publish them to GitHub Releases; see [RELEASING.md](RELEASING.md).
 
 ## Contributing
