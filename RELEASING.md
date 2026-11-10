@@ -254,8 +254,16 @@ Check the Actions logs. Common causes:
 
 - Windows: Vulkan SDK download failure → rerun the workflow
 - Windows: `llama.dll` staging failure → `src-tauri/libs/` and `C:\t\release\build\llama-cpp-sys-2-*\out\bin\`
+- Windows: `vulkan-1.dll` staging failure → `src-tauri/libs/` and `%SystemRoot%\System32\vulkan-1.dll` (the SDK's bundled Vulkan Runtime installer, SDK 1.4.313.1+, puts the loader there during the "Install Vulkan SDK" step; the loader must ship with the installers because the app imports it at load time)
 - macOS: `codesign` verification failure → check that the ad-hoc signing configuration (`--config '{"bundle":{"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}'`) has not disappeared. With ad-hoc signing, hardened runtime must be disabled; otherwise the bundled llama/ggml dylibs are rejected by library validation and the app crashes on launch
 - Build timeout (240 minutes) → usually tens of minutes when the cache is warm
+
+The Windows installer deliberately ships Khronos' Vulkan loader app-local even though Khronos
+discourages bundling one (a system-installed loader can be newer). The alternative is that
+`overlaysubs.exe` has a load-time import of `vulkan-1.dll`, so without a loader the app cannot
+start on a PC that has no Vulkan runtime; the bundled loader is what lets the one installer run
+on GPU and CPU-only PCs alike. Keep the pinned SDK version current when changing this, because
+the bundled loader does not age better than the pin.
 
 You can rerun only the failed jobs.
 

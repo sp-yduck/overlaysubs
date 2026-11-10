@@ -19,8 +19,10 @@
 #
 # The output is deterministic: it depends only on Cargo.lock, the license files
 # in the cargo cache (including the whisper.cpp / llama.cpp checkouts),
-# models.json and the fallback license texts. No timestamps, tool versions or
-# absolute host paths are written.
+# models.json, the fallback license texts, and the Vulkan SDK pin in
+# .github/workflows/release.yml (the version of the bundled Vulkan loader,
+# which has no version number of its own in the file name). No timestamps,
+# tool versions or absolute host paths are written.
 set -euo pipefail
 
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
@@ -136,7 +138,8 @@ cut -f1 "$tmp/terms.tsv" | sort | uniq -c \
 license_count=$(wc -l < "$tmp/terms-sorted.tsv" | tr -d ' ')
 
 # ---------------------------------------------------------------------------
-# 2. Bundled native libraries (whisper.cpp and llama.cpp/ggml)
+# 2. Bundled native libraries (whisper.cpp, llama.cpp/ggml and the Khronos
+#    Vulkan loader that the Windows installers stage from the Vulkan SDK)
 # ---------------------------------------------------------------------------
 manifest_of() {
   jq -r --arg n "$1" '
@@ -199,6 +202,16 @@ else
 fi
 whisper_copyright=$(copyright_line "$tmp/whisper-license.txt")
 llama_copyright=$(copyright_line "$tmp/llama-license.txt")
+
+# The Windows installers ship Khronos' Vulkan loader (vulkan-1.dll). The DLL has
+# no version of its own in the file name, so report the Vulkan SDK that release
+# CI installs; keep this in sync with the "Install Vulkan SDK" step in
+# release.yml (it is the same pin that the build links against). The loader
+# itself comes from the Vulkan Runtime installer bundled with that SDK since
+# 1.4.313.1, which the SDK install runs into the system directory.
+vulkan_sdk_version=$(sed -n 's/^[[:space:]]*\$v = "\([0-9][0-9.]*\)"[[:space:]]*$/\1/p' \
+  "$root/.github/workflows/release.yml" 2>/dev/null | head -n 1 || true)
+vulkan_sdk_version=${vulkan_sdk_version:-1.4.313.2}
 
 # ---------------------------------------------------------------------------
 # 3. License texts for the Rust dependencies
@@ -371,7 +384,10 @@ apply to the distributed builds.
   (Windows `.exe` / `.msi`, macOS `.dmg`) contains compiled native code from
   **whisper.cpp** and ships the **llama.cpp / ggml** shared libraries. Both are
   MIT-licensed; their copyright notices and license texts are reproduced in
-  [§1](#1-bundled-native-libraries).
+  [§1](#1-bundled-native-libraries). The Windows installers additionally ship
+  Khronos' **Vulkan loader** (`vulkan-1.dll`, Apache-2.0) next to
+  `overlaysubs.exe`; it is covered by the Apache-2.0 text reproduced in
+  [§4](#4-license-texts).
 - **Rust dependencies.** The application statically links the third-party Rust
   crates listed in [§3](#3-rust-dependency-inventory). All of them are covered
   by the license texts reproduced in [§4](#4-license-texts).
@@ -414,6 +430,12 @@ macOS: `Contents/Frameworks/` inside the `.app`). The `ggml` code used by both
 projects is part of each upstream repository and is covered by the same MIT
 license.
 
+The Windows installers also ship Khronos' Vulkan loader (`vulkan-1.dll`,
+Apache-2.0) next to the executable. The app is linked against `vulkan-1` at
+load time, so the loader has to be present for the process to start; on a PC
+without a Vulkan-capable GPU or driver it simply finds no device and the app
+runs on the CPU. See [§1.3](#13-khronos-vulkan-loader--apache-20-windows).
+
 SECTION1
   printf '### 1.1 whisper.cpp — MIT\n\n'
   printf 'Version: whisper.cpp %s (vendored in the whisper-rs-sys %s crate)\n\n' \
@@ -436,6 +458,21 @@ SECTION1
   printf 'License text:\n\n```text\n'
   cat "$tmp/llama-license.txt"
   printf '```\n\n'
+
+  printf '### 1.3 Khronos Vulkan Loader — Apache-2.0 (Windows)\n\n'
+  printf 'Version: Vulkan-Loader from the Vulkan Runtime installer bundled with the Vulkan SDK %s\n\n' "$vulkan_sdk_version"
+  printf 'Upstream: <https://github.com/KhronosGroup/Vulkan-Loader>\n\n'
+  printf 'Bundled file: `vulkan-1.dll`, next to `overlaysubs.exe` in the Windows\n'
+  printf '.exe / .msi installers. The macOS build does not link it.\n\n'
+  printf 'The Windows build (`--features vulkan`) has a load-time import of\n'
+  printf '`vulkan-1.dll`: whisper-rs-sys statically links whisper.cpp'"'"'s Vulkan\n'
+  printf 'backend, which links `vulkan-1` on MSVC (the llama.cpp / ggml DLLs chain\n'
+  printf 'to it as well). Shipping the loader keeps a single installer that starts\n'
+  printf 'on every supported PC: on a machine without a Vulkan device the loader\n'
+  printf 'finds none and whisper.cpp / llama.cpp run on the CPU.\n\n'
+  printf 'License text: Apache License 2.0, reproduced in\n'
+  printf '[§4](#4-license-texts). The upstream `LICENSE.txt` notes that most of the\n'
+  printf 'project is Apache-2.0 and that a few files use more-permissive licenses.\n\n'
 
   # --- §2 runtime model assets ---------------------------------------------
   cat <<'SECTION2'

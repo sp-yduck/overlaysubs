@@ -35,7 +35,7 @@ OverlaySubs へのコントリビューションを歓迎します。バグ報�
 - **Visual Studio 2022 Build Tools** の「C++ によるデスクトップ開発」ワークロード（MSVC + Windows SDK）。
 - **CMake** と **LLVM / libclang**（whisper-rs と llama-cpp-sys が bindgen でバインディングを生成するため）。
 - **WebView2 Runtime**（Windows 10/11 には通常プリインストール済み）。
-- **Vulkan SDK**（必須）。CI は LunarG のインストーラで `1.4.313.2` を導入しています。`VULKAN_SDK` を設定し、`%VULKAN_SDK%\Bin` を `PATH` に追加してください。
+- **Vulkan SDK** — 必須なのは Vulkan（GPU）ビルド（`--features vulkan`）だけです。CI は LunarG のインストーラで `1.4.313.2` を導入します。`VULKAN_SDK` を設定し、`%VULKAN_SDK%\Bin` を `PATH` に追加してください。Windows のリリースバンドルには Khronos の Vulkan ローダーも含める必要があるため、SDK 同梱の Vulkan Runtime インストーラ（SDK 1.4.313.1 以降）がシステムディレクトリに置いた `%SystemRoot%\System32\vulkan-1.dll` を llama.cpp の DLL と一緒に `src-tauri/libs/` へコピーしてください（CI も同じことをしています）。`overlaysubs.exe` はロード時に `vulkan-1.dll` を必要とするため、これがないと Vulkan ランタイムのない PC では起動しません。GPU 機能を付けないビルドは CPU 専用で、Vulkan SDK は不要です。
 - パスが長すぎるエラーが出る場合は、`CARGO_TARGET_DIR` を短いパスに設定してください（CI は `C:\t` を使用）。
 
 ```powershell

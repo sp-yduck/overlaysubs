@@ -56,11 +56,12 @@ Install steps, what to do when Windows SmartScreen or macOS Gatekeeper warns you
 |---|---|---|
 | OS | Windows 10 / 11 (64-bit) | macOS 13 Ventura or later |
 | CPU | x64 (Intel / AMD) | Apple Silicon (M1 or later) |
-| GPU | **Vulkan-capable GPU with an up-to-date driver** | Integrated GPU (Metal) |
+| GPU | **Recommended: Vulkan-capable GPU with an up-to-date driver** (runs on the CPU without one) | Integrated GPU (Metal) |
 | Memory | 8 GB or more | 8 GB or more |
 | Free disk space | Model download size (see [Models and tiers](#models-and-tiers)) | Same |
 
-- Windows builds require a **Vulkan-capable GPU and current driver** (the official build uses `--features vulkan`). With an old driver the GPU is not used and performance is not usable in real time.
+- You do **not** need to install a Vulkan runtime to start the Windows app: the installer ships Khronos' Vulkan loader (`vulkan-1.dll`, Apache-2.0), because the official `--features vulkan` build links `vulkan-1` at load time. On a PC with no Vulkan-capable GPU or with an old driver the loader finds no device and the app runs on the CPU (use the CPU-tier models; it is slower).
+- A **Vulkan-capable GPU with a current driver is strongly recommended** for real-time speed. With an old driver the GPU is not used and performance is not usable in real time.
 - There is no Intel Mac build, no 32-bit Windows build, and no Windows on ARM build.
 - The only supported distribution channel is **GitHub Releases**; there is no auto-updater. The app only notifies you when a newer release exists and links to its release page.
 
@@ -96,6 +97,8 @@ WASAPI loopback (Windows) / ScreenCaptureKit system audio (macOS) / microphone �
 
 The tier is decided when you run "Check this PC" in first-run setup, and the models for that tier are selected automatically. The settings window lets you change the individual Whisper / PLaMo / VAD models. The detection result is cached; run "Check again" after changing the hardware, such as a new GPU.
 
+Each of the three models also has a **Runs on** choice — **Auto / GPU / CPU** — in the settings window where the backend supports it: Whisper and PLaMo can use either, while VAD is CPU-only upstream (whisper.cpp forces GPU VAD off). "Auto" uses the GPU when one was detected and the CPU otherwise; if loading a model on the GPU fails, the app retries it on the CPU. A model or Runs-on change takes effect the next time you start translating.
+
 | Tier | Detected when | Whisper | PLaMo 3 Translate | First download |
 |---|---|---|---|---|
 | High | VRAM 12 GB+ / Apple Silicon RAM 32 GB+ | large-v3-turbo | 8B Q4_K_M | ~6.9 GB |
@@ -109,11 +112,14 @@ The tier is decided when you run "Check this PC" in first-run setup, and the mod
 
 ## Build
 
-Prerequisites: Rust stable (edition 2021). On Windows, MSVC + Windows SDK, CMake, LLVM / libclang (for bindgen), the Vulkan SDK, and WebView2. On macOS, Xcode 26 or Command Line Tools with the macOS 26 SDK: the ScreenCaptureKit bindings compile a small Swift bridge at build time, and the Metal dependency they link needs the macOS 26 SDK. Source builds need a Swift toolchain. Release CI selects the preinstalled Xcode 26 on the `macos-15` runner. Node.js is only needed to run the Tauri CLI through `npx` (not for the app itself).
+Prerequisites: Rust stable (edition 2021). On Windows, MSVC + Windows SDK, CMake, LLVM / libclang (for bindgen), and WebView2. The **Vulkan SDK is only needed for `--features vulkan`** (the official GPU build); the loader from it must be copied into `src-tauri/libs/` before bundling (see below), and a build without GPU features is a CPU-only build that needs no Vulkan SDK. On macOS, Xcode 26 or Command Line Tools with the macOS 26 SDK: the ScreenCaptureKit bindings compile a small Swift bridge at build time, and the Metal dependency they link needs the macOS 26 SDK. Source builds need a Swift toolchain. Release CI selects the preinstalled Xcode 26 on the `macos-15` runner. Node.js is only needed to run the Tauri CLI through `npx` (not for the app itself).
 
 ```bash
 # Windows (Vulkan, same as the official build)
 npx --yes @tauri-apps/cli@2.12.4 build --features vulkan
+
+# Windows (CPU only; needs no Vulkan SDK)
+npx --yes @tauri-apps/cli@2.12.4 build
 
 # macOS (Metal)
 npx --yes @tauri-apps/cli@2.12.4 build --features metal
@@ -126,7 +132,7 @@ You can also `cargo install tauri-cli --version "^2" --locked` and use `cargo ta
 
 whisper.cpp and llama.cpp both embed ggml, so statically linking both into one process clashes on symbols. llama.cpp is therefore linked as a shared library (`dynamic-link` in `llama-cpp-2`) and shipped inside the installer.
 
-- Windows: `src-tauri/libs/*.dll` is bundled via `bundle.resources`. `src-tauri/libs/` is gitignored, so before bundling copy llama.cpp's build output (`target/release/build/llama-cpp-sys-2-*/out/bin/*.dll`) into `src-tauri/libs/`. The CI steps are in `.github/workflows/release.yml`.
+- Windows: `src-tauri/libs/*.dll` is bundled via `bundle.resources`. `src-tauri/libs/` is gitignored, so before bundling copy llama.cpp's build output (`target/release/build/llama-cpp-sys-2-*/out/bin/*.dll`) into `src-tauri/libs/`; for `--features vulkan` also copy the Khronos Vulkan loader that the SDK's Vulkan Runtime installer (bundled with SDK 1.4.313.1+) placed in `"%SystemRoot%\System32\vulkan-1.dll"`. `overlaysubs.exe` has a load-time import of `vulkan-1.dll`, so an installer built with Vulkan features but without the loader fails to start on PCs that have no Vulkan runtime. The CI steps are in `.github/workflows/release.yml`.
 - macOS: `beforeBundleCommand` runs `scripts/stage-dylibs.sh`, which collects the dylibs into `target/frameworks`; `bundle.macOS.files` ships them in `Frameworks`.
 - `THIRD_PARTY_NOTICES.md` is bundled too (see `src-tauri/tauri.windows.conf.json` and `tauri.macos.conf.json`).
 - macOS: `src-tauri/Info.plist` is merged into the bundle's generated Info.plist (`bundle.macOS.infoPlist`). It declares the microphone and screen/system-audio usage strings (`NSMicrophoneUsageDescription` / `NSScreenCaptureUsageDescription`).
@@ -165,4 +171,4 @@ Pushing a `v*` tag makes the release workflow build the bundles and publish them
 - The revised license does not require attribution when you publish translated subtitles. For books, papers and similar long-form publications, state that PLaMo was used for translation; if you distribute subtitle data (for example as a dataset), state that the license applies to any model trained on it.
 - If you publish subtitles for streams or videos, mind the copyright of the source content.
 - Whisper models (MIT) and Silero VAD (MIT) follow their own licenses.
-- Third-party licenses for the bundled whisper.cpp / llama.cpp / ggml are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- Third-party licenses for the bundled whisper.cpp / llama.cpp / ggml (MIT) and the Windows Vulkan loader `vulkan-1.dll` (Apache-2.0) are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

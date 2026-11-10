@@ -261,6 +261,8 @@ jobs:
         shell: pwsh
         # MSBuild caps paths at 260 chars; whisper.cpp's Vulkan shader build nests deep, so use a short target dir.
         # The DLLs must exist before tauri-build resolves bundle.resources.
+        # `src-tauri/libs/*.dll` is bundled next to overlaysubs.exe (bundle.resources in
+        # src-tauri/tauri.windows.conf.json), so whatever is staged here reaches the installers.
         run: |
           "CARGO_TARGET_DIR=C:\t" >> $env:GITHUB_ENV
           $env:CARGO_TARGET_DIR = "C:\t"
@@ -271,6 +273,33 @@ jobs:
           Remove-Item src-tauri/libs/placeholder.dll
           Copy-Item C:\t\release\build\llama-cpp-sys-2-*\out\bin\*.dll src-tauri/libs/
           if (!(Test-Path src-tauri/libs/llama.dll)) { throw "llama.dll was not staged" }
+          # whisper-rs-sys statically links whisper.cpp's Vulkan backend, which links `vulkan-1` on
+          # MSVC, so overlaysubs.exe has a LOAD-TIME import of vulkan-1.dll; llama.cpp's ggml
+          # DLLs chain to it as well. On a PC without a Vulkan runtime (no GPU driver, basic
+          # display adapter, VM) the process then dies before showing a window with
+          # "vulkan-1.dll was not found". Ship Khronos' loader (Apache-2.0) from the pinned SDK
+          # app-local: Windows loads it, finds no Vulkan device, and whisper.cpp / llama.cpp fall
+          # back to the CPU, so this one installer works on GPU and CPU-only PCs alike.
+          # Only the Vulkan build has that import, so a Windows build without GPU features neither
+          # needs the SDK nor stages the loader. Khronos discourages shipping a loader app-local
+          # (a newer system loader can exist), but it is required here to start CPU-only PCs;
+          # keep the SDK pin current so the bundled loader does not age.
+          #
+          # The SDK's `Bin` only has tools: since SDK 1.4.313.1 the SDK installer bundles and runs
+          # the Vulkan Runtime installer, which puts the loader in the system directory. Take it
+          # from there (a `runtime\x64` copy is used when an SDK layout has one).
+          if ("${{ matrix.features }}" -eq "vulkan") {
+            if (-not $env:VULKAN_SDK) { throw "VULKAN_SDK is not set; the Vulkan build must ship the Vulkan loader" }
+            $candidates = @(
+              (Join-Path $env:VULKAN_SDK 'runtime\x64\vulkan-1.dll'),
+              (Join-Path $env:windir 'System32\vulkan-1.dll')
+            )
+            $loader = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $loader) { throw "vulkan-1.dll not found after installing the Vulkan SDK; searched: $($candidates -join ', ')" }
+            Write-Host "Bundling Vulkan loader: $loader ($((Get-Item $loader).VersionInfo.FileVersion))"
+            Copy-Item $loader src-tauri/libs/vulkan-1.dll
+            if (!(Test-Path src-tauri/libs/vulkan-1.dll)) { throw "vulkan-1.dll was not staged" }
+          }
           Get-ChildItem src-tauri/libs
 
       # The npm package ships a prebuilt CLI; `cargo install tauri-cli` took up to 19 minutes.

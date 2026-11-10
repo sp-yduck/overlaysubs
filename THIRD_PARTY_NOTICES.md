@@ -8,7 +8,10 @@ apply to the distributed builds.
   (Windows `.exe` / `.msi`, macOS `.dmg`) contains compiled native code from
   **whisper.cpp** and ships the **llama.cpp / ggml** shared libraries. Both are
   MIT-licensed; their copyright notices and license texts are reproduced in
-  [§1](#1-bundled-native-libraries).
+  [§1](#1-bundled-native-libraries). The Windows installers additionally ship
+  Khronos' **Vulkan loader** (`vulkan-1.dll`, Apache-2.0) next to
+  `overlaysubs.exe`; it is covered by the Apache-2.0 text reproduced in
+  [§4](#4-license-texts).
 - **Rust dependencies.** The application statically links the third-party Rust
   crates listed in [§3](#3-rust-dependency-inventory). All of them are covered
   by the license texts reproduced in [§4](#4-license-texts).
@@ -46,6 +49,12 @@ are shipped as separate files (Windows: `libs/*.dll` next to the executable,
 macOS: `Contents/Frameworks/` inside the `.app`). The `ggml` code used by both
 projects is part of each upstream repository and is covered by the same MIT
 license.
+
+The Windows installers also ship Khronos' Vulkan loader (`vulkan-1.dll`,
+Apache-2.0) next to the executable. The app is linked against `vulkan-1` at
+load time, so the loader has to be present for the process to start; on a PC
+without a Vulkan-capable GPU or driver it simply finds no device and the app
+runs on the CPU. See [§1.3](#13-khronos-vulkan-loader--apache-20-windows).
 
 ### 1.1 whisper.cpp — MIT
 
@@ -118,6 +127,26 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+### 1.3 Khronos Vulkan Loader — Apache-2.0 (Windows)
+
+Version: Vulkan-Loader from the Vulkan Runtime installer bundled with the Vulkan SDK 1.4.313.2
+
+Upstream: <https://github.com/KhronosGroup/Vulkan-Loader>
+
+Bundled file: `vulkan-1.dll`, next to `overlaysubs.exe` in the Windows
+.exe / .msi installers. The macOS build does not link it.
+
+The Windows build (`--features vulkan`) has a load-time import of
+`vulkan-1.dll`: whisper-rs-sys statically links whisper.cpp's Vulkan
+backend, which links `vulkan-1` on MSVC (the llama.cpp / ggml DLLs chain
+to it as well). Shipping the loader keeps a single installer that starts
+on every supported PC: on a machine without a Vulkan device the loader
+finds none and whisper.cpp / llama.cpp run on the CPU.
+
+License text: Apache License 2.0, reproduced in
+[§4](#4-license-texts). The upstream `LICENSE.txt` notes that most of the
+project is Apache-2.0 and that a few files use more-permissive licenses.
 
 ## 2. Runtime-downloaded model assets
 

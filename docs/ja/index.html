@@ -241,7 +241,8 @@
             <li><strong>クリック透過</strong>: 既定はオフ。オンにするとマウス操作が下の画面に通ります（オンの間はオーバーレイ自体は操作できません）</li>
             <li><strong>履歴</strong>: 最近の字幕をテキスト / SRT で保存</li>
             <li><strong>表示言語</strong>: 日本語 / English / 中文（繁體字・簡体字）</li>
-            <li><strong>詳細設定</strong>: 翻訳モデルの GPU レイヤー数（0 で CPU）、音声認識に GPU を使うか、モデルの保存先</li>
+            <li><strong>モデルの準備</strong>: 使用する Whisper / PLaMo / VAD モデルと、Whisper / PLaMo それぞれの「実行先」（自動 / GPU / CPU。各モデルの横で選択）。VAD は常に CPU で動作します</li>
+            <li><strong>詳細設定</strong>: モデルの保存先</li>
           </ul>
           <figure>
             <img src="../images/ui-settings-ja.png" width="1960" height="1508" loading="lazy" alt="設定画面の「翻訳」タブ。音声入力、言語、翻訳の調整の各設定と、最近の字幕（原文と訳文）の一覧が表示されている。">
@@ -318,14 +319,14 @@
             <tbody>
               <tr><th scope="row">OS</th><td>Windows 10 / 11（64bit）</td><td>macOS 13 Ventura 以降</td></tr>
               <tr><th scope="row">CPU</th><td>x64（Intel / AMD）</td><td>Apple Silicon（M1 以降）</td></tr>
-              <tr><th scope="row">GPU</th><td>Vulkan 対応 GPU + 最新の GPU ドライバ</td><td>内蔵 GPU（Metal）</td></tr>
+              <tr><th scope="row">GPU</th><td>推奨: Vulkan 対応 GPU + 最新の GPU ドライバ（なくても CPU で動作）</td><td>内蔵 GPU（Metal）</td></tr>
               <tr><th scope="row">メモリ</th><td>8GB 以上</td><td>8GB 以上</td></tr>
               <tr><th scope="row">空き容量</th><td>初回のモデルダウンロード分（下表）</td><td>同左</td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          Windows 版は <strong>Vulkan 対応の GPU と最新ドライバ</strong>が必要です。ドライバが古いと GPU が使われず、実用的な速度が出ません。
+          Windows 版のインストーラには <strong>Vulkan ローダー</strong>が含まれているため、Vulkan 対応 GPU やドライバがない PC でも起動し、CPU で動作します（遅くなります）。実用的な速度で動かすには <strong>Vulkan 対応 GPU と最新ドライバを推奨</strong>します。ドライバが古いと GPU が使われず、実用的な速度が出ません。
           配布は <strong>GitHub Releases のみ</strong>です。自動アップデート機能はありません（起動時に新しいリリースがあるかを確認して通知しますが、ダウンロード・インストールは自動では行いません）。
         </p>
 
@@ -351,7 +352,7 @@
             </table>
           </div>
           <p class="muted">
-            数値は <code>models.json</code> の宣言サイズの合計（Silero VAD の約 0.9MB を含む）です。初回セットアップで「PC の性能を調べる」を実行すると、ハードウェアからティアが決まりモデルが自動選択されます。設定画面では使用するモデル（Whisper / PLaMo）を個別に変更できます。検出結果は設定フォルダの <code>hardware.json</code> に保存され、次回起動時は再調査せずに表示されます。ハードウェアを変更したときは「もう一度調べる」を実行してください。
+            数値は <code>models.json</code> の宣言サイズの合計（Silero VAD の約 0.9MB を含む）です。初回セットアップで「PC の性能を調べる」を実行すると、ハードウェアからティアが決まりモデルが自動選択されます。設定画面では使用するモデル（Whisper / PLaMo）を個別に変更でき、それぞれの実行先（自動 / GPU / CPU。VAD は CPU 専用）も選べます。モデルや実行先の変更は、翻訳を停止して開始し直すと反映されます。検出結果は設定フォルダの <code>hardware.json</code> に保存され、次回起動時は再調査せずに表示されます。ハードウェアを変更したときは「もう一度調べる」を実行してください。
           </p>
           <p class="muted">
             ティアの目安: High は VRAM 12GB 以上、Mid は VRAM 8GB、Low は VRAM 4〜6GB、CPU は GPU がない場合または VRAM 4GB 未満です（Apple Silicon はメモリ量で判定）。
@@ -369,7 +370,7 @@
         <ul class="plain">
           <li>配布ビルドは<strong>未署名・未公証</strong>です（Windows はコード署名なし、macOS は Developer ID 署名なし・公証なしで <strong>ad-hoc 署名のみ</strong>）。SmartScreen / Gatekeeper の警告が出ます（<a href="#warning">警告が表示されたとき</a>）。</li>
           <li><strong>Intel Mac 版はありません。</strong>macOS は Apple Silicon（M1 以降）かつ macOS 13 以降のみです。</li>
-          <li>Windows は <strong>Vulkan 対応 GPU と最新ドライバが必須</strong>です。対応していない環境では実用的な速度が出ません。</li>
+          <li>Windows は <strong>Vulkan 対応 GPU やドライバがなくても CPU で動作します</strong>（CPU ティアのモデルを使うため遅くなります）。実用的な速度で動かすには Vulkan 対応 GPU と最新ドライバを推奨します。</li>
           <li>macOS のシステム音声は ScreenCaptureKit で取り込みます。初回は「画面収録とシステム音声録音」（macOS 15 以降。macOS 13〜14 は「画面収録」）の許可とアプリの再起動が必要です（<a href="#faq">FAQ</a>）。</li>
           <li>特定のアプリだけをキャプチャする機能、システム音声とマイクを同時に処理する機能は未実装です。</li>
           <li><strong>自動アップデートはありません。</strong>起動時に新しいリリースがあるかを確認して通知しますが、ダウンロードとインストールは自動では行いません。新しいバージョンは <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> から手動でダウンロードしてください（配布は GitHub Releases のみです）。</li>
@@ -387,7 +388,7 @@
           <div>
             <h3>アプリのコード</h3>
             <p><strong>MIT ライセンス</strong>です。全文は <a href="https://github.com/sp-yduck/overlaysubs/blob/main/LICENSE">LICENSE</a> にあります。</p>
-            <p>同梱している whisper.cpp / llama.cpp / ggml などのサードパーティライセンスは
+            <p>同梱している whisper.cpp / llama.cpp / ggml（MIT）と Windows 版の Vulkan ローダー（Apache-2.0）などのサードパーティライセンスは
               <a href="https://github.com/sp-yduck/overlaysubs/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にまとめています。
               Whisper モデル（MIT）と Silero VAD（MIT）は、それぞれのライセンスに従います。</p>
           </div>
@@ -433,7 +434,11 @@
         </details>
         <details>
           <summary>GPU が使われていない / 動作が遅いです。</summary>
-          <p>Windows では Vulkan 対応の最新 GPU ドライバが必要です（<a href="#requirements">動作環境</a>）。それでも遅い場合は、設定画面で使用するモデル（Whisper / PLaMo）を軽いものに変更するか、「速度を測る」を実行して 1 段下げたモデルに切り替えてください。CPU 向けのモデルでも動作しますが遅くなります。</p>
+          <p>Windows で GPU を使うには Vulkan 対応の最新 GPU ドライバが必要です（<a href="#requirements">動作環境</a>）。ない場合は CPU で動作します。設定画面で Whisper / PLaMo の「実行先」が「自動」または「GPU」になっているか確認してください。それでも遅い場合は、設定画面で使用するモデル（Whisper / PLaMo）を軽いものに変更するか、「速度を測る」を実行して 1 段下げたモデルに切り替えてください。CPU 向けのモデルでも動作しますが遅くなります。</p>
+        </details>
+        <details>
+          <summary>GPU がない PC でも動きますか？</summary>
+          <p>動きます。Windows 版のインストーラには Vulkan ローダーが含まれているため、Vulkan 対応 GPU やドライバがない PC でも起動し、CPU で動作します。「PC の性能を調べる」で選ばれる CPU ティアのモデル（Whisper base + PLaMo 0.8B）を使い、設定画面で Whisper / PLaMo の「実行先」を「CPU」にしてください（VAD は常に CPU で動作します）。動作しますが GPU より遅くなるため、リアルタイムに間に合わない場合はより小さいモデルに切り替えてください。</p>
         </details>
         <details>
           <summary>macOS でシステム音声を取り込めません。</summary>

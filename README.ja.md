@@ -56,11 +56,12 @@ PC 上で再生されるあらゆる音声をリアルタイムで文字起こ�
 |---|---|---|
 | OS | Windows 10 / 11（64bit） | macOS 13 Ventura 以降 |
 | CPU | x64（Intel / AMD） | Apple Silicon（M1 以降） |
-| GPU | **Vulkan 対応 GPU + 最新の GPU ドライバ** | 内蔵 GPU（Metal） |
+| GPU | **推奨: Vulkan 対応 GPU + 最新の GPU ドライバ**（なくても CPU で動作） | 内蔵 GPU（Metal） |
 | メモリ | 8GB 以上 | 8GB 以上 |
 | 空き容量 | モデルのダウンロード分（[モデルとティア](#モデルとティア)を参照） | 同左 |
 
-- Windows 版は **Vulkan 対応の GPU と最新ドライバ**が必要です（公式ビルドは `--features vulkan`）。ドライバが古いと GPU が使われず、実用的な速度が出ません。
+- Windows 版は、**Vulkan ランタイムを別途インストールしなくても起動します**。公式ビルド（`--features vulkan`）はロード時に `vulkan-1` をリンクするため、インストーラに Khronos の Vulkan ローダー（`vulkan-1.dll`、Apache-2.0）を同梱しています。Vulkan 対応 GPU やドライバがない PC ではローダーがデバイスを見つけられず、CPU で動作します（CPU ティアのモデルを使うため遅くなります）。
+- 実用的な速度で動かすには **Vulkan 対応 GPU と最新ドライバを強く推奨します**。ドライバが古いと GPU が使われず、実用的な速度が出ません。
 - Intel Mac 版はありません。32bit Windows、Windows on ARM 版もありません。
 - 配布は **GitHub Releases のみ**です（自動アップデート機能はありません。新しいリリースがある場合に通知し、リリースページへのリンクを表示するだけです）。
 
@@ -96,6 +97,8 @@ WASAPI loopback（Windows）/ ScreenCaptureKit のシステム音声（macOS）/
 
 ティアは初回セットアップで「PC の性能を調べる」を実行したときに決まり、そのティアに応じたモデルが自動で選択されます。設定画面では使用するモデル（Whisper / PLaMo / VAD）を個別に変更できます。検出結果はキャッシュされるため、グラフィックボードを交換した場合などは「もう一度調べる」で再検出してください。
 
+3 つのモデルにはそれぞれ**実行先（Runs on）**の選択肢があり、バックエンドが対応していれば設定画面で **自動 / GPU / CPU** から選べます。Whisper と PLaMo はどちらでも動きますが、VAD は上流の仕様で CPU 専用です（whisper.cpp が GPU 版 VAD を強制的に無効にしています）。「自動」は GPU が検出できたときに GPU、それ以外は CPU を使います。GPU での読み込みに失敗した場合は、そのモデルを CPU で読み込み直します。モデルや実行先の変更は、次に翻訳を開始したときから反映されます。
+
 | ティア | 判定 | Whisper | PLaMo 3 Translate | 初回ダウンロード量 |
 |---|---|---|---|---|
 | High | VRAM 12GB以上 / Apple Silicon RAM 32GB以上 | large-v3-turbo | 8B Q4_K_M | 約 6.9GB |
@@ -109,11 +112,14 @@ WASAPI loopback（Windows）/ ScreenCaptureKit のシステム音声（macOS）/
 
 ## ビルド
 
-必要なもの: Rust stable（edition 2021）。Windows は MSVC + Windows SDK、CMake、LLVM / libclang（bindgen 用）、Vulkan SDK、WebView2。macOS は Xcode 26（または macOS 26 SDK を含む Command Line Tools）が必要です。ScreenCaptureKit の Rust バインディングがビルド時に小さな Swift ブリッジをコンパイルし、その依存クレート（apple-metal）が macOS 26 SDK の Metal API を参照するためです。リリース CI は `macos-15` ランナー上の Xcode 26 を選択してビルドします。Node.js は Tauri CLI を `npx` で動かすためだけに使います（アプリ本体には不要）。
+必要なもの: Rust stable（edition 2021）。Windows は MSVC + Windows SDK、CMake、LLVM / libclang（bindgen 用）、WebView2。**Vulkan SDK が必要なのは `--features vulkan`（公式の GPU ビルド）だけ**で、同梱する Vulkan ローダーをバンドル前に `src-tauri/libs/` へコピーします（後述）。GPU 機能を付けないビルドは CPU 専用で、Vulkan SDK は不要です。macOS は Xcode 26（または macOS 26 SDK を含む Command Line Tools）が必要です。ScreenCaptureKit の Rust バインディングがビルド時に小さな Swift ブリッジをコンパイルし、その依存クレート（apple-metal）が macOS 26 SDK の Metal API を参照するためです。リリース CI は `macos-15` ランナー上の Xcode 26 を選択してビルドします。Node.js は Tauri CLI を `npx` で動かすためだけに使います（アプリ本体には不要）。
 
 ```bash
 # Windows（Vulkan。公式ビルドと同じ）
 npx --yes @tauri-apps/cli@2.12.4 build --features vulkan
+
+# Windows（CPU 専用。Vulkan SDK は不要）
+npx --yes @tauri-apps/cli@2.12.4 build
 
 # macOS（Metal）
 npx --yes @tauri-apps/cli@2.12.4 build --features metal
@@ -126,7 +132,7 @@ npx --yes @tauri-apps/cli@2.12.4 build --features cuda
 
 whisper.cpp と llama.cpp はどちらも ggml を含むため、同じプロセスに静的リンクするとシンボルが衝突します。llama.cpp は共有ライブラリとしてリンクし（`llama-cpp-2` の `dynamic-link`）、インストーラに同梱しています。
 
-- Windows: `src-tauri/libs/*.dll` を `bundle.resources` で同梱します。`src-tauri/libs/` は `.gitignore` 対象なので、バンドル前に llama.cpp のビルド成果物（`target/release/build/llama-cpp-sys-2-*/out/bin/*.dll`）を `src-tauri/libs/` にコピーしてください。CI の手順は `.github/workflows/release.yml` にあります。
+- Windows: `src-tauri/libs/*.dll` を `bundle.resources` で同梱します。`src-tauri/libs/` は `.gitignore` 対象なので、バンドル前に llama.cpp のビルド成果物（`target/release/build/llama-cpp-sys-2-*/out/bin/*.dll`）を `src-tauri/libs/` にコピーしてください。`--features vulkan` の場合は、SDK 同梱の Vulkan Runtime インストーラ（SDK 1.4.313.1 以降）が `"%SystemRoot%\System32\vulkan-1.dll"` に置いた Khronos の Vulkan ローダーもコピーします。`overlaysubs.exe` はロード時に `vulkan-1.dll` を必要とするため、Vulkan 機能付きでビルドしたインストーラにローダーが入っていないと、Vulkan ランタイムのない PC では起動しません。CI の手順は `.github/workflows/release.yml` にあります。
 - macOS: `beforeBundleCommand` が `scripts/stage-dylibs.sh` を実行し、`target/frameworks` に dylib を集めて `bundle.macOS.files` で同梱します。
 - `THIRD_PARTY_NOTICES.md` もバンドルに同梱されます（`src-tauri/tauri.windows.conf.json` / `tauri.macos.conf.json`）。
 - macOS: `src-tauri/Info.plist` はバンドルの生成される Info.plist にマージされます（`bundle.macOS.infoPlist`）。マイクと画面収録／システム音声の利用目的（`NSMicrophoneUsageDescription` / `NSScreenCaptureUsageDescription`）を宣言しています。
@@ -165,4 +171,4 @@ OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
 - 改定後のライセンスでは、翻訳した字幕の公開にクレジット表示は必須ではありません。書籍・論文その他これらに類する長文の公表物では、PLaMo を翻訳に利用した旨を明示してください。字幕データをデータセット等として配布する場合は、そのデータで学習したモデルに本ライセンスが適用される旨を明示してください。
 - 配信や動画の字幕を公開する場合は、元コンテンツの著作権にも注意してください。
 - Whisper モデル（MIT）と Silero VAD（MIT）は、それぞれのライセンスに従います。
-- 同梱している whisper.cpp / llama.cpp / ggml などのサードパーティライセンスは [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にまとめています。
+- 同梱している whisper.cpp / llama.cpp / ggml（MIT）と Windows 版の Vulkan ローダー `vulkan-1.dll`（Apache-2.0）などのサードパーティライセンスは [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にまとめています。

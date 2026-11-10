@@ -238,7 +238,8 @@
             <li><strong>Click-through</strong>: off by default. When on, mouse input passes to the window underneath (you can't interact with the overlay itself while it's on)</li>
             <li><strong>History</strong>: save recent subtitles as text / SRT</li>
             <li><strong>Interface language</strong>: English / Japanese / Chinese (Traditional and Simplified)</li>
-            <li><strong>Advanced</strong>: GPU layers for the translation model (0 = CPU), whether speech recognition uses the GPU, model folder</li>
+            <li><strong>Set up models</strong>: the Whisper / PLaMo / VAD model, and "Runs on" (Auto / GPU / CPU) for Whisper and PLaMo next to each model; VAD always runs on the CPU</li>
+            <li><strong>Advanced</strong>: model folder</li>
           </ul>
           <figure>
             <img src="images/ui-settings.png" width="1960" height="1508" loading="lazy" alt="The Translation tab of Settings, showing audio input, language and translation tuning settings, and a list of recent subtitles (source and translation).">
@@ -315,14 +316,14 @@
             <tbody>
               <tr><th scope="row">OS</th><td>Windows 10 / 11 (64-bit)</td><td>macOS 13 Ventura or later</td></tr>
               <tr><th scope="row">CPU</th><td>x64 (Intel / AMD)</td><td>Apple Silicon (M1 or later)</td></tr>
-              <tr><th scope="row">GPU</th><td>Vulkan-capable GPU + latest GPU driver</td><td>Integrated GPU (Metal)</td></tr>
+              <tr><th scope="row">GPU</th><td>Recommended: Vulkan-capable GPU + latest GPU driver (runs on the CPU without one)</td><td>Integrated GPU (Metal)</td></tr>
               <tr><th scope="row">Memory</th><td>8 GB or more</td><td>8 GB or more</td></tr>
               <tr><th scope="row">Free space</th><td>Enough for the first-run model download (table below)</td><td>Same</td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          The Windows build needs a <strong>Vulkan-capable GPU and an up-to-date driver</strong>. With an old driver the GPU isn't used and the app is too slow to be practical.
+          The Windows installer includes the <strong>Vulkan loader</strong>, so the app starts even on a PC with no Vulkan-capable GPU or driver and then runs on the CPU (slower). A <strong>Vulkan-capable GPU with an up-to-date driver is recommended</strong> for real-time speed: with an old driver the GPU isn't used and the app is too slow to be practical.
           It is distributed <strong>only via GitHub Releases</strong>. There is no auto-update: the app checks at startup whether a newer release exists and notifies you, but never downloads or installs it automatically.
         </p>
 
@@ -348,7 +349,7 @@
             </table>
           </div>
           <p class="muted">
-            Sizes are the sum of the sizes declared in <code>models.json</code> (including Silero VAD, about 0.9 MB). Running "Check this PC" during first-run setup determines your tier from the hardware and picks the models. You can change the Whisper / PLaMo models individually in Settings. The result is cached in <code>hardware.json</code> in the config folder, so later launches show it without probing again; run "Check again" after changing the hardware.
+            Sizes are the sum of the sizes declared in <code>models.json</code> (including Silero VAD, about 0.9 MB). Running "Check this PC" during first-run setup determines your tier from the hardware and picks the models. You can change the Whisper / PLaMo models individually in Settings and pick where each one runs (Auto / GPU / CPU; VAD is CPU-only); changing a model or where it runs takes effect after you stop and start translating. The result is cached in <code>hardware.json</code> in the config folder, so later launches show it without probing again; run "Check again" after changing the hardware.
           </p>
           <p class="muted">
             Tier guide: High is 12 GB+ VRAM, Mid is 8 GB VRAM, Low is 4–6 GB VRAM, and CPU is for no GPU or under 4 GB VRAM (Apple Silicon is judged by memory size).
@@ -366,7 +367,7 @@
         <ul class="plain">
           <li>The builds are <strong>not signed and not notarized</strong> (no Windows code-signing certificate; on macOS no Developer ID signature or notarization, <strong>ad-hoc signed only</strong>). SmartScreen / Gatekeeper will warn you (see <a href="#warning">Warnings</a>).</li>
           <li><strong>There is no Intel Mac build.</strong> macOS requires Apple Silicon (M1 or later) and macOS 13 or later.</li>
-          <li>Windows <strong>requires a Vulkan-capable GPU and an up-to-date driver</strong>. Without them the app is too slow to be practical.</li>
+          <li>Windows <strong>runs on the CPU when there is no Vulkan-capable GPU or driver</strong> (with the CPU-tier models, so it is slower); a Vulkan-capable GPU with an up-to-date driver is recommended for real-time speed.</li>
           <li>On macOS, system audio is captured with ScreenCaptureKit. The first use requires the "Screen &amp; System Audio Recording" (macOS 15+) or "Screen Recording" (macOS 13–14) permission and an app restart (see <a href="#faq">FAQ</a>).</li>
           <li>Capturing a single app only, or processing system audio and the microphone at the same time, is not implemented yet.</li>
           <li><strong>There is no auto-update.</strong> The app checks for a newer release at startup and notifies you, but it never downloads or installs one. Download new versions manually from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> (the only distribution channel).</li>
@@ -384,7 +385,7 @@
           <div>
             <h3>App code</h3>
             <p><strong>MIT License</strong>. The full text is in <a href="https://github.com/sp-yduck/overlaysubs/blob/main/LICENSE">LICENSE</a>.</p>
-            <p>Licenses for bundled third-party software such as whisper.cpp / llama.cpp / ggml are collected in
+            <p>Licenses for bundled third-party software such as whisper.cpp / llama.cpp / ggml (MIT) and the Windows Vulkan loader (Apache-2.0) are collected in
               <a href="https://github.com/sp-yduck/overlaysubs/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.
               The Whisper models (MIT) and Silero VAD (MIT) follow their own licenses.</p>
           </div>
@@ -430,7 +431,11 @@
         </details>
         <details>
           <summary>The GPU isn't used / it's slow.</summary>
-          <p>Windows needs an up-to-date Vulkan-capable GPU driver (see <a href="#requirements">Requirements</a>). If it's still slow, switch to lighter Whisper / PLaMo models in Settings, or run "Measure speed" and drop one model size. The CPU models work too, but more slowly.</p>
+          <p>Windows needs an up-to-date Vulkan-capable GPU driver for GPU acceleration (see <a href="#requirements">Requirements</a>); without one the app runs on the CPU. Check that "Runs on" is set to Auto or GPU for Whisper and PLaMo in Settings. If it's still slow, switch to lighter Whisper / PLaMo models in Settings, or run "Measure speed" and drop one model size. The CPU models work too, but more slowly.</p>
+        </details>
+        <details>
+          <summary>Does it run on a PC without a GPU?</summary>
+          <p>Yes. The Windows installer includes the Vulkan loader, so the app starts even if there is no Vulkan-capable GPU or driver, and it runs on the CPU. Pick the CPU-tier models (Whisper base + PLaMo 0.8B, which "Check this PC" selects) and set "Runs on" to CPU for Whisper and PLaMo in Settings; VAD always runs on the CPU. It works but is slower than on a GPU — if it can't keep up in real time, switch to smaller models.</p>
         </details>
         <details>
           <summary>I can't capture system audio on macOS.</summary>
