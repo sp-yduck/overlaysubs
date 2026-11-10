@@ -277,7 +277,47 @@ mod tests {
         asr: String,
         mt: String,
         gpu: bool,
+        /// Peaks over the whole run in MB, models included; see `mem_sampler`. Absent in reports from before they were measured.
+        #[serde(default)]
+        ram_peak_mb: Option<f64>,
+        #[serde(default)]
+        vram_peak_mb: Option<f64>,
         clips: Vec<Clip>,
+    }
+
+    /// Samples memory until `stop` is set and returns the peaks in MB. RAM is this process's resident set.
+    /// VRAM is how far GPU 0's used memory rose above its reading at the start, so keep other GPU apps idle.
+    /// shortcut: VRAM comes from nvidia-smi, so it is None without an NVIDIA GPU; add a per-vendor query if AMD / Intel / Metal numbers are needed.
+    fn mem_sampler(stop: std::sync::Arc<std::sync::atomic::AtomicBool>) -> std::thread::JoinHandle<(f64, Option<f64>)> {
+        use std::io::BufRead;
+        use std::process::{Command, Stdio};
+        let smi = |extra: &[&str]| {
+            let mut c = Command::new("nvidia-smi");
+            c.args(["--query-gpu=memory.used", "--format=csv,noheader,nounits", "-i", "0"]).args(extra).stdout(Stdio::piped()).stderr(Stdio::null());
+            c
+        };
+        // Read synchronously, before the caller loads a model.
+        let base = smi(&[]).output().ok().and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse::<f64>().ok());
+        std::thread::spawn(move || {
+            // One long-lived nvidia-smi printing every 200 ms costs less than spawning one per sample.
+            let mut child = base.and_then(|_| smi(&["-lms", "200"]).spawn().ok());
+            let lines = child.as_mut().and_then(|c| c.stdout.take()).map(std::io::BufReader::new);
+            let vram = lines.map(|l| std::thread::spawn(move || l.lines().map_while(Result::ok).filter_map(|l| l.trim().parse::<f64>().ok()).fold(0.0, f64::max)));
+            let pid = sysinfo::get_current_pid().unwrap();
+            let mut sys = sysinfo::System::new().unwrap();
+            let mut ram = 0;
+            while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                sys.refresh_processes_specifics(sysinfo::ProcessesToUpdate::Some(&[pid]), false, sysinfo::ProcessRefreshKind::nothing().with_memory());
+                ram = ram.max(sys.process(pid).map_or(0, |p| p.memory()));
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            if let Some(mut c) = child {
+                let _ = c.kill();
+                let _ = c.wait();
+            }
+            let peak = vram.map(|t| t.join().unwrap());
+            (ram as f64 / (1 << 20) as f64, base.zip(peak).map(|(b, p)| (p - b).max(0.0)))
+        })
     }
 
     /// Times are seconds. `load` is engine time over audio time (above 1 cannot keep up);
@@ -319,6 +359,8 @@ mod tests {
         }
         let p = |i: usize| dir.join(&reg.get(&ids[i]).unwrap().file);
         let gpu = env("OVERLAYSUBS_GPU", "0") == "1";
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mem = mem_sampler(stop.clone());
         let threads = std::thread::available_parallelism().unwrap().get();
         let mut asr = Timed(Whisper::load(&p(0), &p(2), gpu, threads).unwrap(), Duration::ZERO);
         let mut mt = Timed(Plamo::load(&p(1), if gpu { 999 } else { 0 }, threads).unwrap(), Duration::ZERO);
@@ -330,7 +372,7 @@ mod tests {
         };
         wavs.sort();
         assert!(!wavs.is_empty(), "no .wav in OVERLAYSUBS_WAV");
-        let mut report = Report { asr: ids[0].clone(), mt: ids[1].clone(), gpu, clips: vec![] };
+        let mut report = Report { asr: ids[0].clone(), mt: ids[1].clone(), gpu, ram_peak_mb: None, vram_peak_mb: None, clips: vec![] };
         for path in wavs {
             let pcm = wav(&path);
             // 10 ms chunks, as live capture delivers them; a second of silence ends the last utterance.
@@ -376,15 +418,19 @@ mod tests {
             });
         }
 
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        let (ram, vram) = mem.join().unwrap();
+        (report.ram_peak_mb, report.vram_peak_mb) = (Some(ram), vram);
+
         let base: Option<Report> = std::env::var("OVERLAYSUBS_BASELINE").ok().filter(|p| !p.is_empty()).map(|p| serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap());
         let pct = |v: Option<f64>| v.map_or("-".into(), |v| format!("{:.1}%", v * 100.0));
+        let row = |name: &str, new: f64, old: Option<f64>| match old {
+            Some(old) => eprintln!("  {name:<18}{old:>8.2} -> {new:>8.2}  ({:+.0}%)", (new / old - 1.0) * 100.0),
+            None => eprintln!("  {name:<18}{new:>8.2}"),
+        };
         for c in &report.clips {
             eprintln!("\n{} ({:.1} s, {} + {}, {})", c.name, c.audio_s, report.asr, report.mt, if gpu { "GPU" } else { "CPU" });
             let b = base.as_ref().and_then(|b| b.clips.iter().find(|b| b.name == c.name));
-            let row = |name: &str, new: f64, old: Option<f64>| match old {
-                Some(old) => eprintln!("  {name:<18}{old:>8.2} -> {new:>8.2}  ({:+.0}%)", (new / old - 1.0) * 100.0),
-                None => eprintln!("  {name:<18}{new:>8.2}"),
-            };
             row("load (x realtime)", c.load, b.map(|b| b.load));
             row("final delay p50 s", c.final_delay_p50, b.map(|b| b.final_delay_p50));
             row("final delay max s", c.final_delay_max, b.map(|b| b.final_delay_max));
@@ -401,6 +447,12 @@ mod tests {
                 None => eprintln!("  transcript CER    {}\n  translation CER   {}", pct(c.cer), pct(c.tr_cer)),
             }
             eprintln!("  {}\n  -> {}", c.source, c.translation);
+        }
+        eprintln!("\nmemory, whole run");
+        row("RAM peak MB", ram, base.as_ref().and_then(|b| b.ram_peak_mb));
+        match vram {
+            Some(v) => row("VRAM peak MB", v, base.as_ref().and_then(|b| b.vram_peak_mb)),
+            None => eprintln!("  VRAM peak MB             -  (needs nvidia-smi)"),
         }
         if let Ok(out) = std::env::var("OVERLAYSUBS_OUT") {
             std::fs::write(out, serde_json::to_string_pretty(&report).unwrap()).unwrap();

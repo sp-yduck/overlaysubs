@@ -8,6 +8,9 @@
 # Optional, next to clip.wav: clip.txt (what is said) and clip.tr.txt (a reference translation);
 # with them the report has character error rates, without them only the change from the baseline.
 #
+# Peak RAM (this process, models included) is always reported; peak VRAM only with an NVIDIA GPU
+# (nvidia-smi), as the rise of the GPU's used memory during the run, so keep other GPU apps idle.
+#
 # The report goes to target/bench/<commit>.json. To measure a change:
 #   git switch main      && scripts/bench.sh clips/            # -> target/bench/<main>.json
 #   git switch my-branch && scripts/bench.sh clips/ target/bench/<main>.json
@@ -17,7 +20,7 @@
 # BENCH_FEATURES=vulkan|cuda|metal. Timings vary between runs: close other apps, and rerun before
 # trusting a difference of a few percent.
 set -euo pipefail
-[ $# -ge 1 ] || { sed -n '2,18p' "$0"; exit 1; }
+[ $# -ge 1 ] || { sed -n '2,21p' "$0"; exit 1; }
 root="$(cd "$(dirname "$0")/.." && pwd)"
 abs() { (cd "$(dirname "$1")" && echo "$PWD/$(basename "$1")"); }
 dirty=""; git -C "$root" diff --quiet HEAD || dirty="-dirty"
