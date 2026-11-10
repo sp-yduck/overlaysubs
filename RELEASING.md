@@ -254,7 +254,7 @@ Check the Actions logs. Common causes:
 
 - Windows: Vulkan SDK download failure → rerun the workflow
 - Windows: `llama.dll` staging failure → `src-tauri/libs/` and `C:\t\release\build\llama-cpp-sys-2-*\out\bin\`
-- Windows: `vulkan-1.dll` staging failure → `src-tauri/libs/` and `%VULKAN_SDK%\Bin\vulkan-1.dll` (set by the "Install Vulkan SDK" step; the loader must ship with the installers because the app imports it at load time)
+- Windows: `vulkan-1.dll` staging failure → `src-tauri/libs/` and `%SystemRoot%\System32\vulkan-1.dll` (the SDK's bundled Vulkan Runtime installer, SDK 1.4.313.1+, puts the loader there during the "Install Vulkan SDK" step; the loader must ship with the installers because the app imports it at load time)
 - macOS: `codesign` verification failure → check that the ad-hoc signing configuration (`--config '{"bundle":{"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}'`) has not disappeared. With ad-hoc signing, hardened runtime must be disabled; otherwise the bundled llama/ggml dylibs are rejected by library validation and the app crashes on launch
 - Build timeout (240 minutes) → usually tens of minutes when the cache is warm
 

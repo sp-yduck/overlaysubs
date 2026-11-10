@@ -206,7 +206,9 @@ llama_copyright=$(copyright_line "$tmp/llama-license.txt")
 # The Windows installers ship Khronos' Vulkan loader (vulkan-1.dll). The DLL has
 # no version of its own in the file name, so report the Vulkan SDK that release
 # CI installs; keep this in sync with the "Install Vulkan SDK" step in
-# release.yml (it is the same pin that the build links against).
+# release.yml (it is the same pin that the build links against). The loader
+# itself comes from the Vulkan Runtime installer bundled with that SDK since
+# 1.4.313.1, which the SDK install runs into the system directory.
 vulkan_sdk_version=$(sed -n 's/^[[:space:]]*\$v = "\([0-9][0-9.]*\)"[[:space:]]*$/\1/p' \
   "$root/.github/workflows/release.yml" 2>/dev/null | head -n 1 || true)
 vulkan_sdk_version=${vulkan_sdk_version:-1.4.313.2}
@@ -458,7 +460,7 @@ SECTION1
   printf '```\n\n'
 
   printf '### 1.3 Khronos Vulkan Loader — Apache-2.0 (Windows)\n\n'
-  printf 'Version: Vulkan-Loader from the Vulkan SDK %s\n\n' "$vulkan_sdk_version"
+  printf 'Version: Vulkan-Loader from the Vulkan Runtime installer bundled with the Vulkan SDK %s\n\n' "$vulkan_sdk_version"
   printf 'Upstream: <https://github.com/KhronosGroup/Vulkan-Loader>\n\n'
   printf 'Bundled file: `vulkan-1.dll`, next to `overlaysubs.exe` in the Windows\n'
   printf '.exe / .msi installers. The macOS build does not link it.\n\n'

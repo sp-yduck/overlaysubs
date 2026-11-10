@@ -132,7 +132,7 @@ npx --yes @tauri-apps/cli@2.12.4 build --features cuda
 
 whisper.cpp と llama.cpp はどちらも ggml を含むため、同じプロセスに静的リンクするとシンボルが衝突します。llama.cpp は共有ライブラリとしてリンクし（`llama-cpp-2` の `dynamic-link`）、インストーラに同梱しています。
 
-- Windows: `src-tauri/libs/*.dll` を `bundle.resources` で同梱します。`src-tauri/libs/` は `.gitignore` 対象なので、バンドル前に llama.cpp のビルド成果物（`target/release/build/llama-cpp-sys-2-*/out/bin/*.dll`）を `src-tauri/libs/` にコピーしてください。`--features vulkan` の場合は Khronos の Vulkan ローダー（`"%VULKAN_SDK%\Bin\vulkan-1.dll"`）もコピーします。`overlaysubs.exe` はロード時に `vulkan-1.dll` を必要とするため、Vulkan 機能付きでビルドしたインストーラにローダーが入っていないと、Vulkan ランタイムのない PC では起動しません。CI の手順は `.github/workflows/release.yml` にあります。
+- Windows: `src-tauri/libs/*.dll` を `bundle.resources` で同梱します。`src-tauri/libs/` は `.gitignore` 対象なので、バンドル前に llama.cpp のビルド成果物（`target/release/build/llama-cpp-sys-2-*/out/bin/*.dll`）を `src-tauri/libs/` にコピーしてください。`--features vulkan` の場合は、SDK 同梱の Vulkan Runtime インストーラ（SDK 1.4.313.1 以降）が `"%SystemRoot%\System32\vulkan-1.dll"` に置いた Khronos の Vulkan ローダーもコピーします。`overlaysubs.exe` はロード時に `vulkan-1.dll` を必要とするため、Vulkan 機能付きでビルドしたインストーラにローダーが入っていないと、Vulkan ランタイムのない PC では起動しません。CI の手順は `.github/workflows/release.yml` にあります。
 - macOS: `beforeBundleCommand` が `scripts/stage-dylibs.sh` を実行し、`target/frameworks` に dylib を集めて `bundle.macOS.files` で同梱します。
 - `THIRD_PARTY_NOTICES.md` もバンドルに同梱されます（`src-tauri/tauri.windows.conf.json` / `tauri.macos.conf.json`）。
 - macOS: `src-tauri/Info.plist` はバンドルの生成される Info.plist にマージされます（`bundle.macOS.infoPlist`）。マイクと画面収録／システム音声の利用目的（`NSMicrophoneUsageDescription` / `NSScreenCaptureUsageDescription`）を宣言しています。

@@ -130,7 +130,7 @@ SOFTWARE.
 
 ### 1.3 Khronos Vulkan Loader — Apache-2.0 (Windows)
 
-Version: Vulkan-Loader from the Vulkan SDK 1.4.313.2
+Version: Vulkan-Loader from the Vulkan Runtime installer bundled with the Vulkan SDK 1.4.313.2
 
 Upstream: <https://github.com/KhronosGroup/Vulkan-Loader>
 

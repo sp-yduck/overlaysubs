@@ -284,10 +284,21 @@ jobs:
           # needs the SDK nor stages the loader. Khronos discourages shipping a loader app-local
           # (a newer system loader can exist), but it is required here to start CPU-only PCs;
           # keep the SDK pin current so the bundled loader does not age.
+          #
+          # The SDK's `Bin` only has tools: since SDK 1.4.313.1 the SDK installer bundles and runs
+          # the Vulkan Runtime installer, which puts the loader in the system directory. Take it
+          # from there (a `runtime\x64` copy is used when an SDK layout has one).
           if ("${{ matrix.features }}" -eq "vulkan") {
             if (-not $env:VULKAN_SDK) { throw "VULKAN_SDK is not set; the Vulkan build must ship the Vulkan loader" }
-            Copy-Item "$env:VULKAN_SDK\Bin\vulkan-1.dll" src-tauri/libs/
-            if (!(Test-Path src-tauri/libs/vulkan-1.dll)) { throw "vulkan-1.dll was not staged ($env:VULKAN_SDK\Bin)" }
+            $candidates = @(
+              (Join-Path $env:VULKAN_SDK 'runtime\x64\vulkan-1.dll'),
+              (Join-Path $env:windir 'System32\vulkan-1.dll')
+            )
+            $loader = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $loader) { throw "vulkan-1.dll not found after installing the Vulkan SDK; searched: $($candidates -join ', ')" }
+            Write-Host "Bundling Vulkan loader: $loader ($((Get-Item $loader).VersionInfo.FileVersion))"
+            Copy-Item $loader src-tauri/libs/vulkan-1.dll
+            if (!(Test-Path src-tauri/libs/vulkan-1.dll)) { throw "vulkan-1.dll was not staged" }
           }
           Get-ChildItem src-tauri/libs
 
