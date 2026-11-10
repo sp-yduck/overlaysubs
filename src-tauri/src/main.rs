@@ -7,6 +7,7 @@ mod update;
 
 use capture::Source;
 use overlaysubs_core::cache::HardwareCache;
+use overlaysubs_core::device::Device;
 use overlaysubs_core::endpoint::{EndpointConfig, Endpointer, Event};
 use overlaysubs_core::export::{self, Entry};
 use overlaysubs_core::registry::{Registry, Selection};
@@ -23,6 +24,11 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
+/// Whether this build can use a GPU at all: the official builds enable one of these backends.
+/// A build without one still launches, and `snapshot` publishes this so the settings UI can hide
+/// the GPU choices instead of offering a switch that the build cannot honour.
+const GPU_BUILD: bool = cfg!(any(feature = "vulkan", feature = "cuda", feature = "metal"));
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 struct Settings {
@@ -31,9 +37,16 @@ struct Settings {
     selection: Option<Selection>,
     source: Source,
     session: SessionConfig,
-    /// Cap GPU use when gaming. 0 = translator on CPU.
-    gpu_layers: u32,
-    whisper_gpu: bool,
+    /// Where each model runs. Auto uses the GPU when this build has the backend and the hardware
+    /// probe found one. VAD has no setting: whisper.cpp forces the GPU VAD off upstream.
+    asr_device: Device,
+    translator_device: Device,
+    /// Written by builds before the per-model choice, parsed only so `migrate` can carry a CPU
+    /// choice over; never serialized, so the keys disappear from settings.json on the next save.
+    #[serde(default, skip_serializing)]
+    whisper_gpu: Option<bool>,
+    #[serde(default, skip_serializing)]
+    gpu_layers: Option<u32>,
     hotkey: String,
     /// Empty until the UI picks one from the OS languages on first launch.
     ui_lang: String,
@@ -49,8 +62,10 @@ impl Default for Settings {
             selection: None,
             source: Source::System { device: None },
             session: SessionConfig::default(),
-            gpu_layers: 999,
-            whisper_gpu: true,
+            asr_device: Device::Auto,
+            translator_device: Device::Auto,
+            whisper_gpu: None,
+            gpu_layers: None,
             hotkey: "CmdOrCtrl+Shift+T".into(),
             ui_lang: String::new(),
             overlay: serde_json::json!({}),
@@ -58,8 +73,33 @@ impl Default for Settings {
     }
 }
 
-struct Engines {
+impl Settings {
+    /// Folds the removed `whisper_gpu` / `gpu_layers` settings into the per-model choice and drops
+    /// them, so users upgrading from an older file keep the CPU choice they made. Idempotent: the
+    /// new fields are left alone when the old ones are absent, and this runs again on every launch
+    /// until the next settings save rewrites the file without them (a write here could fail or
+    /// race the UI rewriting settings.json, so it is not done at startup).
+    fn migrate(&mut self) {
+        let (whisper_gpu, gpu_layers) = (self.whisper_gpu, self.gpu_layers);
+        overlaysubs_core::device::apply_legacy(&mut self.asr_device, &mut self.translator_device, whisper_gpu, gpu_layers);
+        self.whisper_gpu = None;
+        self.gpu_layers = None;
+    }
+}
+
+/// The model files and device settings the loaded engines were requested with. Kept next to them
+/// so a settings change reloads the models, and stored as *requested* even when a GPU load fell
+/// back to the CPU: recomputing it from what actually loaded would retry a broken or missing GPU
+/// on every launch.
+#[derive(PartialEq, Eq)]
+struct EngineConfig {
     ids: Selection,
+    asr_gpu: bool,
+    gpu_layers: u32,
+}
+
+struct Engines {
+    cfg: EngineConfig,
     asr: engine::Whisper,
     mt: engine::Plamo,
 }
@@ -149,6 +189,8 @@ struct Snapshot {
     devices: capture::Devices,
     /// Last "Check this PC" result from disk, so the model setup screen can show it again after a restart.
     hardware: Option<HardwareCache>,
+    /// False in a build without a GPU backend; the settings UI then offers Auto / CPU only.
+    gpu_build: bool,
 }
 
 #[tauri::command]
@@ -168,6 +210,7 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
         platform: std::env::consts::OS,
         devices: capture::devices(),
         hardware: hw::cached(&config_dir(&app)),
+        gpu_build: GPU_BUILD,
     })
 }
 
@@ -233,28 +276,66 @@ fn delete_model(app: AppHandle, st: State<App>, id: String) -> Result<(), String
     let s = st.settings.lock().unwrap().clone();
     let m = registry(&app)?.get(&id).cloned().ok_or("unknown model")?;
     let mut eng = st.engines.lock().unwrap();
-    if eng.as_ref().is_some_and(|e| [&e.ids.asr, &e.ids.translator, &e.ids.vad].contains(&&id)) {
+    if eng.as_ref().is_some_and(|e| [&e.cfg.ids.asr, &e.cfg.ids.translator, &e.cfg.ids.vad].contains(&&id)) {
         *eng = None;
     }
     std::fs::remove_file(models_dir(&app, &s).join(m.file)).map_err(|e| e.to_string())
 }
 
+/// Whether a GPU can be used: this build needs a GPU backend and the last hardware probe must have
+/// found a GPU. No probe yet (a fresh install that has not opened the setup screen) counts as
+/// available: a wrong guess only costs one failed load, which `load_engines` retries on the CPU,
+/// and the probe is cached by then for later launches.
+fn gpu_available(app: &AppHandle) -> bool {
+    GPU_BUILD && hw::cached(&config_dir(app)).map_or(true, |c| c.hardware.gpu.is_some())
+}
+
 fn ensure_engines(app: &AppHandle, st: &App) -> Result<(), String> {
     let s = st.settings.lock().unwrap().clone();
     let sel = s.selection.clone().ok_or("no models selected")?;
+    let gpu = gpu_available(app);
+    let cfg = EngineConfig {
+        ids: sel,
+        asr_gpu: s.asr_device.uses_gpu(gpu),
+        // llama.cpp takes a layer count rather than a flag: all layers on the GPU, or none.
+        gpu_layers: if s.translator_device.uses_gpu(gpu) { 999 } else { 0 },
+    };
     let mut eng = st.engines.lock().unwrap();
-    if eng.as_ref().is_some_and(|e| e.ids == sel) {
+    // Compare the requested config: after a CPU fallback the loaded engines are on the CPU but a
+    // machine whose GPU driver is broken must not retry the GPU load on every launch.
+    if eng.as_ref().is_some_and(|e| e.cfg == cfg) {
         return Ok(());
     }
     *eng = None;
-    let reg = registry(app)?;
-    let dir = models_dir(app, &s);
-    let path = |id: &str| reg.get(id).map(|m| dir.join(&m.file)).filter(|p| p.exists()).ok_or(format!("model {id} not downloaded"));
-    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
-    let asr = engine::Whisper::load(&path(&sel.asr)?, &path(&sel.vad)?, s.whisper_gpu, threads)?;
-    let mt = engine::Plamo::load(&path(&sel.translator)?, s.gpu_layers, threads)?;
-    *eng = Some(Engines { ids: sel, asr, mt });
+    let (asr, mt) = load_engines(app, &s, &cfg)?;
+    *eng = Some(Engines { cfg, asr, mt });
     Ok(())
+}
+
+/// Loads both models, retrying everything on the CPU when a GPU load fails: a machine with no
+/// usable GPU (no driver, basic display adapter, a VM) must still get subtitles, and a load error
+/// would otherwise leave the app unable to start translating at all. Both are retried rather than
+/// the one that failed: the first engine may already hold a GPU context on the backend that just
+/// failed, and a half-GPU/half-CPU pair is harder to reason about than the documented CPU setup.
+fn load_engines(app: &AppHandle, s: &Settings, cfg: &EngineConfig) -> Result<(engine::Whisper, engine::Plamo), String> {
+    let reg = registry(app)?;
+    let dir = models_dir(app, s);
+    let path = |id: &str| reg.get(id).map(|m| dir.join(&m.file)).filter(|p| p.exists()).ok_or(format!("model {id} not downloaded"));
+    let (asr, vad, mt) = (path(&cfg.ids.asr)?, path(&cfg.ids.vad)?, path(&cfg.ids.translator)?);
+    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let load = |asr_gpu: bool, gpu_layers: u32| {
+        let asr = engine::Whisper::load(&asr, &vad, asr_gpu, threads)?;
+        let mt = engine::Plamo::load(&mt, gpu_layers, threads)?;
+        Ok::<_, String>((asr, mt))
+    };
+    match load(cfg.asr_gpu, cfg.gpu_layers) {
+        Ok(engines) => Ok(engines),
+        Err(gpu_err) if cfg.asr_gpu || cfg.gpu_layers > 0 => {
+            eprintln!("loading the models with the GPU failed ({gpu_err}); retrying on the CPU");
+            load(false, 0).map_err(|cpu_err| format!("GPU load failed ({gpu_err}), and the CPU retry failed too ({cpu_err})"))
+        }
+        Err(err) => Err(err),
+    }
 }
 
 #[derive(Serialize)]
@@ -746,7 +827,7 @@ fn main() {
         .setup(|app| {
             let h = app.handle().clone();
             let path = config_dir(&h).join("settings.json");
-            let s: Settings = match std::fs::read_to_string(&path) {
+            let mut s: Settings = match std::fs::read_to_string(&path) {
                 Err(_) => Settings::default(),
                 Ok(j) => serde_json::from_str(&j).unwrap_or_else(|e| {
                     // Keep the unreadable file instead of silently overwriting it on the next save.
@@ -755,6 +836,8 @@ fn main() {
                     Settings::default()
                 }),
             };
+            // One-time: turn the removed GPU settings into the per-model choice before anything uses them.
+            s.migrate();
             if let Err(e) = h.global_shortcut().register(s.hotkey.as_str()) {
                 eprintln!("hotkey {}: {e}", s.hotkey);
             }
@@ -935,5 +1018,43 @@ mod tests {
         assert!(matches!(serde_json::from_str::<SavedPosition>(r#"{"x":200.5,"y":600}"#), Ok(SavedPosition::Desktop { x, y }) if x == 200.5 && y == 600.0));
         assert!(matches!(serde_json::from_str::<SavedPosition>("[400, 1200]"), Ok(SavedPosition::Physical(400, 1200))));
         assert!(serde_json::from_str::<SavedPosition>("garbage").is_err());
+    }
+
+    #[test]
+    fn legacy_settings_carry_a_cpu_choice_over_and_leave_the_rest_auto() {
+        // An older settings.json where the user turned the ASR GPU off and set the translator to
+        // 0 layers; both meant "run this model on the CPU" and must survive the upgrade.
+        let mut cpu: Settings = serde_json::from_str(r#"{"whisper_gpu": false, "gpu_layers": 0}"#).unwrap();
+        cpu.migrate();
+        assert_eq!((cpu.asr_device, cpu.translator_device), (Device::Cpu, Device::Cpu));
+        assert!(cpu.whisper_gpu.is_none() && cpu.gpu_layers.is_none(), "the legacy fields are cleared after migrating");
+
+        // A file that kept the old defaults (GPU on, every layer) behaved exactly like Auto.
+        let mut defaults: Settings = serde_json::from_str(r#"{"whisper_gpu": true, "gpu_layers": 999}"#).unwrap();
+        defaults.migrate();
+        assert_eq!((defaults.asr_device, defaults.translator_device), (Device::Auto, Device::Auto));
+
+        // A file from this build has neither legacy key; migrating must not touch its choices.
+        let mut fresh: Settings = serde_json::from_str(r#"{"asr_device": "gpu", "translator_device": "cpu"}"#).unwrap();
+        fresh.migrate();
+        assert_eq!((fresh.asr_device, fresh.translator_device), (Device::Gpu, Device::Cpu));
+    }
+
+    #[test]
+    fn saved_settings_write_the_device_choices_and_drop_the_legacy_keys() {
+        // The legacy fields only ever parse: a save must not bring them back, or the UI would keep
+        // showing (and migrating) settings that no longer exist.
+        let mut s = Settings { asr_device: Device::Gpu, translator_device: Device::Cpu, ..Settings::default() };
+        s.whisper_gpu = Some(false);
+        s.gpu_layers = Some(0);
+        let j = serde_json::to_value(&s).unwrap();
+        assert_eq!(j["asr_device"], "gpu");
+        assert_eq!(j["translator_device"], "cpu");
+        assert!(j.get("whisper_gpu").is_none() && j.get("gpu_layers").is_none());
+
+        // Untouched settings are Auto for both, which is today's behaviour: GPU when one was found.
+        let defaults = serde_json::to_value(Settings::default()).unwrap();
+        assert_eq!(defaults["asr_device"], "auto");
+        assert_eq!(defaults["translator_device"], "auto");
     }
 }

@@ -131,6 +131,22 @@ function termsView() {
 const progressView = (p) =>
   `<progress data-prog="${esc(p.id)}" max="${p.total}" value="${p.done}"></progress><span class="muted" data-pct="${esc(p.id)}">${Math.floor((100 * p.done) / p.total)}%</span>`;
 
+/**
+ * "Runs on" selector for one model kind. The value is persisted by the generic change handler
+ * through data-k, so a device change is saved like any other setting. VAD has no GPU path upstream
+ * (whisper.cpp hard-forces GPU VAD off), so its control is CPU-only and deliberately has no data-k:
+ * there is nothing to store or send.
+ */
+function deviceRow(kind, key) {
+  const note = t("run_cpu_only");
+  if (kind === "vad") {
+    return `<label class="f" title="${esc(note)}"><span>${t("run_on")}</span><select disabled aria-label="${esc(`${t("run_on")}: ${note}`)}"><option>${t("run_cpu")}</option></select></label>`;
+  }
+  // snap.gpu_build is false for a source build without a GPU backend; offering GPU there would only fail.
+  const pairs = [["auto", t("run_auto")], ...(snap.gpu_build ? [["gpu", t("run_gpu")]] : []), ["cpu", t("run_cpu")]];
+  return select(t("run_on"), `${key}_device`, opts(pairs, get(snap.settings, `${key}_device`)));
+}
+
 function modelRow(kind, key) {
   const s = snap.settings.selection;
   const list = snap.registry.models.filter((m) => m.kind === kind);
@@ -144,6 +160,7 @@ function modelRow(kind, key) {
       : `<span class="muted">${t("missing")} · ${gb(cur.size)}</span>`;
   return `<div class="mrow">
     ${select(t(kind), `selection.${key}`, opts(list.map((m) => [m.id, `${m.label} · ${gb(m.size)}${snap.downloaded.includes(m.id) ? " ✓" : ""}`]), s[key]))}
+    ${deviceRow(kind, key)}
     <div class="mstatus" data-mstatus="${esc(cur.id)}">${status}</div></div>`;
 }
 
@@ -164,13 +181,13 @@ function modelsPage() {
   ${step(2, ready, !sel, t("step_download"), sel
     ? `<p class="muted">${t("step_download_desc")}</p>
       ${modelRow("asr", "asr")}${modelRow("translator", "translator")}${modelRow("vad", "vad")}
+      ${snap.gpu_build ? "" : `<p class="muted small">${t("gpu_build_cpu")}</p>`}
+      ${snap.running ? `<p class="muted small">${t("model_restart_note")}</p>` : ""}
       <div class="row">${btn("download", busy.has("download") ? t("downloading") : `${t("download")} (${gb(total)})`, { cls: ready ? "" : "primary", disabled: ready })}</div>`
     : `<p class="muted">${t("step_locked")}</p>`)}
   ${step(3, !!benchMsg, !ready, t("step_bench"), `<p class="muted">${t("step_bench_desc")}</p>
     <div class="row">${btn("bench", busy.has("bench") ? t("benchmarking") : t("benchmark"), { disabled: !ready })}${benchMsg ? `<span>${esc(benchMsg)}</span>` : ""}</div>`)}
   <details class="card"><summary>${t("advanced")}</summary>
-    ${field(t("gpu_layers"), "gpu_layers", "number", 'min="0" max="999"')}
-    ${field(t("whisper_gpu"), "whisper_gpu", "check")}
     <div class="f"><span>${t("models_dir")}</span><div class="row"><code>${esc(snap.models_dir)}</code>${btn("dir", t("change"), { cls: "small" })}</div></div>
   </details>`;
 }

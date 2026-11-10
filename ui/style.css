@@ -106,6 +106,9 @@ button.busy::before { content: ""; display: inline-block; width: 11px; height: 1
 .step p { margin: 0 0 8px; }
 .mrow { padding: 6px 0; border-top: 1px solid var(--border); }
 .mrow .f { margin: 0; }
+/* The model picker and the Runs-on picker stack in one row, so keep a hairline gap between them. */
+.mrow .f + .f { margin-top: 4px; }
+.mrow select:disabled { opacity: .6; cursor: not-allowed; }
 .mstatus { display: flex; gap: 8px; align-items: center; margin: 4px 0 0 calc(min(200px, 40%) + 10px); min-height: 24px; }
 progress { flex: 1; max-width: 320px; accent-color: var(--accent); }
 

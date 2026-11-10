@@ -32,7 +32,7 @@ Do not translate functional data or legal texts: the terms of use (`licenses/`),
 - **Visual Studio 2022 Build Tools** with the "Desktop development with C++" workload (MSVC + Windows SDK).
 - **CMake** and **LLVM / libclang** (whisper-rs and llama-cpp-sys generate bindings with bindgen).
 - **WebView2 Runtime** (normally preinstalled on Windows 10/11).
-- **Vulkan SDK** (required). CI installs `1.4.313.2` from LunarG's installer. Set `VULKAN_SDK` and add `%VULKAN_SDK%\Bin` to `PATH`.
+- **Vulkan SDK** — required only for the Vulkan (GPU) build, i.e. `--features vulkan`. CI installs `1.4.313.2` from LunarG's installer; set `VULKAN_SDK` and add `%VULKAN_SDK%\Bin` to `PATH`. The Windows release bundle must also contain Khronos' loader: copy `%VULKAN_SDK%\Bin\vulkan-1.dll` into `src-tauri/libs/` next to the llama.cpp DLLs before bundling (CI does this), because `overlaysubs.exe` has a load-time import of `vulkan-1.dll` and would not start on a PC without a Vulkan runtime otherwise. A build with no features is a CPU-only build and needs no Vulkan SDK.
 - If you hit "path too long" errors, point `CARGO_TARGET_DIR` at a short path (CI uses `C:\t`).
 
 ```powershell
