@@ -30,23 +30,18 @@ pub struct EndpointConfig {
     pub max_ms: usize,
     /// Audio kept from before speech onset, so the first syllable is not clipped.
     pub pre_roll_ms: usize,
-    /// A pause this long, once the utterance is `pause_after_ms` old, marks a partial as a place the
-    /// session may cut if the text so far ends a sentence. 0 turns it off (the default: only `Early::Pause` uses it).
-    pub pause_ms: usize,
-    pub pause_after_ms: usize,
 }
 
 impl Default for EndpointConfig {
     fn default() -> Self {
-        Self { threshold: 0.5, silence_ms: 600, partial_every_ms: 1000, max_ms: 15_000, pre_roll_ms: 200, pause_ms: 0, pause_after_ms: 3000 }
+        Self { threshold: 0.5, silence_ms: 600, partial_every_ms: 1000, max_ms: 15_000, pre_roll_ms: 200 }
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Event {
     /// Utterance still running; audio so far. `start` is the stream position (in samples) of `pcm[0]`.
-    /// `pause` is set when the speaker just paused: the stream position where the speech stopped.
-    Partial { pcm: Vec<f32>, start: usize, pause: Option<usize> },
+    Partial { pcm: Vec<f32>, start: usize },
     /// Utterance finished.
     Final { pcm: Vec<f32>, start: usize },
 }
@@ -72,12 +67,11 @@ pub struct Endpointer {
     /// Stream position of the next sample pushed into `buf`, and of `buf[0]`.
     pos: usize,
     start: usize,
-    paused: bool,
 }
 
 impl Endpointer {
     pub fn new(cfg: EndpointConfig) -> Self {
-        Self { cfg, pending: Vec::new(), pre: Vec::new(), buf: Vec::new(), silent: 0, since_partial: 0, pos: 0, start: 0, paused: false }
+        Self { cfg, pending: Vec::new(), pre: Vec::new(), buf: Vec::new(), silent: 0, since_partial: 0, pos: 0, start: 0 }
     }
 
     /// The session committed everything before stream position `pos`: drop that audio from the running
@@ -113,28 +107,18 @@ impl Endpointer {
             if self.buf.is_empty() {
                 self.buf = std::mem::take(&mut self.pre);
                 self.start = self.pos - frame.len() - self.buf.len();
-                self.paused = false;
             }
             self.buf.extend_from_slice(frame);
             self.silent = if speaking { 0 } else { self.silent + frame.len() };
-            if speaking {
-                self.paused = false;
-            }
             self.since_partial += frame.len();
-            let at_pause = self.cfg.pause_ms > 0 && !self.paused && ms(self.silent) >= self.cfg.pause_ms && ms(self.buf.len()) >= self.cfg.pause_after_ms;
             if ms(self.silent) >= self.cfg.silence_ms || ms(self.buf.len()) >= self.cfg.max_ms {
                 let keep = self.buf.len() - self.silent.min(self.buf.len());
                 self.buf.truncate(keep.max(1));
                 out.push(Event::Final { pcm: std::mem::take(&mut self.buf), start: self.start });
                 self.silent = 0;
                 self.since_partial = 0;
-            } else if at_pause {
-                // Once per pause; it stands in for the regular partial.
-                self.paused = true;
-                out.push(Event::Partial { pcm: self.buf.clone(), start: self.start, pause: Some(self.pos - self.silent) });
-                self.since_partial = 0;
             } else if ms(self.since_partial) >= self.cfg.partial_every_ms {
-                out.push(Event::Partial { pcm: self.buf.clone(), start: self.start, pause: None });
+                out.push(Event::Partial { pcm: self.buf.clone(), start: self.start });
                 self.since_partial = 0;
             }
         }
@@ -146,7 +130,7 @@ impl Endpointer {
 mod tests {
     use super::*;
 
-    const NO_PRE: EndpointConfig = EndpointConfig { threshold: 0.5, silence_ms: 600, partial_every_ms: 1000, max_ms: 15_000, pre_roll_ms: 0, pause_ms: 0, pause_after_ms: 3000 };
+    const NO_PRE: EndpointConfig = EndpointConfig { threshold: 0.5, silence_ms: 600, partial_every_ms: 1000, max_ms: 15_000, pre_roll_ms: 0 };
 
     /// Replays fixed probabilities, one per frame.
     struct Script(Vec<f32>);
@@ -208,21 +192,21 @@ mod tests {
     }
 
     #[test]
-    fn pause_marks_a_partial_and_commit_drops_the_audio_before_it() {
-        let cfg = EndpointConfig { pause_ms: 250, ..NO_PRE };
-        let mut e = Endpointer::new(cfg);
+    fn commit_drops_the_audio_before_it_from_the_running_utterance() {
+        let mut e = Endpointer::new(NO_PRE);
         let mut ev = Vec::new();
         let vad = &mut Energy(0.01);
         e.push(&vec![0.0; 32 * FRAME], vad, &mut ev).unwrap();
-        e.push(&vec![0.1; 100 * FRAME], vad, &mut ev).unwrap(); // 3.2 s of speech
-        e.push(&vec![0.0; 12 * FRAME], vad, &mut ev).unwrap(); // 384 ms pause, under silence_ms
-        let pauses: Vec<_> = ev.iter().filter_map(|x| if let Event::Partial { pause: Some(p), start, .. } = x { Some((*start, *p)) } else { None }).collect();
-        assert_eq!(pauses, vec![(32 * FRAME, 132 * FRAME)], "one pause partial, at the end of the speech");
-        e.commit(132 * FRAME);
-        e.push(&vec![0.1; 32 * FRAME], vad, &mut ev).unwrap();
+        e.push(&vec![0.1; 100 * FRAME], vad, &mut ev).unwrap();
+        let Some(Event::Partial { start, .. }) = ev.last() else { panic!() };
+        assert_eq!(*start, 32 * FRAME, "positions count from the start of the stream");
+        e.commit(90 * FRAME);
+        e.commit(10 * FRAME); // already gone: ignored
+        e.push(&vec![0.1; 20 * FRAME], vad, &mut ev).unwrap();
         e.push(&vec![0.0; 32 * FRAME], vad, &mut ev).unwrap();
         let Some(Event::Final { pcm, start }) = ev.pop() else { panic!() };
-        assert_eq!((start, pcm.len()), (132 * FRAME, 44 * FRAME), "the final starts at the commit: the pause, then the new speech");
+        assert_eq!((start, pcm.len()), (90 * FRAME, 62 * FRAME), "the final starts at the commit");
+        e.commit(1_000 * FRAME); // no utterance running: ignored
     }
 
     #[test]

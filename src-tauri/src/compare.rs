@@ -1,5 +1,5 @@
-//! Side-by-side check of caption segmentation: the same clip with pause commits off and on.
-//! Run: OVERLAYSUBS_WAV=clip.wav [OVERLAYSUBS_GPU=1] [OVERLAYSUBS_MODES=off,stable,overlap] \
+//! Side-by-side check of caption segmentation: the same clip with early commits off and on.
+//! Run: OVERLAYSUBS_WAV=clip.wav [OVERLAYSUBS_GPU=1] [OVERLAYSUBS_MODES=off,on] \
 //!   cargo test --release -p overlaysubs [--features vulkan] segmentation_compare -- --ignored --nocapture
 //! It replays the app's loop on a virtual clock: audio arrives in real time, the session takes what is
 //! queued when it is free (dropping stale partials), and its commits reach the endpointer when it finishes.
@@ -7,7 +7,7 @@ use crate::engine::{Plamo, Silero, Whisper};
 use overlaysubs_core::endpoint::{EndpointConfig, Endpointer, Event};
 use overlaysubs_core::metrics::cer;
 use overlaysubs_core::registry::Registry;
-use overlaysubs_core::session::{Caption, Early, Session, SessionConfig, Stage};
+use overlaysubs_core::session::{Caption, Session, SessionConfig, Stage};
 use std::collections::VecDeque;
 use std::time::Instant;
 
@@ -30,7 +30,6 @@ struct Commit {
 #[derive(serde::Serialize)]
 struct Run {
     mode: String,
-    pause_ms: usize,
     load: f64,
     commits: Vec<Commit>,
     /// Longest draft each time a draft was replaced by a commit, in chars of translation.
@@ -38,8 +37,6 @@ struct Run {
     source: String,
     /// Seconds where the endpointer ended an utterance (end of its audio).
     final_ends: Vec<f64>,
-    /// Seconds of each pause and what became of it.
-    pauses: Vec<(f64, String)>,
     /// The longest draft: (source, translation).
     longest: (String, String),
 }
@@ -49,19 +46,16 @@ fn pct(v: &mut [f64], q: f64) -> f64 {
     v.get(((v.len() as f64 - 1.0) * q).round() as usize).copied().unwrap_or(0.0)
 }
 
-/// Modes: "off" (today), "pause<ms>" (commit at a pause), "stable" (commit what two partials agree on,
-/// cut at its last word), "overlap" (the same, cut a second early and the repeat removed).
+/// Modes: "off" (commit only at the endpointer's final) or "on" (early commits, the default).
 fn run(pcm: &[f32], mode: &str, vad_path: &str, asr: &mut Whisper, mt: &mut Plamo) -> Run {
-    let (early, pause_ms) = match mode {
-        "off" => (Early::Off, 0),
-        "stable" => (Early::Stable, 0),
-        "overlap" => (Early::Overlap, 0),
-        m => (Early::Pause, m.strip_prefix("pause").and_then(|v| v.parse().ok()).expect("mode: off, stable or pause<ms>")),
-    };
     let mut vad = Silero::load(vad_path).unwrap();
-    let mut ep = Endpointer::new(EndpointConfig { pause_ms, ..Default::default() });
+    let mut ep = Endpointer::new(EndpointConfig::default());
     let mut s = Session::new(SessionConfig::default());
-    s.early = early;
+    s.early_commit = match mode {
+        "off" => false,
+        "on" => true,
+        m => panic!("mode {m}: off or on"),
+    };
     let mut longest = (String::new(), String::new());
     let (mut out, mut queue) = (vec![], VecDeque::<(f64, Event, usize)>::new());
     let (mut busy_until, mut busy, mut seen, mut pos) = (0.0f64, 0.0f64, 0usize, 0usize);
@@ -69,7 +63,7 @@ fn run(pcm: &[f32], mode: &str, vad_path: &str, asr: &mut Whisper, mt: &mut Plam
     let mut commits = vec![];
     let mut drafts_before_commit = vec![];
     let mut longest_draft = 0;
-    let (mut final_ends, mut pauses) = (vec![], vec![]);
+    let mut final_ends = vec![];
     let silence = vec![0.0; 16_000];
     let chunks: Vec<&[f32]> = pcm.chunks(160).chain(std::iter::once(&silence[..])).collect();
     let n_chunks = chunks.len();
@@ -94,9 +88,6 @@ fn run(pcm: &[f32], mode: &str, vad_path: &str, asr: &mut Whisper, mt: &mut Plam
             let n = batch.len();
             for (i, (_, ev, epos)) in batch.into_iter().enumerate() {
                 if !ev.is_final() && i != n - 1 {
-                    if let Event::Partial { pause: Some(cut), .. } = ev {
-                        pauses.push((cut as f64 / 16_000.0, "dropped while the engines were busy".to_string()));
-                    }
                     continue;
                 }
                 if let Event::Final { pcm, start } = &ev {
@@ -134,8 +125,7 @@ fn run(pcm: &[f32], mode: &str, vad_path: &str, asr: &mut Whisper, mt: &mut Plam
         }
     }
     let source = s.entries.iter().map(|e| e.source.as_str()).collect::<Vec<_>>().join(" ");
-    pauses.extend(s.pause_log.iter().map(|&(c, why)| (c as f64 / 16_000.0, why.to_string())));
-    Run { mode: mode.to_string(), pause_ms, longest, load: busy / (pcm.len() as f64 / 16_000.0), commits, drafts_before_commit, source, final_ends, pauses }
+    Run { mode: mode.to_string(), longest, load: busy / (pcm.len() as f64 / 16_000.0), commits, drafts_before_commit, source, final_ends }
 }
 
 /// Sentence ends over the whole clip (seconds, sentence): one Whisper pass with token timestamps.
@@ -195,7 +185,7 @@ fn segmentation_compare() {
     let mut mt = Plamo::load(&p(1), if gpu { 999 } else { 0 }, threads).unwrap();
     let pcm = wav(&env("OVERLAYSUBS_WAV", ""));
     let vad_path = asr.vad_path.clone();
-    let runs: Vec<Run> = env("OVERLAYSUBS_MODES", "off,stable,overlap").split(',').map(|m| run(&pcm, m.trim(), &vad_path, &mut asr, &mut mt)).collect();
+    let runs: Vec<Run> = env("OVERLAYSUBS_MODES", "off,on").split(',').map(|m| run(&pcm, m.trim(), &vad_path, &mut asr, &mut mt)).collect();
 
     for r in &runs {
         let mut sizes: Vec<f64> = r.commits.iter().map(|c| c.sentences.len() as f64).collect();
@@ -219,7 +209,7 @@ fn segmentation_compare() {
             }
         }
     }
-    // Ground truth: sentence ends that the endpointer (pauses off) did not end an utterance at.
+    // Ground truth: sentence ends that the endpointer (early commits off) did not end an utterance at.
     // Those are the places a caption is held today and an early commit would help.
     let ends = sentence_ends(&asr, &pcm, &env("OVERLAYSUBS_LANG", "en"));
     let mut vad = Silero::load(&vad_path).unwrap();
@@ -251,13 +241,7 @@ fn segmentation_compare() {
         eprintln!("\n  {}: early commits {}, last sentence not matching any offline sentence end {} (rough: the offline pass joins some sentences)", r.mode, heads.len(), unmatched);
         for ((t, sentence), gap) in opportunities.iter().zip(&gaps) {
             let text_caught = early.iter().any(|e| same_end(e, sentence));
-            let why = match r.pauses.iter().filter(|(c, _)| (c - t).abs() < 0.8).min_by(|a, b| (a.0 - t).abs().total_cmp(&(b.0 - t).abs())) {
-                _ if text_caught => "committed".to_string(),
-                _ if r.pause_ms == 0 => "not committed".to_string(),
-                Some((_, why)) if why != "committed" => why.clone(),
-                _ if *gap < r.pause_ms => format!("pause shorter than {} ms", r.pause_ms),
-                _ => format!("no pause event (utterance under {} ms?)", EndpointConfig::default().pause_after_ms),
-            };
+            let why = if text_caught { "committed" } else { "not committed" }.to_string();
             eprintln!("    {t:7.2}s gap {gap:4}ms  {why:<36} {sentence}");
             *tally.entry(why).or_default() += 1;
         }

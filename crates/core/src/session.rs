@@ -11,31 +11,15 @@ pub struct Transcript {
     pub word_ends: Vec<(usize, usize)>,
 }
 
-/// How a running utterance commits text before the endpointer's final.
-/// Sessions start with `Overlap`; the other modes are kept for the side-by-side comparison (`compare.rs`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Early {
-    Off,
-    /// At a pause (`Event::Partial::pause`) where the text ends a sentence.
-    Pause,
-    /// When two partials in a row agree on a finished sentence; the audio is cut at its last word.
-    Stable,
-    /// Like `Stable`, but the audio is cut a second before the sentence's end, since Whisper's word times
-    /// are rough; the committed words heard again are matched and removed from later transcripts.
-    Overlap,
-}
-
-/// Byte offset in `text` where what follows `overlap` (words already committed, heard again) begins:
-/// the end of the word prefix closest to `overlap`, or 0 when no prefix is close.
-fn strip_overlap(overlap: &str, text: &str) -> usize {
+/// Byte offset in `text` where what follows `overlap` begins: `overlap` is committed text whose audio is
+/// heard again after the cut, so a transcript starts with (roughly) those words. None when no word prefix
+/// of `text` is close to it; the caller then cannot tell old words from new ones.
+fn strip_overlap(overlap: &str, text: &str) -> Option<usize> {
     let mut ends = vec![0];
     ends.extend(text.split_whitespace().map(|w| w.as_ptr() as usize - text.as_ptr() as usize + w.len()));
-    let n = overlap.split_whitespace().count() + 4;
-    let best = ends.iter().take(n + 1).map(|&e| (crate::metrics::cer(overlap, &text[..e]), e)).min_by(|a, b| a.0.total_cmp(&b.0));
-    match best {
-        Some((d, e)) if d <= 0.4 => e,
-        _ => 0,
-    }
+    let n = overlap.split_whitespace().count() + 2;
+    let (d, e) = ends.iter().take(n + 1).map(|&e| (crate::metrics::cer(overlap, &text[..e]), e)).min_by(|a, b| a.0.total_cmp(&b.0))?;
+    (d <= 0.35).then_some(e)
 }
 
 pub trait Asr: Send {
@@ -169,44 +153,6 @@ pub fn split_sentences(text: &str) -> Vec<String> {
     out
 }
 
-enum Confirm {
-    /// The candidate holds: the text up to the boundary, and what follows it.
-    Yes(String, String),
-    /// Nothing heard after the pause yet.
-    NotYet,
-    No,
-}
-
-/// Whether `now`, transcribed from audio that runs past the pause, still ends a sentence where the
-/// candidate did: some prefix of it ending in sentence punctuation is close to the candidate, and words follow.
-fn confirm(candidate: &str, now: &str) -> Confirm {
-    let chars: Vec<(usize, char)> = now.char_indices().collect();
-    let mut best: Option<(f64, usize)> = None;
-    for (i, &(at, c)) in chars.iter().enumerate() {
-        if !matches!(c, '.' | '?' | '!' | '。' | '？' | '！' | '…') {
-            continue;
-        }
-        // The closing quote belongs to the sentence.
-        let end = chars[i + 1..].iter().take_while(|(_, c)| ['"', '\'', '」', '』', ')', '）', '”', '’'].contains(c)).last().map_or(at + c.len_utf8(), |&(a, c)| a + c.len_utf8());
-        let d = crate::metrics::cer(candidate, &now[..end]);
-        if best.is_none_or(|(b, _)| d < b) {
-            best = Some((d, end));
-        }
-    }
-    match best {
-        Some((d, end)) if d <= 0.15 => {
-            let tail = now[end..].trim();
-            if has_words(tail) {
-                Confirm::Yes(now[..end].trim().to_string(), tail.to_string())
-            } else {
-                Confirm::NotYet
-            }
-        }
-        _ if crate::metrics::cer(candidate, now) <= 0.15 => Confirm::NotYet,
-        _ => Confirm::No,
-    }
-}
-
 /// Byte offsets just past sentence-ending punctuation (and a closing quote) that is followed by a space or the end.
 fn sentence_bounds(text: &str) -> Vec<usize> {
     let chars: Vec<(usize, char)> = text.char_indices().collect();
@@ -223,10 +169,8 @@ fn sentence_bounds(text: &str) -> Vec<usize> {
         }
         let end = chars.get(j).map_or(text.len(), |&(a, _)| a);
         let next = chars.get(j).map(|&(_, c)| c);
-        if full || next.is_none_or(char::is_whitespace) {
-            if out.last() != Some(&end) {
-                out.push(end);
-            }
+        if (full || next.is_none_or(char::is_whitespace)) && out.last() != Some(&end) {
+            out.push(end);
         }
     }
     out
@@ -254,23 +198,23 @@ pub struct Session {
     history: Vec<(String, String)>,
     next_id: u64,
     pos_ms: u64,
-    committed: usize,
-    /// Text that ended a sentence at a pause, and the stream position of that pause.
-    candidate: Option<(String, usize)>,
-    /// How many times a pause committed text before the endpointer's final.
+    /// Commit sentences before the endpointer's final (see `handle`). On by default.
+    pub early_commit: bool,
+    /// How many times sentences were committed before the final.
     pub early_commits: usize,
-    /// What became of each pause: (stream position, outcome). For measuring only.
-    pub pause_log: Vec<(usize, &'static str)>,
-    pub early: Early,
-    /// The previous partial's text, for `Early::Stable`.
+    /// Stream position (samples) before which the audio is committed and no longer transcribed.
+    committed: usize,
+    /// The previous partial's text.
     prev: Option<String>,
-    /// Committed words still in the audio after the cut, for `Early::Overlap`.
+    /// Committed words still in the audio after the cut.
     overlap: Option<String>,
+    /// Set when a transcript did not start with `overlap`: no more early commits until the final.
+    held: bool,
 }
 
 impl Session {
     pub fn new(cfg: SessionConfig) -> Self {
-        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0, committed: 0, candidate: None, early_commits: 0, pause_log: vec![], early: Early::Overlap, prev: None, overlap: None }
+        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0, early_commit: true, early_commits: 0, committed: 0, prev: None, overlap: None, held: false }
     }
 
     /// Advance the wall clock used for history timestamps (call with every captured chunk).
@@ -299,14 +243,17 @@ impl Session {
     /// Holding it for the rest of the sentence made captions pile up to 150+ chars and 20+ s whenever Whisper
     /// left out punctuation, which it usually does for Korean.
     ///
-    /// A short pause inside an utterance (a partial with `pause`) commits the text before it early, but only
-    /// when Whisper ended a sentence there and the next partial, which hears past the pause, still has a
-    /// sentence boundary at that point: Whisper tends to close any cut-off audio with a full stop.
-    /// Audio before `committed()` is dropped from every later event, so nothing is transcribed twice.
+    /// Speakers rarely pause between sentences (on a 5 min English talk, 79 of 98 sentence ends inside an
+    /// utterance had under 100 ms of silence), so waiting for the final held 4-7 sentences back and then showed
+    /// them at once. Instead, a sentence two partials in a row agree on is committed right away and the audio
+    /// before it is dropped (`committed()`). Whisper's word times are rough, and cutting right at the last word
+    /// lost or garbled the words around the cut, so the cut is a second early and the committed words heard
+    /// again are removed from later transcripts by matching the text. When that match fails, nothing more is
+    /// committed early until the final.
     pub fn handle(&mut self, ev: Event, asr: &mut dyn Asr, mt: &mut dyn Translator, emit: &mut dyn FnMut(Caption)) -> Result<(), String> {
-        let (mut pcm, mut start, pause, fin) = match ev {
-            Event::Partial { pcm, start, pause } => (pcm, start, pause, false),
-            Event::Final { pcm, start } => (pcm, start, None, true),
+        let (mut pcm, mut start, fin) = match ev {
+            Event::Partial { pcm, start } => (pcm, start, false),
+            Event::Final { pcm, start } => (pcm, start, true),
         };
         if start < self.committed {
             let skip = self.committed - start;
@@ -320,17 +267,22 @@ impl Session {
         if is_hallucination(&t.text) {
             return Ok(());
         }
-        let (mut raw, mut word_ends) = (t.text, t.word_ends);
+        let (mut text, mut word_ends) = (t.text, t.word_ends);
         if let Some(ov) = &self.overlap {
-            let rest = raw[strip_overlap(ov, &raw)..].trim_start().to_string();
-            let cut = raw.len() - rest.len();
-            word_ends = word_ends.into_iter().filter(|&(o, _)| o > cut).map(|(o, t)| (o - cut, t)).collect();
-            raw = rest;
+            match strip_overlap(ov, &text) {
+                Some(at) => {
+                    let rest = text[at..].trim_start().to_string();
+                    let cut = text.len() - rest.len();
+                    word_ends = word_ends.into_iter().filter(|&(o, _)| o > cut).map(|(o, t)| (o - cut, t)).collect();
+                    text = rest;
+                }
+                None => self.held = true,
+            }
         }
         if fin {
-            self.overlap = None;
+            (self.overlap, self.prev, self.held) = (None, None, false);
         }
-        if !has_words(&raw) {
+        if !has_words(&text) {
             return Ok(());
         }
         // History timestamps follow the wall clock (`tick`); the event's audio ends about now.
@@ -338,65 +290,29 @@ impl Session {
         let ago = move |samples: usize| pos_ms.saturating_sub((samples * 1000 / RATE) as u64);
         let start_ms = ago(pcm.len());
         if fin {
-            self.prev = None;
-            if let Some((_, cut)) = self.candidate.take() {
-                self.pause_log.push((cut, "final came first"));
-            }
-            return self.finalize(raw, t.lang, start_ms, self.pos_ms, mt, emit);
+            return self.finalize(text, t.lang, start_ms, self.pos_ms, mt, emit);
         }
-        let mut text = raw;
-        if matches!(self.early, Early::Stable | Early::Overlap) {
-            let found = self.prev.take().and_then(|prev| stable_head(&prev, &text, &word_ends)).filter(|&(_, cut)| cut > 0 && cut <= pcm.len());
-            if let Some((b, we)) = found {
-                let end_ms = ago(pcm.len().saturating_sub(we));
-                let (head, tail) = (text[..b].trim().to_string(), text[b..].trim().to_string());
-                self.finalize(head.clone(), t.lang.clone(), start_ms, end_ms, mt, emit)?;
-                let want = we.saturating_sub(RATE);
-                if self.early == Early::Stable {
-                    self.committed = start + we;
-                } else if want > 0 && start + want > self.committed {
-                    let from = word_ends.iter().filter(|&&(o, t)| t <= want && o <= b).map(|&(o, _)| o).last().unwrap_or(0);
-                    self.overlap = Some(text[from..b].trim().to_string());
-                    self.committed = start + want;
-                } else {
-                    // Too close to the last cut: keep the audio, and all of it is heard again.
-                    self.overlap = Some(match self.overlap.take() {
-                        Some(o) => format!("{o} {head}"),
-                        None => head,
-                    });
-                }
-                self.early_commits += 1;
-                self.pause_log.push((start + we, "committed"));
-                text = tail;
-            }
-            self.prev = Some(text.clone());
-        }
-        if let Some((cand, cut)) = self.candidate.take().filter(|_| self.early == Early::Pause) {
-            match confirm(&cand, &text) {
-                Confirm::Yes(head, tail) => {
-                    let end_ms = ago((start + pcm.len()).saturating_sub(cut));
-                    self.finalize(head, t.lang.clone(), start_ms, end_ms, mt, emit)?;
-                    self.committed = cut;
-                    self.early_commits += 1;
-                    self.pause_log.push((cut, "committed"));
-                    text = tail;
-                }
-                Confirm::NotYet => self.candidate = Some((cand, cut)),
-                Confirm::No => self.pause_log.push((cut, "next partial disagreed")),
-            }
-        }
-        if let Some(cut) = pause.filter(|_| self.early == Early::Pause) {
-            if cut <= self.committed {
-            } else if !ends_sentence(&text) {
-                self.pause_log.push((cut, "no sentence end in text"));
-            } else if text.chars().count() < MIN_SENTENCE_CHARS {
-                self.pause_log.push((cut, "text too short"));
+        let prev = self.prev.take().filter(|_| self.early_commit && !self.held);
+        if let Some((b, end)) = prev.and_then(|prev| stable_head(&prev, &text, &word_ends)).filter(|&(_, end)| end > 0 && end <= pcm.len()) {
+            let (head, tail) = (text[..b].trim().to_string(), text[b..].trim().to_string());
+            self.finalize(head.clone(), t.lang.clone(), start_ms, ago(pcm.len() - end), mt, emit)?;
+            let cut = end.saturating_sub(RATE);
+            if cut > 0 {
+                // The committed words after the cut are heard again.
+                let from = word_ends.iter().rfind(|&&(o, t)| t <= cut && o <= b).map_or(0, |&(o, _)| o);
+                self.overlap = Some(text[from..b].trim().to_string());
+                self.committed = start + cut;
             } else {
-                if let Some((_, old)) = self.candidate.replace((text.clone(), cut)) {
-                    self.pause_log.push((old, "replaced by a later pause"));
-                }
+                // Within a second of the last cut: keep the audio; all of it is heard again.
+                self.overlap = Some(match self.overlap.take() {
+                    Some(o) => format!("{o} {head}"),
+                    None => head,
+                });
             }
+            self.early_commits += 1;
+            text = tail;
         }
+        self.prev = Some(text.clone());
         // Not final yet: show a draft translation under the same id. The source is sent together with it,
         // because a caption without a translation would blank the previous draft in the overlay.
         // A draft of an unfinished fragment can come back empty or as just "…"; showing it would replace a readable one.
@@ -529,7 +445,7 @@ mod tests {
     fn partial_emits_one_translated_draft_without_recording() {
         let mut s = Session::new(SessionConfig::default());
         let mut caps = vec![];
-        s.handle(Event::Partial { pcm: vec![0.0; SEC], start: 0, pause: None }, &mut asr(vec!["Hello"]), &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        s.handle(Event::Partial { pcm: vec![0.0; SEC], start: 0 }, &mut asr(vec!["Hello"]), &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
         assert_eq!(caps.len(), 1, "no caption with an empty translation, which would blank the previous draft");
         assert!(caps[0].source == "Hello" && caps[0].translation == "訳文" && caps[0].stage == Stage::Partial);
         assert!(s.entries.is_empty());
@@ -550,7 +466,7 @@ mod tests {
         let mut s = Session::new(SessionConfig::default());
         let (mut a, mut mt, mut caps) = (asr(vec!["So when", "So when you", "So when you blink"]), ScriptMt(vec!["それで", "…", ""]), vec![]);
         for _ in 0..3 {
-            s.handle(Event::Partial { pcm: vec![0.0; SEC], start: 0, pause: None }, &mut a, &mut mt, &mut |c| caps.push(c)).unwrap();
+            s.handle(Event::Partial { pcm: vec![0.0; SEC], start: 0 }, &mut a, &mut mt, &mut |c| caps.push(c)).unwrap();
         }
         let shown: Vec<_> = caps.iter().map(|c| c.translation.as_str()).collect();
         assert_eq!(shown, ["それで"], "a draft of only \"…\" or nothing would replace the readable one");
@@ -569,76 +485,70 @@ mod tests {
         assert!(caps.iter().all(|c| c.stage != Stage::Partial), "a final is not shown as a held draft");
     }
 
-    fn part(s: &mut Session, a: &mut FakeAsr, caps: &mut Vec<Caption>, pause: Option<usize>) {
-        s.handle(Event::Partial { pcm: vec![0.0; 4 * SEC], start: 0, pause }, a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+    fn part(s: &mut Session, a: &mut FakeAsr, caps: &mut Vec<Caption>) {
+        s.handle(Event::Partial { pcm: vec![0.0; 4 * SEC], start: 0 }, a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
     }
 
     #[test]
-    fn sentence_end_at_a_pause_commits_once_the_next_partial_confirms_it() {
+    fn sentence_two_partials_agree_on_is_committed_and_its_audio_cut_a_second_early() {
         let mut s = Session::new(SessionConfig::default());
-        s.early = Early::Pause;
         let mut caps = vec![];
-        let mut a = asr(vec!["Hello there, my friend.", "Hello there my friend. How are", "How are you today?"]);
-        part(&mut s, &mut a, &mut caps, Some(3 * SEC));
-        assert!(s.entries.is_empty(), "a full stop at a pause alone does not commit");
-        part(&mut s, &mut a, &mut caps, None);
-        let sources: Vec<_> = s.entries.iter().map(|e| e.source.as_str()).collect();
-        assert_eq!(sources, ["Hello there my friend."]);
-        assert_eq!((s.committed(), s.early_commits), (3 * SEC, 1));
+        // FakeAsr: one word per second. The sentence ends at 4 s, so the cut is at 3 s and "friend." is heard again.
+        let mut a = asr(vec!["Hello there my friend. How", "Hello there, my friend. How are you", "friend. How are you doing today?"]);
+        part(&mut s, &mut a, &mut caps);
+        assert!(s.entries.is_empty(), "one partial alone commits nothing");
+        part(&mut s, &mut a, &mut caps);
+        assert_eq!(s.entries.iter().map(|e| e.source.as_str()).collect::<Vec<_>>(), ["Hello there, my friend."]);
+        assert_eq!((s.committed(), s.overlap.as_deref(), s.early_commits), (3 * SEC, Some("friend."), 1));
         let last = caps.last().unwrap();
-        assert!(last.stage == Stage::Partial && last.source == "How are" && last.id == 1, "the rest is a new draft");
-        s.handle(Event::Final { pcm: vec![0.0; 5 * SEC], start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        assert_eq!(s.entries.last().unwrap().source, "How are you today?");
+        assert!(last.stage == Stage::Partial && last.source == "How are you" && last.id == 1, "the rest is a new draft");
+        s.handle(Event::Final { pcm: vec![0.0; 6 * SEC], start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        let sources: Vec<_> = s.entries.iter().map(|e| e.source.as_str()).collect();
+        assert_eq!(sources, ["Hello there, my friend.", "How are you doing today?"], "the repeated word is dropped");
         assert_eq!(s.handle(Event::Final { pcm: vec![0.0; 2 * SEC], start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |_| {}), Ok(()), "audio that is all committed is skipped");
     }
 
     #[test]
-    fn stable_mode_commits_sentences_two_partials_agree_on_and_cuts_at_the_last_word() {
+    fn a_transcript_that_does_not_start_with_the_repeated_words_stops_early_commits_until_the_final() {
         let mut s = Session::new(SessionConfig::default());
-        s.early = Early::Stable;
         let mut caps = vec![];
-        let mut a = asr(vec!["Hello there my friend. How", "Hello there, my friend. How are you", "you doing today? I am", "you doing today? I am fine"]);
-        part(&mut s, &mut a, &mut caps, None);
-        assert!(s.entries.is_empty(), "one partial alone commits nothing");
-        part(&mut s, &mut a, &mut caps, None);
-        assert_eq!(s.entries.iter().map(|e| e.source.as_str()).collect::<Vec<_>>(), ["Hello there, my friend."]);
-        assert_eq!(s.committed(), 4 * SEC, "cut after the fourth word");
-        assert_eq!(caps.last().unwrap().source, "How are you");
-        for _ in 0..2 {
-            s.handle(Event::Partial { pcm: vec![0.0; 6 * SEC], start: 4 * SEC, pause: None }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        }
-        assert_eq!(s.entries.last().unwrap().source, "you doing today?");
-        assert_eq!(s.committed(), 7 * SEC, "word times count from the start of the trimmed audio");
-        assert!(sentence_bounds("Hi. U.S. then 3.5? Yes!") == vec![3, 8, 18, 23], "{:?}", sentence_bounds("Hi. U.S. then 3.5? Yes!"));
+        let mut a = asr(vec![
+            "Hello there my friend. How",
+            "Hello there, my friend. How are you",
+            "Completely different words. Then more",
+            "Completely different words. Then more text",
+            "Back to normal now.",
+            "Short one. And then the next one",
+            "Short one. And then the next one goes",
+        ]);
+        part(&mut s, &mut a, &mut caps);
+        part(&mut s, &mut a, &mut caps);
+        part(&mut s, &mut a, &mut caps);
+        part(&mut s, &mut a, &mut caps);
+        assert_eq!(s.entries.len(), 1, "held: the agreeing sentence is not committed");
+        s.handle(Event::Final { pcm: vec![0.0; 6 * SEC], start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        assert_eq!(s.entries.last().unwrap().source, "Back to normal now.");
+        s.handle(Event::Partial { pcm: vec![0.0; 4 * SEC], start: 10 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        s.handle(Event::Partial { pcm: vec![0.0; 4 * SEC], start: 10 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        assert_eq!(s.entries.last().unwrap().source, "Short one.", "the next utterance commits early again");
     }
 
     #[test]
-    fn overlap_mode_cuts_a_second_early_and_drops_the_words_heard_again() {
+    fn early_commits_can_be_turned_off() {
         let mut s = Session::new(SessionConfig::default());
-        s.early = Early::Overlap;
+        s.early_commit = false;
         let mut caps = vec![];
-        // FakeAsr: one word per second. The sentence ends at 4 s, so the cut is at 3 s and "friend." is heard again.
-        let mut a = asr(vec!["Hello there my friend. How", "Hello there, my friend. How are you", "friend. How are you doing today?"]);
-        part(&mut s, &mut a, &mut caps, None);
-        part(&mut s, &mut a, &mut caps, None);
-        assert_eq!((s.committed(), s.overlap.as_deref()), (3 * SEC, Some("friend.")));
-        s.handle(Event::Final { pcm: vec![0.0; 6 * SEC], start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        let sources: Vec<_> = s.entries.iter().map(|e| e.source.as_str()).collect();
-        assert_eq!(sources, ["Hello there, my friend.", "How are you doing today?"]);
-        assert_eq!(strip_overlap("friend.", "Fred, how are you"), 5, "close enough");
-        assert_eq!(strip_overlap("my friend.", "How are you"), 0, "not heard again");
+        let mut a = asr(vec!["Hello there my friend. How", "Hello there, my friend. How are you"]);
+        part(&mut s, &mut a, &mut caps);
+        part(&mut s, &mut a, &mut caps);
+        assert!(s.entries.is_empty() && s.committed() == 0);
     }
 
     #[test]
-    fn full_stop_that_the_next_partial_drops_commits_nothing() {
-        let mut s = Session::new(SessionConfig::default());
-        s.early = Early::Pause;
-        let mut caps = vec![];
-        let mut a = asr(vec!["So when you blink.", "So when you blink at the light"]);
-        part(&mut s, &mut a, &mut caps, Some(3 * SEC));
-        part(&mut s, &mut a, &mut caps, None);
-        assert!(s.entries.is_empty() && s.committed() == 0, "Whisper closed cut-off audio with a full stop; the sentence went on");
-        assert_eq!(caps.last().unwrap().source, "So when you blink at the light");
+    fn overlap_matching_is_fuzzy_but_not_blind() {
+        assert_eq!(strip_overlap("friend.", "Fred, how are you"), Some(5), "close enough");
+        assert_eq!(strip_overlap("my friend.", "How are you"), None, "not heard again");
+        assert_eq!(sentence_bounds("Hi. U.S. then 3.5? Yes!"), vec![3, 8, 18, 23]);
     }
 
     #[test]
