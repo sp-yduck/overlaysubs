@@ -148,6 +148,8 @@ struct App {
     overlay_geometry_restored: AtomicBool,
     source_hub: Arc<browser_source::Hub>,
     source_server: Mutex<Option<browser_source::Server>>,
+    /// Why the browser source server did not start at launch, until the settings window has shown it.
+    startup_error: Mutex<Option<String>>,
 }
 
 /// What the browser source loads: the overlay page itself, which works outside Tauri too.
@@ -641,6 +643,12 @@ fn terms_text(lang: String) -> String {
 }
 
 /// Open an https URL in the user's default browser.
+/// Handed out once, so the settings window shows it as a single toast.
+#[tauri::command]
+fn startup_error(st: State<App>) -> Option<String> {
+    st.startup_error.lock().unwrap().take()
+}
+
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
     if !url.starts_with("https://") {
@@ -932,8 +940,10 @@ fn main() {
             if let Err(e) = h.global_shortcut().register(s.hotkey.as_str()) {
                 eprintln!("hotkey {}: {e}", s.hotkey);
             }
+            // The settings window does not exist yet, so it asks for the error once it has loaded.
             if let Err(e) = sync_browser_source(&app.state::<App>(), &s) {
                 eprintln!("{e}");
+                *app.state::<App>().startup_error.lock().unwrap() = Some(e);
             }
             *app.state::<App>().settings.lock().unwrap() = s;
             // The windows are created here and not by Tauri (`"create": false` in tauri.conf.json), which would do
@@ -979,7 +989,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, reset_overlay_position, open_url, show_overlay, set_overlay_preview, check_update
+            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, reset_overlay_position, open_url, show_overlay, set_overlay_preview, check_update, startup_error
         ])
         .build(tauri::generate_context!())
         .expect("error while building overlaysubs")

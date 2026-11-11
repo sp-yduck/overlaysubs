@@ -556,3 +556,4 @@ listen("overlay-visible", (e) => {
 listen("error", (e) => toast(errText(e.payload), "error"));
 listen("caption", (e) => { if (e.payload.stage === "final") loadHistory(); });
 refresh().then(loadHistory);
+invoke("startup_error").then((e) => e && toast(errText(e), "error"));
