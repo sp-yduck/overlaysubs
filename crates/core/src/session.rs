@@ -12,14 +12,16 @@ pub struct Transcript {
 }
 
 /// Byte offset in `text` where what follows `overlap` begins: `overlap` is committed text whose audio is
-/// heard again after the cut, so a transcript starts with (roughly) those words. None when no word prefix
-/// of `text` is close to it; the caller then cannot tell old words from new ones.
-fn strip_overlap(overlap: &str, text: &str) -> Option<usize> {
+/// heard again after the cut, so a transcript starts with (roughly) those words. 0 when no word prefix of
+/// `text` is close to it.
+fn strip_overlap(overlap: &str, text: &str) -> usize {
     let mut ends = vec![0];
     ends.extend(text.split_whitespace().map(|w| w.as_ptr() as usize - text.as_ptr() as usize + w.len()));
-    let n = overlap.split_whitespace().count() + 2;
-    let (d, e) = ends.iter().take(n + 1).map(|&e| (crate::metrics::cer(overlap, &text[..e]), e)).min_by(|a, b| a.0.total_cmp(&b.0))?;
-    (d <= 0.35).then_some(e)
+    let n = overlap.split_whitespace().count() + 4;
+    match ends.iter().take(n + 1).map(|&e| (crate::metrics::cer(overlap, &text[..e]), e)).min_by(|a, b| a.0.total_cmp(&b.0)) {
+        Some((d, e)) if d <= 0.4 => e,
+        _ => 0,
+    }
 }
 
 pub trait Asr: Send {
@@ -208,13 +210,11 @@ pub struct Session {
     prev: Option<String>,
     /// Committed words still in the audio after the cut.
     overlap: Option<String>,
-    /// Set when a transcript did not start with `overlap`: no more early commits until the final.
-    held: bool,
 }
 
 impl Session {
     pub fn new(cfg: SessionConfig) -> Self {
-        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0, early_commit: true, early_commits: 0, committed: 0, prev: None, overlap: None, held: false }
+        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0, early_commit: true, early_commits: 0, committed: 0, prev: None, overlap: None }
     }
 
     /// Advance the wall clock used for history timestamps (call with every captured chunk).
@@ -248,8 +248,7 @@ impl Session {
     /// them at once. Instead, a sentence two partials in a row agree on is committed right away and the audio
     /// before it is dropped (`committed()`). Whisper's word times are rough, and cutting right at the last word
     /// lost or garbled the words around the cut, so the cut is a second early and the committed words heard
-    /// again are removed from later transcripts by matching the text. When that match fails, nothing more is
-    /// committed early until the final.
+    /// again are removed from later transcripts by matching the text.
     pub fn handle(&mut self, ev: Event, asr: &mut dyn Asr, mt: &mut dyn Translator, emit: &mut dyn FnMut(Caption)) -> Result<(), String> {
         let (mut pcm, mut start, fin) = match ev {
             Event::Partial { pcm, start } => (pcm, start, false),
@@ -269,18 +268,13 @@ impl Session {
         }
         let (mut text, mut word_ends) = (t.text, t.word_ends);
         if let Some(ov) = &self.overlap {
-            match strip_overlap(ov, &text) {
-                Some(at) => {
-                    let rest = text[at..].trim_start().to_string();
-                    let cut = text.len() - rest.len();
-                    word_ends = word_ends.into_iter().filter(|&(o, _)| o > cut).map(|(o, t)| (o - cut, t)).collect();
-                    text = rest;
-                }
-                None => self.held = true,
-            }
+            let rest = text[strip_overlap(ov, &text)..].trim_start().to_string();
+            let cut = text.len() - rest.len();
+            word_ends = word_ends.into_iter().filter(|&(o, _)| o > cut).map(|(o, t)| (o - cut, t)).collect();
+            text = rest;
         }
         if fin {
-            (self.overlap, self.prev, self.held) = (None, None, false);
+            (self.overlap, self.prev) = (None, None);
         }
         if !has_words(&text) {
             return Ok(());
@@ -292,7 +286,7 @@ impl Session {
         if fin {
             return self.finalize(text, t.lang, start_ms, self.pos_ms, mt, emit);
         }
-        let prev = self.prev.take().filter(|_| self.early_commit && !self.held);
+        let prev = self.prev.take().filter(|_| self.early_commit);
         if let Some((b, end)) = prev.and_then(|prev| stable_head(&prev, &text, &word_ends)).filter(|&(_, end)| end > 0 && end <= pcm.len()) {
             let (head, tail) = (text[..b].trim().to_string(), text[b..].trim().to_string());
             self.finalize(head.clone(), t.lang.clone(), start_ms, ago(pcm.len() - end), mt, emit)?;
@@ -509,31 +503,6 @@ mod tests {
     }
 
     #[test]
-    fn a_transcript_that_does_not_start_with_the_repeated_words_stops_early_commits_until_the_final() {
-        let mut s = Session::new(SessionConfig::default());
-        let mut caps = vec![];
-        let mut a = asr(vec![
-            "Hello there my friend. How",
-            "Hello there, my friend. How are you",
-            "Completely different words. Then more",
-            "Completely different words. Then more text",
-            "Back to normal now.",
-            "Short one. And then the next one",
-            "Short one. And then the next one goes",
-        ]);
-        part(&mut s, &mut a, &mut caps);
-        part(&mut s, &mut a, &mut caps);
-        part(&mut s, &mut a, &mut caps);
-        part(&mut s, &mut a, &mut caps);
-        assert_eq!(s.entries.len(), 1, "held: the agreeing sentence is not committed");
-        s.handle(Event::Final { pcm: vec![0.0; 6 * SEC], start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        assert_eq!(s.entries.last().unwrap().source, "Back to normal now.");
-        s.handle(Event::Partial { pcm: vec![0.0; 4 * SEC], start: 10 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        s.handle(Event::Partial { pcm: vec![0.0; 4 * SEC], start: 10 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        assert_eq!(s.entries.last().unwrap().source, "Short one.", "the next utterance commits early again");
-    }
-
-    #[test]
     fn early_commits_can_be_turned_off() {
         let mut s = Session::new(SessionConfig::default());
         s.early_commit = false;
@@ -546,8 +515,8 @@ mod tests {
 
     #[test]
     fn overlap_matching_is_fuzzy_but_not_blind() {
-        assert_eq!(strip_overlap("friend.", "Fred, how are you"), Some(5), "close enough");
-        assert_eq!(strip_overlap("my friend.", "How are you"), None, "not heard again");
+        assert_eq!(strip_overlap("friend.", "Fred, how are you"), 5, "close enough");
+        assert_eq!(strip_overlap("my friend.", "How are you"), 0, "not heard again");
         assert_eq!(sentence_bounds("Hi. U.S. then 3.5? Yes!"), vec![3, 8, 18, 23]);
     }
 
