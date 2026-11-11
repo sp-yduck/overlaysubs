@@ -218,6 +218,8 @@ function homePage() {
   ${card(t("recent"), `<div class="hist" data-hist="6"></div>`)}`;
 }
 
+const sourceUrl = () => `http://127.0.0.1:${snap.settings.browser_source_port}/`;
+
 function overlayPage() {
   const s = snap.settings;
   return `<h2>${t("overlay")}</h2>
@@ -242,6 +244,10 @@ function overlayPage() {
     ${select(t("valign"), "overlay.vAlign", opts([["bottom", t("valign_bottom")], ["center", t("valign_center")], ["top", t("valign_top")]], s.overlay.vAlign))}
     ${field(t("linger"), "overlay.linger", "number", 'min="1" max="60"')}
     ${field(t("click_through"), "overlay.clickThrough", "check")}`)}
+  ${card(t("browser_source"), `<p class="muted small">${t("browser_source_note")}</p>
+    ${field(t("browser_source_enable"), "browser_source", "check")}
+    ${field(t("browser_source_port"), "browser_source_port", "number", 'min="1024" max="65535"')}
+    ${s.browser_source ? `<div class="f"><span>${t("browser_source_url")}</span><div class="row"><code>${esc(sourceUrl())}</code>${btn("source-copy", t("copy"), { cls: "small" })}</div></div>` : ""}`)}
   ${card("", field(t("hotkey"), "hotkey"))}`;
 }
 
@@ -452,6 +458,10 @@ async function act(name, id, el) {
     await invoke("reset_overlay_position");
     toast(t("position_reset"));
   }
+  if (name === "source-copy") {
+    await navigator.clipboard.writeText(sourceUrl());
+    toast(t("copied"));
+  }
   if (name === "overlay-reset-appearance") {
     // Click-through is an interaction setting, not a look, so resetting the appearance keeps it.
     const { clickThrough } = snap.settings.overlay;
@@ -546,3 +556,4 @@ listen("overlay-visible", (e) => {
 listen("error", (e) => toast(errText(e.payload), "error"));
 listen("caption", (e) => { if (e.payload.stage === "final") loadHistory(); });
 refresh().then(loadHistory);
+invoke("startup_error").then((e) => e && toast(errText(e), "error"));

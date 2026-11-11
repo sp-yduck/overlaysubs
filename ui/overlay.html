@@ -26,6 +26,10 @@
   body:hover #grip { background: rgba(255,255,255,0.15); cursor: move; }
   /* While the appearance settings are open, the grip stays visible with a hint so the overlay can be moved off them. */
   body.preview #grip { background: rgba(255,255,255,0.25); cursor: move; }
+  /* Browser source of a streaming app: only the captions. The scene is the background, and the source is placed there. */
+  body.source { background: transparent; }
+  body.source #grip { display: none; }
+  body.source #lines { overflow-y: hidden; }
 </style>
 </head>
 <body>

@@ -1,5 +1,6 @@
-//! Engine-agnostic logic: audio PCM conversion, per-model device selection, tier selection, cached hardware probe, model registry, PLaMo prompt, endpointing, session, export, benchmark metrics, latest-release check.
+//! Engine-agnostic logic: audio PCM conversion, per-model device selection, tier selection, cached hardware probe, model registry, PLaMo prompt, endpointing, session, export, benchmark metrics, latest-release check, browser-source server.
 pub mod audio;
+pub mod browser_source;
 pub mod cache;
 pub mod device;
 pub mod endpoint;
