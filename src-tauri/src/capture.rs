@@ -9,14 +9,34 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 
+#[cfg(windows)]
+mod app_win;
 #[cfg(target_os = "macos")]
 mod sck;
+
+/// No app is chosen, or the chosen app is not running.
+#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
+const ERR_APP_NOT_RUNNING: &str = "E_APP_NOT_RUNNING";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Source {
     System { device: Option<String> },
     Mic { device: Option<String> },
+    /// One app's audio only. `device` is the app: its bundle identifier on macOS, its executable
+    /// name on Windows. The field keeps the name the other sources use so the UI edits one key.
+    App { device: Option<String> },
+}
+
+/// The apps whose audio can be captured on its own, as (id, label). On macOS this asks for the
+/// Screen Recording permission, so it is only called once the user picks the app source.
+pub fn apps() -> Result<Vec<(String, String)>, String> {
+    #[cfg(target_os = "macos")]
+    return sck::apps();
+    #[cfg(windows)]
+    return app_win::apps();
+    #[cfg(not(any(windows, target_os = "macos")))]
+    return Ok(Vec::new());
 }
 
 #[derive(Serialize)]
@@ -56,8 +76,14 @@ impl Drop for Capture {
 
 pub fn start(src: &Source, tx: Sender<Vec<f32>>) -> Result<Capture, String> {
     #[cfg(target_os = "macos")]
-    if let Source::System { .. } = src {
-        return sck::start(tx).map(|stop| Capture { stop });
+    match src {
+        Source::System { .. } => return sck::start(None, tx).map(|stop| Capture { stop }),
+        Source::App { device } => return sck::start(Some(device.clone().ok_or(ERR_APP_NOT_RUNNING)?), tx).map(|stop| Capture { stop }),
+        Source::Mic { .. } => {}
+    }
+    #[cfg(windows)]
+    if let Source::App { device } = src {
+        return app_win::start(device.as_deref().ok_or(ERR_APP_NOT_RUNNING)?, tx).map(|stop| Capture { stop });
     }
     start_cpal(src, tx)
 }
@@ -78,6 +104,8 @@ fn start_cpal(src: &Source, tx: Sender<Vec<f32>>) -> Result<Capture, String> {
             let c = d.default_output_config().map_err(|e| e.to_string())?;
             (d, c)
         }
+        // Handled per platform in `start` before this point.
+        Source::App { .. } => return Err("Per-app audio capture is not supported on this platform.".into()),
         Source::Mic { device } => {
             let d = match device {
                 Some(n) => h.input_devices().ok().and_then(|it| find(it, n)),

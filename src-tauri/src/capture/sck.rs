@@ -5,6 +5,8 @@
 //! screen configuration is never consumed, it only exists because `SCContentFilter` is built
 //! from a display.
 //!
+//! Per-app capture uses the same stream with a content filter that includes only that app.
+//!
 //! macOS gates this behind the Screen & System Audio Recording permission. The first start
 //! shows the system prompt; after the user grants it, the app has to be relaunched before the
 //! permission takes effect. A denied/missing permission maps to [`ERR_PERMISSION`] so the UI can
@@ -26,17 +28,33 @@ pub const ERR_NO_DISPLAY: &str = "E_MACOS_NO_DISPLAY";
 /// Any other ScreenCaptureKit failure; the underlying error follows a `|`.
 const ERR_AUDIO: &str = "E_MACOS_AUDIO";
 
-/// Start capturing system audio. Returns the stop flag once the stream is running.
+/// The running apps a content filter can single out, as (bundle identifier, name).
+pub fn apps() -> Result<Vec<(String, String)>, String> {
+    // Triggers the Screen Recording prompt on first use, like `open`.
+    let mut apps: Vec<(String, String)> = SCShareableContent::get()
+        .map_err(start_error)?
+        .applications()
+        .into_iter()
+        .map(|app| (app.bundle_identifier(), app.application_name()))
+        .filter(|(id, name)| !id.is_empty() && !name.is_empty())
+        .collect();
+    apps.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+    apps.dedup();
+    Ok(apps)
+}
+
+/// Start capturing system audio, or only the audio of the app with bundle identifier `app`.
+/// Returns the stop flag once the stream is running.
 ///
 /// The stream is created, started, and dropped on its own thread because `SCStream` is not
 /// `Send` everywhere it touches AppKit; the stop flag is polled there.
-pub fn start(tx: Sender<Vec<f32>>) -> Result<Arc<AtomicBool>, String> {
+pub fn start(app: Option<String>, tx: Sender<Vec<f32>>) -> Result<Arc<AtomicBool>, String> {
     let stop = Arc::new(AtomicBool::new(false));
     let flag = Arc::clone(&stop);
     let (ready_tx, ready_rx) = std::sync::mpsc::channel::<Result<(), String>>();
     std::thread::Builder::new()
         .name("sck-audio".into())
-        .spawn(move || match open(tx) {
+        .spawn(move || match open(app.as_deref(), tx) {
             Ok(stream) => {
                 let _ = ready_tx.send(Ok(()));
                 while !flag.load(Ordering::Relaxed) {
@@ -58,7 +76,7 @@ pub fn start(tx: Sender<Vec<f32>>) -> Result<Arc<AtomicBool>, String> {
     Ok(stop)
 }
 
-fn open(tx: Sender<Vec<f32>>) -> Result<SCStream, String> {
+fn open(app: Option<&str>, tx: Sender<Vec<f32>>) -> Result<SCStream, String> {
     // Triggers the Screen Recording prompt on first use and blocks until the user answers.
     let content = SCShareableContent::get().map_err(start_error)?;
     let display = content
@@ -66,11 +84,20 @@ fn open(tx: Sender<Vec<f32>>) -> Result<SCStream, String> {
         .into_iter()
         .next()
         .ok_or(ERR_NO_DISPLAY)?;
-    let filter = SCContentFilter::create()
-        .with_display(&display)
-        .with_excluding_windows(&[])
-        .build()
-        .map_err(start_error)?;
+    let filter = SCContentFilter::create().with_display(&display);
+    let filter = match app {
+        Some(id) => {
+            let apps = content.applications();
+            let app = apps
+                .iter()
+                .find(|app| app.bundle_identifier() == id)
+                .ok_or(super::ERR_APP_NOT_RUNNING)?;
+            filter.with_including_applications(&[app], &[])
+        }
+        None => filter.with_excluding_windows(&[]),
+    }
+    .build()
+    .map_err(start_error)?;
     let config = SCStreamConfiguration::new()
         // Audio-only: no screen output is registered, so these dimensions are never rendered.
         .with_width(2)

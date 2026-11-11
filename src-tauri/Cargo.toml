@@ -33,6 +33,10 @@ sysinfo = "0.40"
 [target.'cfg(target_os = "macos")'.dependencies]
 screencapturekit = { version = "11.1.2", features = ["macos_13_0"] }
 
+# Per-app capture needs WASAPI process loopback, which cpal does not expose.
+[target.'cfg(windows)'.dependencies]
+wasapi = "0.27"
+
 [features]
 vulkan = ["whisper-rs/vulkan", "llama-cpp-2/vulkan"]
 cuda = ["whisper-rs/cuda", "llama-cpp-2/cuda"]
