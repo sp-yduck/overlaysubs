@@ -13,7 +13,7 @@ use std::path::Path;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperVadContext, WhisperVadContextParams, WhisperVadParams};
 
 pub struct Whisper {
-    ctx: WhisperContext,
+    pub(crate) ctx: WhisperContext,
     pub vad_path: String,
     threads: i32,
 }
@@ -52,6 +52,11 @@ impl Asr for Whisper {
             p.set_initial_prompt(&prompt);
         }
         p.set_single_segment(true);
+        // Word-level segments (the text is the same), so each word's end time is known; whisper.cpp maps
+        // segment times back past the silence its VAD removed, which token times are not.
+        p.set_token_timestamps(true);
+        p.set_max_len(1);
+        p.set_split_on_word(true);
         p.set_suppress_blank(true);
         p.set_suppress_nst(true);
         p.set_print_progress(false);
@@ -62,9 +67,17 @@ impl Asr for Whisper {
         p.set_vad_params(WhisperVadParams::new());
         p.enable_vad(true);
         st.full(p, pcm).map_err(|e| e.to_string())?;
-        let text: String = (0..st.full_n_segments()).filter_map(|i| st.get_segment(i)).map(|s| s.to_string()).collect();
+        let (mut raw, mut ends) = (String::new(), vec![]);
+        for seg in (0..st.full_n_segments()).filter_map(|i| st.get_segment(i)) {
+            raw.push_str(&seg.to_string());
+            // Centiseconds into `pcm` -> samples.
+            ends.push((raw.len(), (seg.end_timestamp().max(0) as usize * 160).min(pcm.len())));
+        }
+        let lead = raw.len() - raw.trim_start().len();
+        let text = raw.trim().to_string();
+        let word_ends = ends.into_iter().filter(|&(o, _)| o > lead).map(|(o, t)| ((o - lead).min(text.len()), t)).collect();
         let lang = whisper_rs::get_lang_str(st.full_lang_id_from_state()).unwrap_or("en").to_string();
-        Ok(Transcript { text: text.trim().to_string(), lang })
+        Ok(Transcript { text, lang, word_ends })
     }
 }
 
@@ -200,7 +213,7 @@ mod tests {
                 pos += chunk.len();
                 ep.push(chunk, vad.as_mut(), &mut evs).unwrap();
                 for e in evs.drain(..) {
-                    if let Event::Final(v) = e {
+                    if let Event::Final { pcm: v, .. } = e {
                         eprintln!("{name}: final emitted at {:6.2}s, {:5.2}s long", pos as f32 / 16_000.0, v.len() as f32 / 16_000.0);
                     }
                 }
@@ -241,7 +254,7 @@ mod tests {
         let source_lang = std::env::var("OVERLAYSUBS_SOURCE_LANG").ok();
         let mut s = Session::new(SessionConfig { glossary, topic: env("OVERLAYSUBS_TOPIC", ""), source_lang, ..Default::default() });
         let mut finals = vec![];
-        for ev in evs.into_iter().filter(|e| matches!(e, Event::Final(_))) {
+        for ev in evs.into_iter().filter(|e| e.is_final()) {
             let t0 = std::time::Instant::now();
             s.handle(ev, &mut asr, &mut mt, &mut |c| if c.stage == Stage::Final { finals.push(c) }).unwrap();
             eprintln!("utterance took {:?}", t0.elapsed());
@@ -382,7 +395,7 @@ mod tests {
             for chunk in pcm.chunks(160).chain(std::iter::once(&[0.0; 16_000][..])) {
                 pos += chunk.len();
                 ep.push(chunk, &mut vad, &mut out).unwrap();
-                evs.extend(out.drain(..).map(|e| (pos as f64 / 16_000.0, matches!(e, Event::Final(_)), (e, pos))));
+                evs.extend(out.drain(..).map(|e| (pos as f64 / 16_000.0, e.is_final(), (e, pos))));
             }
             let vad_s = t0.elapsed().as_secs_f64();
             (asr.1, mt.1) = (Duration::ZERO, Duration::ZERO);
