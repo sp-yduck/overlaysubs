@@ -10,10 +10,13 @@ use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::sampling::LlamaSampler;
 use std::num::NonZeroU32;
 use std::path::Path;
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperVadContext, WhisperVadContextParams, WhisperVadParams};
+use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState, WhisperVadContext, WhisperVadContextParams, WhisperVadParams};
 
 pub struct Whisper {
     ctx: WhisperContext,
+    /// Reused across `transcribe` calls: creating one allocates the KV cache and compute buffers, and the
+    /// state also caches the Silero model that `enable_vad` would otherwise reload from disk on every call.
+    state: WhisperState,
     pub vad_path: String,
     threads: i32,
 }
@@ -23,7 +26,8 @@ impl Whisper {
         let mut p = WhisperContextParameters::default();
         p.use_gpu(use_gpu);
         let ctx = WhisperContext::new_with_params(model, p).map_err(|e| e.to_string())?;
-        Ok(Self { ctx, vad_path: vad.to_string_lossy().into_owned(), threads: threads.min(8) as i32 })
+        let state = ctx.create_state().map_err(|e| e.to_string())?;
+        Ok(Self { ctx, state, vad_path: vad.to_string_lossy().into_owned(), threads: threads.min(8) as i32 })
     }
 }
 
@@ -41,7 +45,7 @@ impl Whisper {
 
 impl Asr for Whisper {
     fn transcribe(&mut self, pcm: &[f32], lang: Option<&str>, prompt: &str) -> Result<Transcript, String> {
-        let mut st = self.ctx.create_state().map_err(|e| e.to_string())?;
+        let st = &mut self.state;
         let mut p = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         p.set_n_threads(self.threads);
         p.set_language(Some(lang.unwrap_or("auto")));
