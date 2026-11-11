@@ -174,9 +174,9 @@ mod tests {
     use overlaysubs_core::registry::Registry;
     use overlaysubs_core::session::{Session, SessionConfig, Stage};
 
-    /// 16 kHz mono s16 WAV from OVERLAYSUBS_WAV.
-    fn wav() -> Vec<f32> {
-        let wav = std::fs::read(std::env::var("OVERLAYSUBS_WAV").unwrap()).unwrap();
+    /// A 16 kHz mono s16 WAV.
+    fn wav(path: impl AsRef<Path>) -> Vec<f32> {
+        let wav = std::fs::read(path).unwrap();
         let data = wav.windows(4).position(|w| w == b"data").unwrap() + 8;
         wav[data..].chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect()
     }
@@ -190,7 +190,7 @@ mod tests {
         let dir = std::env::temp_dir().join("overlaysubs-models");
         let m = reg.get("silero-vad-v6.2.0").unwrap();
         crate::download::fetch(m, &dir, &mut |_, _| {}).unwrap();
-        let pcm = wav();
+        let pcm = wav(std::env::var("OVERLAYSUBS_WAV").unwrap());
         let vads: [(&str, Box<dyn overlaysubs_core::endpoint::Vad>); 2] =
             [("energy", Box::new(overlaysubs_core::endpoint::Energy(0.01))), ("silero", Box::new(Silero::load(&dir.join(&m.file).to_string_lossy()).unwrap()))];
         for (name, mut vad) in vads {
@@ -229,7 +229,7 @@ mod tests {
         let mut asr = Whisper::load(&p(0), &p(2), false, threads).unwrap();
         let mut mt = Plamo::load(&p(1), 0, threads).unwrap();
 
-        let pcm = wav();
+        let pcm = wav(std::env::var("OVERLAYSUBS_WAV").unwrap());
         let mut ep = Endpointer::new(EndpointConfig::default());
         let mut evs = vec![];
         let mut vad = Silero::load(&asr.vad_path).unwrap();
@@ -251,5 +251,211 @@ mod tests {
         }
         assert!(!finals.is_empty(), "speech produced captions");
         assert!(finals.iter().all(|c| c.lang == lang && c.translation.chars().any(|ch| ('\u{3040}'..='\u{30ff}').contains(&ch) || ('\u{4e00}'..='\u{9fff}').contains(&ch))), "{lang} speech translated into Japanese");
+    }
+
+    /// Adds up the time spent inside an engine.
+    struct Timed<T>(T, std::time::Duration);
+    impl<T: Asr> Asr for Timed<T> {
+        fn transcribe(&mut self, pcm: &[f32], lang: Option<&str>, prompt: &str) -> Result<Transcript, String> {
+            let t0 = std::time::Instant::now();
+            let r = self.0.transcribe(pcm, lang, prompt);
+            self.1 += t0.elapsed();
+            r
+        }
+    }
+    impl<T: Translator> Translator for Timed<T> {
+        fn translate(&mut self, req: &TranslateRequest, on_piece: &mut dyn FnMut(&str)) -> Result<String, String> {
+            let t0 = std::time::Instant::now();
+            let r = self.0.translate(req, on_piece);
+            self.1 += t0.elapsed();
+            r
+        }
+    }
+
+    #[derive(serde::Serialize, serde::Deserialize)]
+    struct Report {
+        asr: String,
+        mt: String,
+        gpu: bool,
+        /// Peaks over the whole run in MB, models included; see `mem_sampler`. Absent in reports from before they were measured.
+        #[serde(default)]
+        ram_peak_mb: Option<f64>,
+        #[serde(default)]
+        vram_peak_mb: Option<f64>,
+        clips: Vec<Clip>,
+    }
+
+    /// Samples memory until `stop` is set and returns the peaks in MB. RAM is this process's resident set.
+    /// VRAM is how far GPU 0's used memory rose above its reading at the start, so keep other GPU apps idle.
+    /// shortcut: VRAM comes from nvidia-smi, so it is None without an NVIDIA GPU; add a per-vendor query if AMD / Intel / Metal numbers are needed.
+    fn mem_sampler(stop: std::sync::Arc<std::sync::atomic::AtomicBool>) -> std::thread::JoinHandle<(f64, Option<f64>)> {
+        use std::io::BufRead;
+        use std::process::{Command, Stdio};
+        let smi = |extra: &[&str]| {
+            let mut c = Command::new("nvidia-smi");
+            c.args(["--query-gpu=memory.used", "--format=csv,noheader,nounits", "-i", "0"]).args(extra).stdout(Stdio::piped()).stderr(Stdio::null());
+            c
+        };
+        // Read synchronously, before the caller loads a model.
+        let base = smi(&[]).output().ok().and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse::<f64>().ok());
+        std::thread::spawn(move || {
+            // One long-lived nvidia-smi printing every 200 ms costs less than spawning one per sample.
+            let mut child = base.and_then(|_| smi(&["-lms", "200"]).spawn().ok());
+            let lines = child.as_mut().and_then(|c| c.stdout.take()).map(std::io::BufReader::new);
+            let vram = lines.map(|l| std::thread::spawn(move || l.lines().map_while(Result::ok).filter_map(|l| l.trim().parse::<f64>().ok()).fold(0.0, f64::max)));
+            let pid = sysinfo::get_current_pid().unwrap();
+            let mut sys = sysinfo::System::new().unwrap();
+            let mut ram = 0;
+            while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                sys.refresh_processes_specifics(sysinfo::ProcessesToUpdate::Some(&[pid]), false, sysinfo::ProcessRefreshKind::nothing().with_memory());
+                ram = ram.max(sys.process(pid).map_or(0, |p| p.memory()));
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            if let Some(mut c) = child {
+                let _ = c.kill();
+                let _ = c.wait();
+            }
+            let peak = vram.map(|t| t.join().unwrap());
+            (ram as f64 / (1 << 20) as f64, base.zip(peak).map(|(b, p)| (p - b).max(0.0)))
+        })
+    }
+
+    /// Times are seconds. `load` is engine time over audio time (above 1 cannot keep up);
+    /// `final_delay_*` is how long after the endpointer ended an utterance its captions were done.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    struct Clip {
+        name: String,
+        audio_s: f64,
+        vad_s: f64,
+        asr_s: f64,
+        mt_s: f64,
+        load: f64,
+        final_delay_p50: f64,
+        final_delay_max: f64,
+        partials_run: usize,
+        partials_skipped: usize,
+        source: String,
+        translation: String,
+        /// Against `<clip>.txt` / `<clip>.tr.txt` next to the WAV, when present.
+        cer: Option<f64>,
+        tr_cer: Option<f64>,
+    }
+
+    /// Speed and quality of the whole pipeline on recorded clips, replayed as live audio.
+    /// Run it with scripts/bench.sh, which documents the inputs. Env: OVERLAYSUBS_WAV (a 16 kHz mono WAV or a
+    /// folder of them), OVERLAYSUBS_OUT (report path), OVERLAYSUBS_BASELINE (an earlier report to compare with),
+    /// OVERLAYSUBS_ASR / OVERLAYSUBS_MT (model ids), OVERLAYSUBS_GPU=1.
+    #[test]
+    #[ignore]
+    fn bench_report() {
+        use overlaysubs_core::metrics::{cer, replay};
+        use std::time::{Duration, Instant};
+        let env = |k: &str, d: &str| std::env::var(k).unwrap_or_else(|_| d.into());
+        let reg = Registry::parse(include_str!("../../models.json")).unwrap();
+        let dir = std::env::temp_dir().join("overlaysubs-models");
+        let ids = [env("OVERLAYSUBS_ASR", "whisper-base"), env("OVERLAYSUBS_MT", "plamo-3-translate-0.8b-q4_k_m"), "silero-vad-v6.2.0".into()];
+        for id in &ids {
+            crate::download::fetch(reg.get(id).unwrap(), &dir, &mut |_, _| {}).unwrap();
+        }
+        let p = |i: usize| dir.join(&reg.get(&ids[i]).unwrap().file);
+        let gpu = env("OVERLAYSUBS_GPU", "0") == "1";
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mem = mem_sampler(stop.clone());
+        let threads = std::thread::available_parallelism().unwrap().get();
+        let mut asr = Timed(Whisper::load(&p(0), &p(2), gpu, threads).unwrap(), Duration::ZERO);
+        let mut mt = Timed(Plamo::load(&p(1), if gpu { 999 } else { 0 }, threads).unwrap(), Duration::ZERO);
+
+        let input = std::path::PathBuf::from(std::env::var("OVERLAYSUBS_WAV").unwrap());
+        let mut wavs = match input.is_dir() {
+            true => std::fs::read_dir(&input).unwrap().map(|e| e.unwrap().path()).filter(|p| p.extension().is_some_and(|x| x == "wav")).collect(),
+            false => vec![input],
+        };
+        wavs.sort();
+        assert!(!wavs.is_empty(), "no .wav in OVERLAYSUBS_WAV");
+        let mut report = Report { asr: ids[0].clone(), mt: ids[1].clone(), gpu, ram_peak_mb: None, vram_peak_mb: None, clips: vec![] };
+        for path in wavs {
+            let pcm = wav(&path);
+            // 10 ms chunks, as live capture delivers them; a second of silence ends the last utterance.
+            let mut vad = Silero::load(&asr.0.vad_path).unwrap();
+            let mut ep = Endpointer::new(EndpointConfig::default());
+            let (mut evs, mut out, mut pos, t0) = (vec![], vec![], 0, Instant::now());
+            for chunk in pcm.chunks(160).chain(std::iter::once(&[0.0; 16_000][..])) {
+                pos += chunk.len();
+                ep.push(chunk, &mut vad, &mut out).unwrap();
+                evs.extend(out.drain(..).map(|e| (pos as f64 / 16_000.0, matches!(e, Event::Final(_)), (e, pos))));
+            }
+            let vad_s = t0.elapsed().as_secs_f64();
+            (asr.1, mt.1) = (Duration::ZERO, Duration::ZERO);
+            let mut s = Session::new(SessionConfig::default());
+            let mut seen = 0;
+            let mut r = replay(evs, |(ev, pos)| {
+                s.tick(pos - seen);
+                seen = pos;
+                let t0 = Instant::now();
+                s.handle(ev, &mut asr, &mut mt, &mut |_| {}).unwrap();
+                t0.elapsed().as_secs_f64()
+            });
+            r.final_delays.sort_by(f64::total_cmp);
+            let join = |f: fn(&overlaysubs_core::export::Entry) -> &str| s.entries.iter().map(f).collect::<Vec<_>>().join(" ");
+            let (source, translation) = (join(|e| &e.source), join(|e| &e.translation));
+            let audio_s = pcm.len() as f64 / 16_000.0;
+            let reference = |ext: &str, got: &str| std::fs::read_to_string(path.with_extension(ext)).ok().map(|want| cer(&want, got));
+            report.clips.push(Clip {
+                name: path.file_stem().unwrap().to_string_lossy().into_owned(),
+                audio_s,
+                vad_s,
+                asr_s: asr.1.as_secs_f64(),
+                mt_s: mt.1.as_secs_f64(),
+                load: r.busy / audio_s,
+                final_delay_p50: r.final_delays.get(r.final_delays.len() / 2).copied().unwrap_or(0.0),
+                final_delay_max: r.final_delays.last().copied().unwrap_or(0.0),
+                partials_run: r.partials_run,
+                partials_skipped: r.partials_skipped,
+                cer: reference("txt", &source),
+                tr_cer: reference("tr.txt", &translation),
+                source,
+                translation,
+            });
+        }
+
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        let (ram, vram) = mem.join().unwrap();
+        (report.ram_peak_mb, report.vram_peak_mb) = (Some(ram), vram);
+
+        let base: Option<Report> = std::env::var("OVERLAYSUBS_BASELINE").ok().filter(|p| !p.is_empty()).map(|p| serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap());
+        let pct = |v: Option<f64>| v.map_or("-".into(), |v| format!("{:.1}%", v * 100.0));
+        let row = |name: &str, new: f64, old: Option<f64>| match old {
+            Some(old) => eprintln!("  {name:<18}{old:>8.2} -> {new:>8.2}  ({:+.0}%)", (new / old - 1.0) * 100.0),
+            None => eprintln!("  {name:<18}{new:>8.2}"),
+        };
+        for c in &report.clips {
+            eprintln!("\n{} ({:.1} s, {} + {}, {})", c.name, c.audio_s, report.asr, report.mt, if gpu { "GPU" } else { "CPU" });
+            let b = base.as_ref().and_then(|b| b.clips.iter().find(|b| b.name == c.name));
+            row("load (x realtime)", c.load, b.map(|b| b.load));
+            row("final delay p50 s", c.final_delay_p50, b.map(|b| b.final_delay_p50));
+            row("final delay max s", c.final_delay_max, b.map(|b| b.final_delay_max));
+            row("asr s", c.asr_s, b.map(|b| b.asr_s));
+            row("translate s", c.mt_s, b.map(|b| b.mt_s));
+            row("vad s", c.vad_s, b.map(|b| b.vad_s));
+            row("partials run", c.partials_run as f64, b.map(|b| b.partials_run as f64));
+            row("partials skipped", c.partials_skipped as f64, b.map(|b| b.partials_skipped as f64));
+            match b {
+                Some(b) => {
+                    eprintln!("  transcript CER    {} -> {}, changed from baseline {}", pct(b.cer), pct(c.cer), pct(Some(cer(&b.source, &c.source))));
+                    eprintln!("  translation CER   {} -> {}, changed from baseline {}", pct(b.tr_cer), pct(c.tr_cer), pct(Some(cer(&b.translation, &c.translation))));
+                }
+                None => eprintln!("  transcript CER    {}\n  translation CER   {}", pct(c.cer), pct(c.tr_cer)),
+            }
+            eprintln!("  {}\n  -> {}", c.source, c.translation);
+        }
+        eprintln!("\nmemory, whole run");
+        row("RAM peak MB", ram, base.as_ref().and_then(|b| b.ram_peak_mb));
+        match vram {
+            Some(v) => row("VRAM peak MB", v, base.as_ref().and_then(|b| b.vram_peak_mb)),
+            None => eprintln!("  VRAM peak MB             -  (needs nvidia-smi)"),
+        }
+        if let Ok(out) = std::env::var("OVERLAYSUBS_OUT") {
+            std::fs::write(out, serde_json::to_string_pretty(&report).unwrap()).unwrap();
+        }
     }
 }
