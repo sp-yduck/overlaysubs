@@ -40,10 +40,21 @@ impl Default for EndpointConfig {
 
 #[derive(Debug, PartialEq)]
 pub enum Event {
-    /// Utterance still running; audio so far.
-    Partial(Vec<f32>),
+    /// Utterance still running; audio so far. `start` is the stream position (in samples) of `pcm[0]`.
+    Partial { pcm: Vec<f32>, start: usize },
     /// Utterance finished.
-    Final(Vec<f32>),
+    Final { pcm: Vec<f32>, start: usize },
+}
+
+impl Event {
+    pub fn pcm(&self) -> &[f32] {
+        match self {
+            Event::Partial { pcm, .. } | Event::Final { pcm, .. } => pcm,
+        }
+    }
+    pub fn is_final(&self) -> bool {
+        matches!(self, Event::Final { .. })
+    }
 }
 
 pub struct Endpointer {
@@ -53,11 +64,26 @@ pub struct Endpointer {
     buf: Vec<f32>,
     silent: usize,
     since_partial: usize,
+    /// Stream position of the next sample pushed into `buf`, and of `buf[0]`.
+    pos: usize,
+    start: usize,
 }
 
 impl Endpointer {
     pub fn new(cfg: EndpointConfig) -> Self {
-        Self { cfg, pending: Vec::new(), pre: Vec::new(), buf: Vec::new(), silent: 0, since_partial: 0 }
+        Self { cfg, pending: Vec::new(), pre: Vec::new(), buf: Vec::new(), silent: 0, since_partial: 0, pos: 0, start: 0 }
+    }
+
+    /// The session committed everything before stream position `pos`: drop that audio from the running
+    /// utterance, so later partials and `max_ms` only count what is still open.
+    pub fn commit(&mut self, pos: usize) {
+        if self.buf.is_empty() || pos <= self.start {
+            return;
+        }
+        let n = (pos - self.start).min(self.buf.len());
+        self.buf.drain(..n);
+        self.start += n;
+        self.silent = self.silent.min(self.buf.len());
     }
 
     pub fn push(&mut self, pcm: &[f32], vad: &mut dyn Vad, out: &mut Vec<Event>) -> Result<(), String> {
@@ -70,6 +96,7 @@ impl Endpointer {
         let pcm: Vec<f32> = self.pending.drain(..n).collect();
         let probs = vad.probs(&pcm)?;
         for (frame, p) in pcm.chunks(FRAME).zip(probs) {
+            self.pos += frame.len();
             let speaking = p >= if self.buf.is_empty() { self.cfg.threshold } else { self.cfg.threshold - 0.15 };
             if self.buf.is_empty() && !speaking {
                 self.pre.extend_from_slice(frame);
@@ -79,6 +106,7 @@ impl Endpointer {
             }
             if self.buf.is_empty() {
                 self.buf = std::mem::take(&mut self.pre);
+                self.start = self.pos - frame.len() - self.buf.len();
             }
             self.buf.extend_from_slice(frame);
             self.silent = if speaking { 0 } else { self.silent + frame.len() };
@@ -86,11 +114,11 @@ impl Endpointer {
             if ms(self.silent) >= self.cfg.silence_ms || ms(self.buf.len()) >= self.cfg.max_ms {
                 let keep = self.buf.len() - self.silent.min(self.buf.len());
                 self.buf.truncate(keep.max(1));
-                out.push(Event::Final(std::mem::take(&mut self.buf)));
+                out.push(Event::Final { pcm: std::mem::take(&mut self.buf), start: self.start });
                 self.silent = 0;
                 self.since_partial = 0;
             } else if ms(self.since_partial) >= self.cfg.partial_every_ms {
-                out.push(Event::Partial(self.buf.clone()));
+                out.push(Event::Partial { pcm: self.buf.clone(), start: self.start });
                 self.since_partial = 0;
             }
         }
@@ -113,7 +141,7 @@ mod tests {
     }
 
     fn finals(ev: &[Event]) -> Vec<usize> {
-        ev.iter().filter_map(|x| if let Event::Final(v) = x { Some(v.len()) } else { None }).collect()
+        ev.iter().filter_map(|x| if let Event::Final { pcm, .. } = x { Some(pcm.len()) } else { None }).collect()
     }
 
     #[test]
@@ -125,7 +153,7 @@ mod tests {
         assert!(ev.is_empty(), "leading silence is ignored");
         e.push(&vec![0.1; 64 * FRAME], vad, &mut ev).unwrap();
         e.push(&vec![0.0; 32 * FRAME], vad, &mut ev).unwrap();
-        assert_eq!(ev.iter().filter(|x| matches!(x, Event::Partial(_))).count(), 2);
+        assert_eq!(ev.iter().filter(|x| matches!(x, Event::Partial { .. })).count(), 2);
         assert_eq!(finals(&ev), vec![64 * FRAME], "trailing silence trimmed");
     }
 
@@ -161,6 +189,24 @@ mod tests {
         let mut ev = Vec::new();
         e.push(&vec![0.3; 56 * FRAME], &mut Script(probs), &mut ev).unwrap();
         assert_eq!(finals(&ev), vec![24 * FRAME]);
+    }
+
+    #[test]
+    fn commit_drops_the_audio_before_it_from_the_running_utterance() {
+        let mut e = Endpointer::new(NO_PRE);
+        let mut ev = Vec::new();
+        let vad = &mut Energy(0.01);
+        e.push(&vec![0.0; 32 * FRAME], vad, &mut ev).unwrap();
+        e.push(&vec![0.1; 100 * FRAME], vad, &mut ev).unwrap();
+        let Some(Event::Partial { start, .. }) = ev.last() else { panic!() };
+        assert_eq!(*start, 32 * FRAME, "positions count from the start of the stream");
+        e.commit(90 * FRAME);
+        e.commit(10 * FRAME); // already gone: ignored
+        e.push(&vec![0.1; 20 * FRAME], vad, &mut ev).unwrap();
+        e.push(&vec![0.0; 32 * FRAME], vad, &mut ev).unwrap();
+        let Some(Event::Final { pcm, start }) = ev.pop() else { panic!() };
+        assert_eq!((start, pcm.len()), (90 * FRAME, 62 * FRAME), "the final starts at the commit");
+        e.commit(1_000 * FRAME); // no utterance running: ignored
     }
 
     #[test]

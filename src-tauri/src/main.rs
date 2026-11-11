@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod capture;
+#[cfg(test)]
+mod compare;
 mod download;
 mod engine;
 mod hw;
@@ -433,12 +435,16 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     let mut vad = engine::Silero::load(&st.engines.lock().unwrap().as_ref().unwrap().asr.vad_path)?;
     let cap = capture::start(&s.source, audio_tx)?;
     let vad_app = app.clone();
+    // Stream position the session has committed up to, so the endpointer drops that audio.
+    let committed = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let committed_ep = committed.clone();
     std::thread::spawn(move || {
         let mut ep = Endpointer::new(EndpointConfig::default());
         let mut out = Vec::new();
         let mut pos = 0;
         for chunk in audio_rx {
             pos += chunk.len();
+            ep.commit(committed_ep.load(Ordering::SeqCst));
             if let Err(err) = ep.push(&chunk, &mut vad, &mut out) {
                 let _ = vad_app.emit("error", err);
                 return;
@@ -483,7 +489,7 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
             // Under load, skip stale partials: keep every final and only the newest partial.
             let batch: Vec<_> = std::iter::once(first).chain(ev_rx.try_iter()).collect();
             let n = batch.len();
-            let batch = batch.into_iter().enumerate().filter(|(i, (e, _))| matches!(e, Event::Final(_)) || *i == n - 1).map(|(_, x)| x);
+            let batch = batch.into_iter().enumerate().filter(|(i, (e, _))| e.is_final() || *i == n - 1).map(|(_, x)| x);
             for (ev, pos) in batch {
                 session.tick(pos - seen);
                 seen = pos;
@@ -493,6 +499,7 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
                 if let Err(err) = session.handle(ev, asr, mt, &mut emit) {
                     let _ = emit_app.emit("error", err);
                 }
+                committed.store(session.committed(), Ordering::SeqCst);
             }
             *history.lock().unwrap() = session.entries.clone();
         }
