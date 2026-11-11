@@ -1,10 +1,10 @@
-// The same page is the desktop overlay (inside Tauri) and an OBS browser source, where the app's
+// The same page is the desktop overlay (inside Tauri) and a streaming app's browser source, where the app's
 // local server sends the same events over SSE and there is no window to drag, scroll or click through.
 const tauri = window.__TAURI__;
 const sse = tauri ? null : new EventSource("/events");
 const invoke = tauri ? tauri.core.invoke : () => Promise.reject(new Error("not in the app"));
 const listen = tauri ? tauri.event.listen : (name, fn) => sse.addEventListener(name, (e) => fn({ payload: JSON.parse(e.data) }));
-document.body.classList.toggle("obs", !tauri);
+document.body.classList.toggle("source", !tauri);
 
 let cfg = overlayConfig();
 let uiLang = "en";
@@ -254,5 +254,5 @@ function showGrip() {
   document.getElementById("grip").textContent = preview ? `⠿ ${t("drag_hint")}` : "";
 }
 setInterval(draw, 500);
-// An OBS browser source gets the settings as the first event of its stream instead.
+// A browser source gets the settings as the first event of its stream instead.
 if (tauri) invoke("snapshot").then((s) => apply(s.settings));

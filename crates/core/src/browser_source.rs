@@ -1,6 +1,6 @@
-//! Local HTTP server that lets an OBS browser source show the overlay: it serves the overlay page
+//! Local HTTP server that lets a streaming app's browser source show the overlay: it serves the overlay page
 //! and pushes the same events the desktop overlay gets as Server-Sent Events on `/events`.
-//! Bound to 127.0.0.1 only, and only while the user has the OBS option turned on.
+//! Bound to 127.0.0.1 only, and only while the user has the browser source option turned on.
 
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};

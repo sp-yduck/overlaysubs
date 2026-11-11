@@ -9,8 +9,8 @@ use capture::Source;
 use overlaysubs_core::cache::HardwareCache;
 use overlaysubs_core::device::Device;
 use overlaysubs_core::endpoint::{EndpointConfig, Endpointer, Event};
+use overlaysubs_core::browser_source;
 use overlaysubs_core::export::{self, Entry};
-use overlaysubs_core::obs;
 use overlaysubs_core::registry::{Registry, Selection};
 use overlaysubs_core::session::{Asr, Caption, Session, SessionConfig, Translator};
 use overlaysubs_core::tier::{self, Hardware, Tier};
@@ -53,9 +53,9 @@ struct Settings {
     ui_lang: String,
     /// Opaque to Rust: owned by the overlay/settings UI.
     overlay: serde_json::Value,
-    /// Serve the overlay to an OBS browser source at http://127.0.0.1:<obs_port>/.
-    obs: bool,
-    obs_port: u16,
+    /// Serve the overlay to a streaming app's browser source at http://127.0.0.1:<browser_source_port>/.
+    browser_source: bool,
+    browser_source_port: u16,
 }
 
 impl Default for Settings {
@@ -73,8 +73,8 @@ impl Default for Settings {
             hotkey: "CmdOrCtrl+Shift+T".into(),
             ui_lang: String::new(),
             overlay: serde_json::json!({}),
-            obs: false,
-            obs_port: 17777,
+            browser_source: false,
+            browser_source_port: 17777,
         }
     }
 }
@@ -146,29 +146,29 @@ struct App {
     /// Set once the saved position and size were applied at launch. The window reports moves and resizes while it
     /// is being created, and saving those would replace the saved spot before it is read.
     overlay_geometry_restored: AtomicBool,
-    obs_hub: Arc<obs::Hub>,
-    obs_server: Mutex<Option<obs::Server>>,
+    source_hub: Arc<browser_source::Hub>,
+    source_server: Mutex<Option<browser_source::Server>>,
 }
 
-/// What the OBS browser source loads: the overlay page itself, which works outside Tauri too.
-const OBS_FILES: &[obs::File] = &[
+/// What the browser source loads: the overlay page itself, which works outside Tauri too.
+const SOURCE_FILES: &[browser_source::File] = &[
     ("/", "text/html; charset=utf-8", include_str!("../../ui/overlay.html")),
     ("/i18n.js", "text/javascript; charset=utf-8", include_str!("../../ui/i18n.js")),
     ("/overlay-config.js", "text/javascript; charset=utf-8", include_str!("../../ui/overlay-config.js")),
     ("/overlay.js", "text/javascript; charset=utf-8", include_str!("../../ui/overlay.js")),
 ];
 
-/// Starts, moves or stops the OBS server to match the settings, and sends it the appearance.
+/// Starts, moves or stops the browser source server to match the settings, and sends it the appearance.
 /// Only the overlay's own settings leave the app: the rest (folders, glossary) is not its business.
-fn sync_obs(st: &App, s: &Settings) -> Result<(), String> {
-    st.obs_hub.set_settings(serde_json::json!({ "overlay": s.overlay, "ui_lang": s.ui_lang }).to_string());
-    let mut server = st.obs_server.lock().unwrap();
-    if !s.obs {
+fn sync_browser_source(st: &App, s: &Settings) -> Result<(), String> {
+    st.source_hub.set_settings(serde_json::json!({ "overlay": s.overlay, "ui_lang": s.ui_lang }).to_string());
+    let mut server = st.source_server.lock().unwrap();
+    if !s.browser_source {
         *server = None;
-    } else if server.as_ref().map(obs::Server::port) != Some(s.obs_port) {
+    } else if server.as_ref().map(browser_source::Server::port) != Some(s.browser_source_port) {
         // Close the old port first: the new one may be the same after a failed start.
         *server = None;
-        *server = Some(obs::serve(s.obs_port, OBS_FILES, st.obs_hub.clone()).map_err(|e| format!("OBS: 127.0.0.1:{}: {e}", s.obs_port))?);
+        *server = Some(browser_source::serve(s.browser_source_port, SOURCE_FILES, st.source_hub.clone()).map_err(|e| format!("Browser source: 127.0.0.1:{}: {e}", s.browser_source_port))?);
     }
     Ok(())
 }
@@ -267,7 +267,7 @@ fn save_settings(app: AppHandle, st: State<App>, settings: Settings) -> Result<(
     }
     save(&app, &settings)?;
     app.emit("settings", &settings).map_err(|e| e.to_string())?;
-    sync_obs(&st, &settings)
+    sync_browser_source(&st, &settings)
 }
 
 #[derive(Serialize)]
@@ -453,14 +453,14 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     let live_settings = st.settings.clone();
     history.lock().unwrap().clear();
     let emit_app = app.clone();
-    let obs_hub = st.obs_hub.clone();
+    let source_hub = st.source_hub.clone();
     let session_id = st.session_seq.fetch_add(1, Ordering::SeqCst) + 1;
     let session_thread = std::thread::spawn(move || {
         let mut session = Session::new(s.session);
         let mut seen = 0;
         let mut emit = |c: Caption| {
             let _ = emit_app.emit("caption", &c);
-            obs_hub.send("caption", &serde_json::to_string(&c).unwrap());
+            source_hub.send("caption", &serde_json::to_string(&c).unwrap());
         };
         loop {
             let stopping = stop_rx.try_recv().is_ok();
@@ -889,11 +889,11 @@ fn set_overlay_preview(app: AppHandle, st: State<App>, on: bool) {
         }
         set_overlay_visible(&app, true);
         let _ = app.emit_to("overlay", "overlay-preview", true);
-        st.obs_hub.send("overlay-preview", "true");
+        st.source_hub.send("overlay-preview", "true");
     } else {
         st.overlay_preview.store(false, Ordering::SeqCst);
         let _ = app.emit_to("overlay", "overlay-preview", false);
-        st.obs_hub.send("overlay-preview", "false");
+        st.source_hub.send("overlay-preview", "false");
         let running = st.running.lock().unwrap().is_some();
         if !running && !st.preview_prev_visible.load(Ordering::SeqCst) {
             st.overlay_hide_pending.store(false, Ordering::SeqCst);
@@ -932,7 +932,7 @@ fn main() {
             if let Err(e) = h.global_shortcut().register(s.hotkey.as_str()) {
                 eprintln!("hotkey {}: {e}", s.hotkey);
             }
-            if let Err(e) = sync_obs(&app.state::<App>(), &s) {
+            if let Err(e) = sync_browser_source(&app.state::<App>(), &s) {
                 eprintln!("{e}");
             }
             *app.state::<App>().settings.lock().unwrap() = s;

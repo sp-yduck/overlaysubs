@@ -218,7 +218,7 @@ function homePage() {
   ${card(t("recent"), `<div class="hist" data-hist="6"></div>`)}`;
 }
 
-const obsUrl = () => `http://127.0.0.1:${snap.settings.obs_port}/`;
+const sourceUrl = () => `http://127.0.0.1:${snap.settings.browser_source_port}/`;
 
 function overlayPage() {
   const s = snap.settings;
@@ -244,10 +244,10 @@ function overlayPage() {
     ${select(t("valign"), "overlay.vAlign", opts([["bottom", t("valign_bottom")], ["center", t("valign_center")], ["top", t("valign_top")]], s.overlay.vAlign))}
     ${field(t("linger"), "overlay.linger", "number", 'min="1" max="60"')}
     ${field(t("click_through"), "overlay.clickThrough", "check")}`)}
-  ${card(t("obs"), `<p class="muted small">${t("obs_note")}</p>
-    ${field(t("obs_enable"), "obs", "check")}
-    ${field(t("obs_port"), "obs_port", "number", 'min="1024" max="65535"')}
-    ${s.obs ? `<div class="f"><span>${t("obs_url")}</span><div class="row"><code>${esc(obsUrl())}</code>${btn("obs-copy", t("copy"), { cls: "small" })}</div></div>` : ""}`)}
+  ${card(t("browser_source"), `<p class="muted small">${t("browser_source_note")}</p>
+    ${field(t("browser_source_enable"), "browser_source", "check")}
+    ${field(t("browser_source_port"), "browser_source_port", "number", 'min="1024" max="65535"')}
+    ${s.browser_source ? `<div class="f"><span>${t("browser_source_url")}</span><div class="row"><code>${esc(sourceUrl())}</code>${btn("source-copy", t("copy"), { cls: "small" })}</div></div>` : ""}`)}
   ${card("", field(t("hotkey"), "hotkey"))}`;
 }
 
@@ -458,8 +458,8 @@ async function act(name, id, el) {
     await invoke("reset_overlay_position");
     toast(t("position_reset"));
   }
-  if (name === "obs-copy") {
-    await navigator.clipboard.writeText(obsUrl());
+  if (name === "source-copy") {
+    await navigator.clipboard.writeText(sourceUrl());
     toast(t("copied"));
   }
   if (name === "overlay-reset-appearance") {
