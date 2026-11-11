@@ -3,11 +3,13 @@ use overlaysubs_core::endpoint::{Vad, FRAME};
 use overlaysubs_core::pfml::{self, TranslateRequest};
 use overlaysubs_core::session::{Asr, Transcript, Translator};
 use llama_cpp_2::context::params::LlamaContextParams;
+use llama_cpp_2::context::LlamaContext;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::sampling::LlamaSampler;
+use llama_cpp_2::token::LlamaToken;
 use std::num::NonZeroU32;
 use std::path::Path;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState, WhisperVadContext, WhisperVadContextParams, WhisperVadParams};
@@ -104,8 +106,15 @@ impl Vad for Silero {
 }
 
 pub struct Plamo {
+    /// Kept across calls, created on the first. Fields drop in declaration order, so this goes before the
+    /// model it points into. See `translate` for the lifetime.
+    ctx: Option<LlamaContext<'static>>,
+    /// The prompt whose KV entries `ctx` holds at positions `0..`. Partials of one utterance and consecutive
+    /// sentences share the topic / history / glossary head, so only the differing tail is evaluated again.
+    cached: Vec<LlamaToken>,
+    /// Boxed so its address stays fixed while `ctx` refers to it.
+    model: Box<LlamaModel>,
     backend: LlamaBackend,
-    model: LlamaModel,
     threads: i32,
 }
 
@@ -118,29 +127,53 @@ impl Plamo {
         backend.void_logs();
         let params = LlamaModelParams::default().with_n_gpu_layers(gpu_layers);
         let model = LlamaModel::load_from_file(&backend, model, &params).map_err(|e| e.to_string())?;
-        Ok(Self { backend, model, threads: threads.min(8) as i32 })
+        Ok(Self { ctx: None, cached: vec![], model: Box::new(model), backend, threads: threads.min(8) as i32 })
     }
 }
 
 impl Translator for Plamo {
     fn translate(&mut self, req: &TranslateRequest, on_piece: &mut dyn FnMut(&str)) -> Result<String, String> {
+        if self.ctx.is_none() {
+            // swa_full keeps every position in PLaMo 3's sliding-window layers too, so a kept prefix is still
+            // complete after a long generation (llama.cpp's default, set here because the reuse depends on it).
+            let cp = LlamaContextParams::default()
+                .with_n_ctx(NonZeroU32::new(N_CTX))
+                .with_n_batch(N_CTX)
+                .with_n_threads(self.threads)
+                .with_n_threads_batch(self.threads)
+                .with_swa_full(true);
+            let ctx = self.model.new_context(&self.backend, cp).map_err(|e| e.to_string())?;
+            // SAFETY: the context borrows `*self.model`, which is boxed (never moves) and is dropped after
+            // `self.ctx` (field order); nothing replaces `self.model` while `self.ctx` is set.
+            self.ctx = Some(unsafe { std::mem::transmute::<LlamaContext<'_>, LlamaContext<'static>>(ctx) });
+        }
         let vocab = self.model.vocab();
-        // Fresh context per call: cheap at this size and avoids KV-cache bookkeeping.
-        let cp = LlamaContextParams::default().with_n_ctx(NonZeroU32::new(N_CTX)).with_n_batch(N_CTX).with_n_threads(self.threads).with_n_threads_batch(self.threads);
-        let mut ctx = self.model.new_context(&self.backend, cp).map_err(|e| e.to_string())?;
+        let ctx = self.ctx.as_mut().unwrap();
         let tokens = vocab.tokenize(pfml::build(req).as_bytes(), true, true);
         if tokens.len() + MAX_NEW > N_CTX as usize {
             return Err("utterance too long for context".into());
         }
+        // Keep the KV of the prefix shared with the previous prompt and drop the rest (its tail and the tokens
+        // generated after it). At least the last token is evaluated again, for its logits.
+        let mut keep = self.cached.iter().zip(&tokens).take_while(|(a, b)| a == b).count().min(tokens.len() - 1);
+        self.cached.clear();
+        if !ctx.clear_kv_cache_seq(Some(0), Some(keep as u32), None).unwrap_or(false) {
+            ctx.clear_kv_cache();
+            keep = 0;
+        }
         let mut batch = LlamaBatch::new(N_CTX as usize, 1);
-        batch.add_sequence(&tokens, 0, false).map_err(|e| e.to_string())?;
+        for (pos, &tok) in tokens.iter().enumerate().skip(keep) {
+            batch.add(tok, pos as i32, &[0], pos == tokens.len() - 1).map_err(|e| e.to_string())?;
+        }
         ctx.decode(&mut batch).map_err(|e| e.to_string())?;
+        let n_prompt = tokens.len();
+        self.cached = tokens;
         let mut sampler = LlamaSampler::greedy();
         let mut out = Vec::<u8>::new();
         let mut emitted = 0;
-        let mut pos = tokens.len() as i32;
+        let mut pos = n_prompt as i32;
         for _ in 0..MAX_NEW {
-            let tok = sampler.sample(&ctx, batch.n_tokens() - 1);
+            let tok = sampler.sample(ctx, batch.n_tokens() - 1);
             if vocab.is_eog(tok) {
                 break;
             }
