@@ -7,9 +7,9 @@
     "withGlobalTauri": true,
     "macOSPrivateApi": true,
     "windows": [
-      { "label": "main", "title": "OverlaySubs", "url": "index.html", "width": 980, "height": 680, "minWidth": 760, "minHeight": 520 },
+      { "label": "main", "create": false, "title": "OverlaySubs", "url": "index.html", "width": 980, "height": 680, "minWidth": 760, "minHeight": 520 },
       {
-        "label": "overlay", "title": "OverlaySubs overlay", "url": "overlay.html",
+        "label": "overlay", "create": false, "title": "OverlaySubs overlay", "url": "overlay.html",
         "width": 1100, "height": 220, "y": 760, "center": true,
         "transparent": true, "decorations": false, "alwaysOnTop": true, "visibleOnAllWorkspaces": true,
         "skipTaskbar": true, "shadow": false, "focus": false, "visible": false

@@ -137,6 +137,9 @@ struct App {
     overlay_hide_pending: AtomicBool,
     /// Where tauri.conf.json put the overlay at launch (desktop units), before a saved position was applied.
     overlay_default_position: Mutex<Option<(f64, f64)>>,
+    /// Set once the saved position and size were applied at launch. The window reports moves and resizes while it
+    /// is being created, and saving those would replace the saved spot before it is read.
+    overlay_geometry_restored: AtomicBool,
 }
 
 fn config_dir(app: &AppHandle) -> PathBuf {
@@ -630,9 +633,13 @@ fn set_click_through(app: AppHandle, on: bool) -> Result<(), String> {
     w.set_ignore_cursor_events(on).map_err(|e| e.to_string())
 }
 
-/// Where the overlay was last moved, in desktop units `{"x": .., "y": ..}` (see `DESKTOP_IN_POINTS`). Kept out of
-/// settings.json, which the settings window rewrites whole.
+/// Where the overlay was last moved, in desktop units (see `DESKTOP_IN_POINTS`), and the size it was last resized to,
+/// in logical pixels: `{"x": .., "y": .., "width": .., "height": ..}`. Kept out of settings.json, which the settings
+/// window rewrites whole.
 const OVERLAY_POSITION: &str = "overlay-position.json";
+
+/// The smallest saved size that is applied (logical pixels). A smaller one would leave nothing to grab or read.
+const OVERLAY_MIN_SIZE: (f64, f64) = (120.0, 40.0);
 
 /// The unit of the global desktop coordinates, which all overlay placement uses. macOS lays the desktop out in points,
 /// so a physical value is divided by the scale of the display it is on. Windows (and X11) lay it out in physical
@@ -643,7 +650,15 @@ const DESKTOP_IN_POINTS: bool = cfg!(target_os = "macos");
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 enum SavedPosition {
-    Desktop { x: f64, y: f64 },
+    Desktop {
+        x: f64,
+        y: f64,
+        /// Logical size. Missing in files written before the size was saved.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        width: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        height: Option<f64>,
+    },
     /// Physical pixels `[x, y]`, written by #42 before this format.
     Physical(i32, i32),
 }
@@ -673,10 +688,18 @@ fn desktop_position((x, y): (f64, f64)) -> tauri::Position {
     }
 }
 
-fn save_overlay_position(w: &tauri::Window, p: tauri::PhysicalPosition<i32>) {
+/// Saves where the overlay is and how large it is, after a move (`moved` is the new position) or a resize.
+fn save_overlay_geometry(w: &tauri::Window, moved: Option<tauri::PhysicalPosition<i32>>) {
+    if !w.state::<App>().overlay_geometry_restored.load(Ordering::SeqCst) {
+        return;
+    }
     let Ok(scale) = w.scale_factor() else { return };
+    let Some(p) = moved.or_else(|| w.outer_position().ok()) else { return };
     let at = |v: i32| to_desktop(v as f64, scale, DESKTOP_IN_POINTS);
-    let json = serde_json::to_string(&SavedPosition::Desktop { x: at(p.x), y: at(p.y) }).unwrap();
+    // The logical size stays the same when the overlay moves to a display with another scale.
+    // A window without a usable size is minimized or collapsed; where it is then is not worth keeping either.
+    let Some((width, height)) = w.inner_size().ok().map(|s| s.to_logical::<f64>(scale)).and_then(|s| usable_size(Some(s.width), Some(s.height))) else { return };
+    let json = serde_json::to_string(&SavedPosition::Desktop { x: at(p.x), y: at(p.y), width: Some(width), height: Some(height) }).unwrap();
     let dir = config_dir(w.app_handle());
     if let Err(e) = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join(OVERLAY_POSITION), json)) {
         eprintln!("{OVERLAY_POSITION}: {e}");
@@ -698,9 +721,22 @@ fn reset_overlay_position(app: AppHandle, st: State<App>) -> Result<(), String> 
     w.set_position(desktop_position(p)).map_err(|e| e.to_string())
 }
 
-/// Applies the saved position, moved so the whole overlay is on a display. Left at the launch position when the saved
-/// spot overlaps no display (an external display was unplugged, say), since the overlay would then sit out of sight.
-fn restore_overlay_position(app: &AppHandle) {
+/// A saved size that can be applied: both sides present, finite and not too small to use.
+fn usable_size(width: Option<f64>, height: Option<f64>) -> Option<(f64, f64)> {
+    let (w, h) = (width?, height?);
+    (w.is_finite() && h.is_finite() && w >= OVERLAY_MIN_SIZE.0 && h >= OVERLAY_MIN_SIZE.1).then_some((w, h))
+}
+
+/// Applies the saved size and position, and lets later moves and resizes be saved.
+fn restore_overlay_geometry(app: &AppHandle) {
+    restore_saved_overlay_geometry(app);
+    app.state::<App>().overlay_geometry_restored.store(true, Ordering::SeqCst);
+}
+
+/// Applies the saved size, then the saved position moved so the whole overlay is on a display. Left at the launch
+/// position when the saved spot overlaps no display (an external display was unplugged, say), since the overlay would
+/// then sit out of sight.
+fn restore_saved_overlay_geometry(app: &AppHandle) {
     let Some(w) = app.get_webview_window("overlay") else { return };
     if let (Ok(p), Ok(scale)) = (w.outer_position(), w.scale_factor()) {
         let at = |v: i32| to_desktop(v as f64, scale, DESKTOP_IN_POINTS);
@@ -708,7 +744,13 @@ fn restore_overlay_position(app: &AppHandle) {
     }
     let Ok(j) = std::fs::read_to_string(config_dir(app).join(OVERLAY_POSITION)) else { return };
     let saved = match serde_json::from_str::<SavedPosition>(&j) {
-        Ok(SavedPosition::Desktop { x, y }) => (x, y),
+        Ok(SavedPosition::Desktop { x, y, width, height }) => {
+            // Before the position, which is fitted to a display with the size the overlay will have.
+            if let Some((width, height)) = usable_size(width, height) {
+                let _ = w.set_size(tauri::LogicalSize::new(width, height));
+            }
+            (x, y)
+        }
         Ok(SavedPosition::Physical(x, y)) => legacy_to_desktop(&w, x, y),
         Err(_) => return,
     };
@@ -855,7 +897,14 @@ fn main() {
                 eprintln!("hotkey {}: {e}", s.hotkey);
             }
             *app.state::<App>().settings.lock().unwrap() = s;
-            restore_overlay_position(&h);
+            // The windows are created here and not by Tauri (`"create": false` in tauri.conf.json), which would do
+            // it before this hook. On Windows, creating a webview runs the event loop, so the settings window
+            // could load while the overlay was still being created, read the default settings that were in place
+            // until the line above, and save them over settings.json (#64).
+            for config in &app.config().app.windows {
+                tauri::WebviewWindowBuilder::from_config(app, config)?.build()?;
+            }
+            restore_overlay_geometry(&h);
 
             let toggle_i = MenuItem::with_id(app, "toggle", "Start / Stop", true, None::<&str>)?;
             let overlay_i = CheckMenuItem::with_id(app, "overlay", "Show subtitles", true, false, None::<&str>)?;
@@ -885,7 +934,8 @@ fn main() {
             // Closing settings quits the app so the overlay does not linger.
             match e {
                 tauri::WindowEvent::CloseRequested { .. } if w.label() == "main" => w.app_handle().exit(0),
-                tauri::WindowEvent::Moved(p) if w.label() == "overlay" => save_overlay_position(w, *p),
+                tauri::WindowEvent::Moved(p) if w.label() == "overlay" => save_overlay_geometry(w, Some(*p)),
+                tauri::WindowEvent::Resized(_) if w.label() == "overlay" => save_overlay_geometry(w, None),
                 _ => {}
             }
         })
@@ -1028,9 +1078,25 @@ mod tests {
 
     #[test]
     fn saved_position_reads_desktop_and_earlier_physical_files() {
-        assert!(matches!(serde_json::from_str::<SavedPosition>(r#"{"x":200.5,"y":600}"#), Ok(SavedPosition::Desktop { x, y }) if x == 200.5 && y == 600.0));
+        assert!(matches!(serde_json::from_str::<SavedPosition>(r#"{"x":200.5,"y":600}"#), Ok(SavedPosition::Desktop { x, y, width: None, height: None }) if x == 200.5 && y == 600.0));
+        assert!(matches!(
+            serde_json::from_str::<SavedPosition>(r#"{"x":200.5,"y":600,"width":900,"height":300.5}"#),
+            Ok(SavedPosition::Desktop { width: Some(w), height: Some(h), .. }) if w == 900.0 && h == 300.5
+        ));
+        // A position saved without a size is written as before, so an older version still reads the file.
+        assert_eq!(serde_json::to_string(&SavedPosition::Desktop { x: 1.0, y: 2.0, width: None, height: None }).unwrap(), r#"{"x":1.0,"y":2.0}"#);
         assert!(matches!(serde_json::from_str::<SavedPosition>("[400, 1200]"), Ok(SavedPosition::Physical(400, 1200))));
         assert!(serde_json::from_str::<SavedPosition>("garbage").is_err());
+    }
+
+    #[test]
+    fn only_a_usable_saved_size_is_applied() {
+        assert_eq!(usable_size(Some(900.0), Some(300.0)), Some((900.0, 300.0)));
+        assert_eq!(usable_size(Some(900.0), None), None);
+        // A minimized or collapsed window must not come back as a sliver.
+        assert_eq!(usable_size(Some(0.0), Some(0.0)), None);
+        assert_eq!(usable_size(Some(900.0), Some(10.0)), None);
+        assert_eq!(usable_size(Some(f64::NAN), Some(300.0)), None);
     }
 
     #[test]
