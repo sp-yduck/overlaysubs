@@ -65,6 +65,13 @@ The end-to-end tests that use the real models are `ignore`d by default. They run
 OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
 ```
 
+To measure what a change does to speed and quality, run the benchmark on the same clips before and after it. It replays the clips as live audio and reports the engine load, the caption delay and the character error rates; `scripts/bench.sh` documents the inputs.
+
+```bash
+scripts/bench.sh clips/                              # on main: writes target/bench/<commit>.json
+scripts/bench.sh clips/ target/bench/<commit>.json   # on your branch: compares with that report
+```
+
 Depending on what you change, run these tests too.
 
 ```bash

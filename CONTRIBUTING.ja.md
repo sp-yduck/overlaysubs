@@ -68,6 +68,13 @@ cargo test -p overlaysubs-core
 OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
 ```
 
+変更が速度と品質に与える影響は、同じ音声クリップで変更前後にベンチマークを実行して測ります。クリップをライブ音声として再生し、エンジン負荷、字幕の遅延、文字誤り率を出力します。入力の詳細は `scripts/bench.sh` の冒頭にあります。
+
+```bash
+scripts/bench.sh clips/                              # main で実行: target/bench/<commit>.json を出力
+scripts/bench.sh clips/ target/bench/<commit>.json   # 作業ブランチで実行: そのレポートと比較
+```
+
 変更した範囲に応じて、これらのテストも実行してください。
 
 ```bash
