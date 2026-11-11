@@ -26,6 +26,10 @@
   body:hover #grip { background: rgba(255,255,255,0.15); cursor: move; }
   /* While the appearance settings are open, the grip stays visible with a hint so the overlay can be moved off them. */
   body.preview #grip { background: rgba(255,255,255,0.25); cursor: move; }
+  /* OBS browser source: only the captions. The scene is the background, and the source is placed in OBS. */
+  body.obs { background: transparent; }
+  body.obs #grip { display: none; }
+  body.obs #lines { overflow-y: hidden; }
 </style>
 </head>
 <body>

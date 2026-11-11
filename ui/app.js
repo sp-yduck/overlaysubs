@@ -218,6 +218,8 @@ function homePage() {
   ${card(t("recent"), `<div class="hist" data-hist="6"></div>`)}`;
 }
 
+const obsUrl = () => `http://127.0.0.1:${snap.settings.obs_port}/`;
+
 function overlayPage() {
   const s = snap.settings;
   return `<h2>${t("overlay")}</h2>
@@ -242,6 +244,10 @@ function overlayPage() {
     ${select(t("valign"), "overlay.vAlign", opts([["bottom", t("valign_bottom")], ["center", t("valign_center")], ["top", t("valign_top")]], s.overlay.vAlign))}
     ${field(t("linger"), "overlay.linger", "number", 'min="1" max="60"')}
     ${field(t("click_through"), "overlay.clickThrough", "check")}`)}
+  ${card(t("obs"), `<p class="muted small">${t("obs_note")}</p>
+    ${field(t("obs_enable"), "obs", "check")}
+    ${field(t("obs_port"), "obs_port", "number", 'min="1024" max="65535"')}
+    ${s.obs ? `<div class="f"><span>${t("obs_url")}</span><div class="row"><code>${esc(obsUrl())}</code>${btn("obs-copy", t("copy"), { cls: "small" })}</div></div>` : ""}`)}
   ${card("", field(t("hotkey"), "hotkey"))}`;
 }
 
@@ -451,6 +457,10 @@ async function act(name, id, el) {
   if (name === "overlay-reset") {
     await invoke("reset_overlay_position");
     toast(t("position_reset"));
+  }
+  if (name === "obs-copy") {
+    await navigator.clipboard.writeText(obsUrl());
+    toast(t("copied"));
   }
   if (name === "overlay-reset-appearance") {
     // Click-through is an interaction setting, not a look, so resetting the appearance keeps it.
