@@ -271,7 +271,8 @@ function historyPage() {
 function aboutPage() {
   return `<h2>${t("about")}</h2>
   ${card("", `<p>OverlaySubs · MIT License. Translation: <b>Built with PLaMo</b> (PLaMo 3 Translate, Preferred Networks). Speech: whisper.cpp. VAD: Silero.</p>
-    <p class="muted">${t("about_plamo_license")}</p>`)}
+    <p class="muted">${t("about_plamo_license")}</p>
+    <p><a href="https://github.com/sp-yduck/overlaysubs" data-external>${t("star")}</a></p>`)}
   ${card(t("terms_title"), `<div class="seg">${btn("terms-en", "English", { cls: termsLang === "en" ? "on" : "" })}${btn("terms-ja", "日本語", { cls: termsLang === "ja" ? "on" : "" })}</div>
     <pre class="license" id="terms"></pre>`)}`;
 }
