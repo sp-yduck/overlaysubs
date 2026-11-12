@@ -251,13 +251,13 @@
 
         <div class="block">
           <h3>New version notifications</h3>
-          <p>At startup the app checks once for a newer version and, if there is one, shows an "Update available" banner at the top of Settings with the latest and current version. Click "Open release page" to open the release page, or "Later" to dismiss it (it stays hidden until the next launch). Nothing is downloaded or installed automatically.</p>
+          <p>At startup the app checks once for a newer version and, if there is one, shows an "Update available" banner at the top of Settings with the latest and current version. Click "Open release page" to open the release page, or "Later" to dismiss it (it stays hidden until the next launch). Unless you turn off "Download new versions automatically" on the About page, the installer is downloaded in the background and the banner then offers "Quit and install", which starts the installer and closes the app. Nothing is installed until you click it.</p>
         </div>
 
         <div class="block">
           <p>
             Audio, transcripts and translations are never sent anywhere. There is no telemetry.
-            The only network access is the model download and one anonymous GitHub API request at startup to check for a newer release (it sends no account, token or personal data; if it fails, nothing happens).
+            The only network access is the model download, one anonymous GitHub API request at startup to check for a newer release, and, unless turned off, the download of that release's installer from GitHub (none of these send an account, token or personal data; if they fail, nothing happens).
             Once the models are downloaded, the app works offline.
           </p>
         </div>
@@ -326,7 +326,7 @@
         </div>
         <p>
           The Windows installer includes the <strong>Vulkan loader</strong>, so the app starts even on a PC with no Vulkan-capable GPU or driver and then runs on the CPU (slower). A <strong>Vulkan-capable GPU with an up-to-date driver is recommended</strong> for real-time speed: with an old driver the GPU isn't used and the app is too slow to be practical.
-          It is distributed <strong>only via GitHub Releases</strong>. There is no auto-update: the app checks at startup whether a newer release exists and notifies you, but never downloads or installs it automatically.
+          It is distributed <strong>only via GitHub Releases</strong>. The app checks at startup whether a newer release exists, notifies you and, unless turned off, downloads its installer in the background; it never installs it without your click.
         </p>
 
         <div class="block">
@@ -372,7 +372,7 @@
           <li>Windows <strong>runs on the CPU when there is no Vulkan-capable GPU or driver</strong> (with the CPU-tier models, so it is slower); a Vulkan-capable GPU with an up-to-date driver is recommended for real-time speed.</li>
           <li>On macOS, system audio is captured with ScreenCaptureKit. The first use requires the "Screen &amp; System Audio Recording" (macOS 15+) or "Screen Recording" (macOS 13–14) permission and an app restart (see <a href="#faq">FAQ</a>).</li>
           <li>Capturing a single app only, or processing system audio and the microphone at the same time, is not implemented yet.</li>
-          <li><strong>There is no auto-update.</strong> The app checks for a newer release at startup and notifies you, but it never downloads or installs one. Download new versions manually from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> (the only distribution channel).</li>
+          <li><strong>Updates are never installed silently.</strong> The app checks for a newer release at startup, notifies you and (unless turned off on the About page) downloads the installer, but you start the installation yourself with "Quit and install". You can also download new versions manually from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> (the only distribution channel).</li>
         </ul>
       </div>
     </div>
@@ -461,7 +461,7 @@
         </details>
         <details>
           <summary>How do I update to a new version?</summary>
-          <p>There is no auto-update. When Settings shows a new-version banner, use "Open release page", or download the latest version from the links on this page or from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> and install it. Your settings and models are kept (see <a href="#limits">Limitations</a>).</p>
+          <p>When Settings shows a new-version banner, click "Quit and install" once the download has finished (automatic download can be turned off on the About page). You can also use "Open release page", or download the latest version from the links on this page or from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> and install it. Your settings and models are kept (see <a href="#limits">Limitations</a>).</p>
         </details>
       </div>
     </div>

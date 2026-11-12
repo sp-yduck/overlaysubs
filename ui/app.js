@@ -4,6 +4,8 @@ const { save: saveDialog, open: openDialog } = window.__TAURI__.dialog;
 
 let snap, page, progress = {}, benchMsg = "", hist = [], termsLang, agreed = false;
 let updateInfo = null, updateChecked = false;
+/** "" until the installer download starts, then "downloading", and "ready" or "failed". */
+let updateState = "";
 const busy = new Set();
 const $ = (s) => document.querySelector(s);
 const t = (k) => (I18N[snap?.settings.ui_lang] || I18N.en)[k] || k;
@@ -47,7 +49,8 @@ async function refresh() {
     try { await invoke("save_settings", { settings: snap.settings }); }
     catch (e) { toast(errText(e), "error"); }
   }
-  if (snap.terms_accepted) checkUpdate();
+  // Also after a settings save, so turning automatic download on fetches a pending update right away.
+  if (snap.terms_accepted) checkUpdate().then(downloadUpdate);
   render();
 }
 
@@ -59,6 +62,16 @@ async function checkUpdate() {
     const u = await invoke("check_update");
     if (u) { updateInfo = u; showUpdateBanner(); }
   } catch { /* offline / API error: stay quiet */ }
+}
+
+/** Downloads the installer in the background when the setting is on; a failure leaves the release page link. */
+async function downloadUpdate() {
+  if (!updateInfo?.downloadable || !snap.settings.auto_update || updateState) return;
+  updateState = "downloading";
+  showUpdateBanner();
+  try { await invoke("download_update"); updateState = "ready"; }
+  catch { updateState = "failed"; }
+  showUpdateBanner();
 }
 
 async function persist() {
@@ -273,23 +286,28 @@ function aboutPage() {
   ${card("", `<p>OverlaySubs · MIT License. Translation: <b>Built with PLaMo</b> (PLaMo 3 Translate, Preferred Networks). Speech: whisper.cpp. VAD: Silero.</p>
     <p class="muted">${t("about_plamo_license")}</p>
     <p><a href="https://github.com/sp-yduck/overlaysubs" data-external>${t("star")}</a></p>`)}
+  ${card(t("updates"), `${field(t("auto_update"), "auto_update", "check")}<p class="muted small">${t("auto_update_note")}</p>`)}
   ${card(t("terms_title"), `<div class="seg">${btn("terms-en", "English", { cls: termsLang === "en" ? "on" : "" })}${btn("terms-ja", "日本語", { cls: termsLang === "ja" ? "on" : "" })}</div>
     <pre class="license" id="terms"></pre>`)}`;
 }
 
 function updateBanner() {
   if (!updateInfo) return "";
-  const msg = t("update_available").replace("{latest}", esc(updateInfo.latest)).replace("{current}", esc(updateInfo.current));
+  const ready = updateState === "ready";
+  const msg = t(ready ? "update_ready" : "update_available").replace("{latest}", esc(updateInfo.latest)).replace("{current}", esc(updateInfo.current));
+  const main = ready ? btn("install-update", t("update_install"), { cls: "primary small" }) : btn("open-release", t("update_open"), { cls: "primary small" });
   return `<div class="update-banner" role="status" aria-live="polite">
-    <div class="msg"><b>${esc(t("update_title"))}</b> ${msg}</div>
-    <div class="row">${btn("open-release", t("update_open"), { cls: "primary small" })}${btn("dismiss-update", t("update_later"), { cls: "small" })}</div>
+    <div class="msg"><b>${esc(t("update_title"))}</b> ${msg}${updateState === "downloading" ? ` <span class="muted">${esc(t("update_downloading"))}</span>` : ""}</div>
+    <div class="row">${main}${btn("dismiss-update", t("update_later"), { cls: "small" })}</div>
   </div>`;
 }
 
-/** Insert the banner in place: the check can resolve seconds after startup, so a full render would steal focus. */
+/** Insert or redraw the banner in place: the check and the download finish at any time, so a full render would steal focus. */
 function showUpdateBanner() {
   const host = $("#page");
-  if (host && !$(".update-banner")) host.insertAdjacentHTML("afterbegin", updateBanner());
+  if (!host) return;
+  $(".update-banner")?.remove();
+  host.insertAdjacentHTML("afterbegin", updateBanner());
 }
 
 const PAGES = { home: homePage, models: modelsPage, overlay: overlayPage, history: historyPage, about: aboutPage };
@@ -493,6 +511,7 @@ async function act(name, id, el) {
     if (path) { await invoke("export_history", { path, format, withSource: snap.settings.overlay.showSource }); toast(t("exported")); toast(t("output_note"), "warn"); }
   }
   if (name === "open-release") return invoke("open_url", { url: updateInfo.url }).catch((e) => toast(errText(e), "error"));
+  if (name === "install-update") return invoke("install_update");
   if (name === "dismiss-update") { updateInfo = null; return render(); }
   await refresh();
 }
