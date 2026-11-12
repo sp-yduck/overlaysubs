@@ -292,7 +292,13 @@ async fn download_update(app: AppHandle) -> Result<(), String> {
                 let _ = std::fs::remove_file(e.path());
             }
         }
-        download::fetch_file(&a.url, &file, a.size, &a.sha256, &dir, &mut |_, _| {})
+        let mut last = 0;
+        download::fetch_file(&a.url, &file, a.size, &a.sha256, &dir, &mut |done, total| {
+            if done - last > (1 << 20) || done == total {
+                last = done;
+                let _ = app.emit("update-download", serde_json::json!({ "done": done, "total": total }));
+            }
+        })
     })
     .await
     .map_err(|e| e.to_string())?

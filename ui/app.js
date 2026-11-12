@@ -6,6 +6,7 @@ let snap, page, progress = {}, benchMsg = "", hist = [], termsLang, agreed = fal
 let updateInfo = null, updateChecked = false;
 /** "" until the installer download starts, then "downloading", and "ready" or "failed". */
 let updateState = "";
+let updateProgress = null;
 const busy = new Set();
 const $ = (s) => document.querySelector(s);
 const t = (k) => (I18N[snap?.settings.ui_lang] || I18N.en)[k] || k;
@@ -64,13 +65,18 @@ async function checkUpdate() {
   } catch { /* offline / API error: stay quiet */ }
 }
 
-/** Downloads the installer in the background when the setting is on; a failure leaves the release page link. */
-async function downloadUpdate() {
-  if (!updateInfo?.downloadable || !snap.settings.auto_update || updateState) return;
+/**
+ * Downloads the installer: in the background when the setting is on, or `manual`ly from the banner's
+ * button, which is also the retry after a failure.
+ */
+async function downloadUpdate(manual = false) {
+  if (!updateInfo?.downloadable || updateState === "downloading" || updateState === "ready") return;
+  if (!manual && (!snap.settings.auto_update || updateState)) return;
   updateState = "downloading";
+  updateProgress = null;
   showUpdateBanner();
   try { await invoke("download_update"); updateState = "ready"; }
-  catch { updateState = "failed"; }
+  catch (e) { updateState = "failed"; if (manual) toast(errText(e), "error"); }
   showUpdateBanner();
 }
 
@@ -295,9 +301,15 @@ function updateBanner() {
   if (!updateInfo) return "";
   const ready = updateState === "ready";
   const msg = t(ready ? "update_ready" : "update_available").replace("{latest}", esc(updateInfo.latest)).replace("{current}", esc(updateInfo.current));
-  const main = ready ? btn("install-update", t("update_install"), { cls: "primary small" }) : btn("open-release", t("update_open"), { cls: "primary small" });
+  const loading = updateState === "downloading";
+  const p = updateProgress || { done: 0, total: 1 };
+  // Shown when automatic download is off, and as the retry after a failed download.
+  const download = updateInfo.downloadable && !loading;
+  const main = ready
+    ? btn("install-update", t("update_install"), { cls: "primary small" })
+    : `${download ? btn("download-update", t("update_download"), { cls: "primary small" }) : ""}${btn("open-release", t("update_open"), { cls: download || loading ? "small" : "primary small" })}`;
   return `<div class="update-banner" role="status" aria-live="polite">
-    <div class="msg"><b>${esc(t("update_title"))}</b> ${msg}${updateState === "downloading" ? ` <span class="muted">${esc(t("update_downloading"))}</span>` : ""}</div>
+    <div class="msg"><b>${esc(t("update_title"))}</b> ${msg}${loading ? `<div class="row"><span class="muted">${esc(t("update_downloading"))}</span><progress data-uprog max="${p.total}" value="${p.done}" aria-label="${esc(t("update_downloading"))}"></progress><span class="muted" data-upct>${Math.floor((100 * p.done) / p.total)}%</span></div>` : ""}</div>
     <div class="row">${main}${btn("dismiss-update", t("update_later"), { cls: "small" })}</div>
   </div>`;
 }
@@ -511,6 +523,8 @@ async function act(name, id, el) {
     if (path) { await invoke("export_history", { path, format, withSource: snap.settings.overlay.showSource }); toast(t("exported")); toast(t("output_note"), "warn"); }
   }
   if (name === "open-release") return invoke("open_url", { url: updateInfo.url }).catch((e) => toast(errText(e), "error"));
+  // Not awaited: the banner shows the progress, and the click handler must not hold the page busy meanwhile.
+  if (name === "download-update") { downloadUpdate(true); return; }
   if (name === "install-update") return invoke("install_update");
   if (name === "dismiss-update") { updateInfo = null; return render(); }
   await refresh();
@@ -566,6 +580,15 @@ listen("download", (e) => {
   bar.value = p.done;
   const pct = cell.querySelector(`[data-pct="${CSS.escape(p.id)}"]`);
   if (pct) pct.textContent = `${Math.floor((100 * p.done) / p.total)}%`;
+});
+listen("update-download", (e) => {
+  updateProgress = e.payload;
+  // Patched in place like the model progress: a render between mousedown and mouseup swallows clicks.
+  const bar = $("[data-uprog]");
+  if (!bar) return;
+  bar.max = e.payload.total;
+  bar.value = e.payload.done;
+  $("[data-upct]").textContent = `${Math.floor((100 * e.payload.done) / e.payload.total)}%`;
 });
 listen("running", refresh);
 listen("overlay-visible", (e) => {
