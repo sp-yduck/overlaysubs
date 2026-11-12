@@ -24,6 +24,8 @@ const TAIL_BYTES: u64 = 512 << 10;
 pub struct LogFile {
     state: Mutex<State>,
     start: Instant,
+    /// Written as `~`, so a log posted in a public issue does not carry the user's account name.
+    home: Option<String>,
 }
 
 struct State {
@@ -38,7 +40,9 @@ impl LogFile {
         std::fs::create_dir_all(dir)?;
         let _ = std::fs::rename(dir.join(CURRENT), dir.join(PREVIOUS));
         let out = File::create(dir.join(CURRENT))?;
-        Ok(Self { state: Mutex::new(State { out, written: 0, recent: VecDeque::new() }), start: Instant::now() })
+        // A home of "/" (or none) would only garble every path.
+        let home = std::env::home_dir().map(|h| h.to_string_lossy().into_owned()).filter(|h| h.len() > 1);
+        Ok(Self { state: Mutex::new(State { out, written: 0, recent: VecDeque::new() }), start: Instant::now(), home })
     }
 }
 
@@ -65,6 +69,10 @@ impl Log for LogFile {
         }
         // Seconds since launch: enough to order events, and needs no date library.
         let line = format!("[{:9.3}] {:5} {}: {}", self.start.elapsed().as_secs_f64(), r.level(), r.target(), r.args());
+        let line = match &self.home {
+            Some(home) => line.replace(home.as_str(), "~"),
+            None => line,
+        };
         // Never panic here: llama.cpp calls this through a C callback.
         let mut s = self.state.lock().unwrap_or_else(|e| e.into_inner());
         if r.level() <= Level::Warn || r.target().starts_with("overlaysubs") {
@@ -112,6 +120,11 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         let f = LogFile::open(&dir).unwrap();
         log(&f, Level::Info, "overlaysubs", "started");
+        if let Some(home) = std::env::home_dir().filter(|h| h.as_os_str().len() > 1) {
+            log(&f, Level::Info, "overlaysubs", &format!("model at {}", home.join("models/a.gguf").display()));
+            let sep = std::path::MAIN_SEPARATOR;
+            assert!(read(&dir).contains(&format!("model at ~{sep}models{sep}a.gguf")), "the home folder is written as ~");
+        }
         log(&f, Level::Info, "llama.cpp", "quiet detail");
         log(&f, Level::Debug, "overlaysubs", "debug noise");
         assert!(read(&dir).contains("started") && !read(&dir).contains("quiet detail"));

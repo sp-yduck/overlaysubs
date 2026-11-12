@@ -432,7 +432,12 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     }
     ensure_engines(&app, &st)?;
     let s = st.settings.lock().unwrap().clone();
-    log::info!("start: {:?}", s.source);
+    // Not the device name: it is often the owner's name ("Taro's AirPods").
+    let (kind, device) = match &s.source {
+        Source::System { device } => ("system audio", device),
+        Source::Mic { device } => ("microphone", device),
+    };
+    log::info!("start: {kind}, {} device", if device.is_some() { "chosen" } else { "default" });
     let (audio_tx, audio_rx) = mpsc::channel::<Vec<f32>>();
     let (ev_tx, ev_rx) = mpsc::channel::<(Event, usize)>();
     let (stop_tx, stop_rx) = mpsc::channel::<()>();

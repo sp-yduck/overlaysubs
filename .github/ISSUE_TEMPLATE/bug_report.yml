@@ -102,7 +102,7 @@ body:
     attributes:
       label: Logs, error messages, and notes
       description: |
-        Versions after 0.7.0: open "Logs" in the settings window, press "Copy" or "Save to file", and paste or attach the result. It holds no subtitles, but it does hold folder paths, which may contain your user name.
+        Versions after 0.7.0: open "Logs" in the settings window, press "Copy" or "Save to file", and paste or attach the result. It holds no subtitles, and the path of your home folder is written as `~`.
         On older versions, paste any error message shown on screen verbatim.
         You can find the model folder under "Set up models" → "Folder" in the settings window.
         You can drag screenshots or videos into this field.
