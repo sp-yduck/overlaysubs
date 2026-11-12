@@ -5,7 +5,18 @@ use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
 
-pub fn fetch(m: &ModelDef, dir: &Path, progress: &mut dyn FnMut(u64, u64)) -> Result<(), String> {
+/// reqwest's Display stops at "error sending request"; the cause (DNS, refused, TLS) is in the chain.
+fn chain(e: reqwest::Error) -> String {
+    let mut s = e.to_string();
+    let mut src = std::error::Error::source(&e);
+    while let Some(c) = src {
+        s = format!("{s}: {c}");
+        src = c.source();
+    }
+    s
+}
+
+pub fn fetch(m: &ModelDef, dir: &Path, mirror: &str, progress: &mut dyn FnMut(u64, u64)) -> Result<(), String> {
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let dst = dir.join(&m.file);
     if dst.exists() {
@@ -13,12 +24,12 @@ pub fn fetch(m: &ModelDef, dir: &Path, progress: &mut dyn FnMut(u64, u64)) -> Re
     }
     let part = dir.join(format!("{}.part", m.file));
     let have = fs::metadata(&part).map(|x| x.len()).unwrap_or(0);
-    let client = reqwest::blocking::Client::builder().user_agent("overlaysubs").timeout(None).build().map_err(|e| e.to_string())?;
-    let mut req = client.get(&m.url);
+    let client = reqwest::blocking::Client::builder().user_agent("overlaysubs").timeout(None).build().map_err(chain)?;
+    let mut req = client.get(m.url_via(mirror));
     if have > 0 {
         req = req.header("Range", format!("bytes={have}-"));
     }
-    let mut resp = req.send().and_then(|r| r.error_for_status()).map_err(|e| e.to_string())?;
+    let mut resp = req.send().and_then(|r| r.error_for_status()).map_err(chain)?;
     let resumed = resp.status() == reqwest::StatusCode::PARTIAL_CONTENT;
     let mut f = OpenOptions::new().create(true).write(true).append(resumed).truncate(!resumed).open(&part).map_err(|e| e.to_string())?;
     let mut done = if resumed { have } else { 0 };
