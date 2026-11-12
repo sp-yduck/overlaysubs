@@ -262,7 +262,8 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
 /// Check GitHub for a newer release; `None` when up to date or the release is unusable.
 #[tauri::command]
 async fn check_update(app: AppHandle) -> Result<Option<update::UpdateInfo>, String> {
-    let current = app.package_info().version.to_string();
+    // OVERLAYSUBS_VERSION pretends to be an older build, so the update flow can be tried before a newer release exists.
+    let current = std::env::var("OVERLAYSUBS_VERSION").unwrap_or_else(|_| app.package_info().version.to_string());
     let info = tauri::async_runtime::spawn_blocking(move || update::fetch(&current)).await.map_err(|e| e.to_string())??;
     if info.is_none() {
         // Up to date: the installer that got us here is no longer needed.
