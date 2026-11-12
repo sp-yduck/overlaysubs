@@ -1,7 +1,7 @@
 //! The app's log file. A GUI build has no visible stderr, so this is the only record of why something failed
 //! on a user's machine. Captions are never logged.
 use log::{Level, Log, Metadata, Record};
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -15,12 +15,16 @@ const PREVIOUS: &str = "overlaysubs.old.log";
 const MAX_BYTES: u64 = 8 << 20;
 /// INFO lines of whisper.cpp / llama.cpp held back in memory; see [`LogFile`].
 const RECENT: usize = 200;
+/// Distinct warnings of other crates that are written once each; see [`LogFile`]. Past this they are only held back.
+const WARNED: usize = 256;
 /// How much of each file [`read`] returns.
 const TAIL_BYTES: u64 = 512 << 10;
 
 /// Writes the app's own messages at INFO and above, and every other crate's at WARN and above. whisper.cpp and
 /// llama.cpp print dozens of INFO lines per utterance, too many to keep, but they hold the sizes and devices that
 /// explain a failure. So the last [`RECENT`] of them stay in memory and are written just before the next ERROR.
+/// A warning of theirs is written the first time only and held back like INFO after that: llama.cpp repeats one
+/// on every translation (measured), which would fill the file within hours and leave no room for a later error.
 pub struct LogFile {
     state: Mutex<State>,
     start: Instant,
@@ -32,6 +36,7 @@ struct State {
     out: File,
     written: u64,
     recent: VecDeque<String>,
+    warned: HashSet<String>,
 }
 
 impl LogFile {
@@ -42,7 +47,7 @@ impl LogFile {
         let out = File::create(dir.join(CURRENT))?;
         // A home of "/" (or none) would only garble every path.
         let home = std::env::home_dir().map(|h| h.to_string_lossy().into_owned()).filter(|h| h.len() > 1);
-        Ok(Self { state: Mutex::new(State { out, written: 0, recent: VecDeque::new() }), start: Instant::now(), home })
+        Ok(Self { state: Mutex::new(State { out, written: 0, recent: VecDeque::new(), warned: HashSet::new() }), start: Instant::now(), home })
     }
 }
 
@@ -75,7 +80,9 @@ impl Log for LogFile {
         };
         // Never panic here: llama.cpp calls this through a C callback.
         let mut s = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        if r.level() <= Level::Warn || r.target().starts_with("overlaysubs") {
+        let app = r.target().starts_with("overlaysubs");
+        let repeated = !app && r.level() == Level::Warn && (s.warned.len() >= WARNED || !s.warned.insert(format!("{} {}", r.target(), r.args())));
+        if (r.level() <= Level::Warn && !repeated) || app {
             if r.level() == Level::Error {
                 while let Some(l) = s.recent.pop_front() {
                     s.write(&l);
@@ -130,9 +137,12 @@ mod tests {
         assert!(read(&dir).contains("started") && !read(&dir).contains("quiet detail"));
         log(&f, Level::Warn, "llama.cpp", "a warning");
         assert!(read(&dir).contains("a warning") && !read(&dir).contains("quiet detail"), "a warning does not flush the held lines");
+        log(&f, Level::Warn, "llama.cpp", "a warning");
+        assert_eq!(read(&dir).matches("a warning").count(), 1, "a repeated warning is held back");
         log(&f, Level::Error, "llama.cpp", "failed to initialize the context");
         let text = read(&dir);
         assert!(text.find("quiet detail").unwrap() < text.find("failed to initialize the context").unwrap());
+        assert_eq!(text.matches("a warning").count(), 2, "the held warning is written with the error");
         assert!(!text.contains("debug noise"));
 
         // The next launch keeps this one as the previous log.
