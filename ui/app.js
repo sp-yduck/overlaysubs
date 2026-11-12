@@ -7,6 +7,8 @@ let updateInfo = null, updateChecked = false;
 /** "" until the installer download starts, then "downloading", and "ready" or "failed". */
 let updateState = "";
 let updateProgress = null;
+/** [id, label] pairs for the "app audio" source; filled by refresh(). */
+let apps = [];
 const busy = new Set();
 const $ = (s) => document.querySelector(s);
 const t = (k) => (I18N[snap?.settings.ui_lang] || I18N.en)[k] || k;
@@ -50,6 +52,8 @@ async function refresh() {
     try { await invoke("save_settings", { settings: snap.settings }); }
     catch (e) { toast(errText(e), "error"); }
   }
+  // Listed only while the app source is chosen: on macOS the list asks for the Screen Recording permission.
+  if (snap.settings.source.kind === "app") apps = await invoke("audio_apps").catch((e) => (toast(errText(e), "error"), []));
   // Also after a settings save, so turning automatic download on fetches a pending update right away.
   if (snap.terms_accepted) checkUpdate().then(downloadUpdate);
   render();
@@ -217,12 +221,17 @@ function homePage() {
   // macOS captures system audio from every app through ScreenCaptureKit, so there is nothing to pick.
   const macSystem = s.source.kind === "system" && snap.platform === "macos";
   const devs = s.source.kind === "system" ? snap.devices.outputs : snap.devices.inputs;
+  // A saved app that is not running now stays selectable, so the choice survives until it is back.
+  const appOpts = [["", t("choose_app")], ...apps, ...(s.source.device && !apps.some(([id]) => id === s.source.device) ? [[s.source.device, s.source.device]] : [])];
+  const picker = s.source.kind === "app" ? `${select(t("app"), "source.device", opts(appOpts, s.source.device), "nullable")}<p class="muted small">${t("app_audio_note")}</p>`
+    : macSystem ? `<p class="muted small">${t("system_audio_note")}</p>`
+    : select(t("device"), "source.device", opts([["", t("default_dev")], ...devs.map((d) => [d, d])], s.source.device), "nullable");
   const glossary = (s.session.glossary || []).map(([a, b]) => `${a}=${b}`).join("\n");
   return `<h2>${t("home")}</h2>
   ${ready ? "" : `<div class="banner"><span>${t("need_setup_long")}</span>${btn("goto-models", t("goto_models"), { cls: "primary" })}</div>`}
   <div class="grid2">
-    ${card(t("input"), `${select(t("source"), "source.kind", opts([["system", t("system")], ["mic", t("mic")]], s.source.kind))}
-      ${macSystem ? `<p class="muted small">${t("system_audio_note")}</p>` : select(t("device"), "source.device", opts([["", t("default_dev")], ...devs.map((d) => [d, d])], s.source.device), "nullable")}
+    ${card(t("input"), `${select(t("source"), "source.kind", opts([["system", t("system")], ["app", t("app_audio")], ["mic", t("mic")]], s.source.kind))}
+      ${picker}
       ${snap.running ? `<p class="muted small">${t("input_restart_note")}</p>` : ""}`)}
     ${card(t("languages"), `${select(t("src_lang"), "session.source_lang", langOpts(s.session.source_lang, [["", t("auto")]]), "nullable")}
       ${select(t("tgt_lang"), "session.target_lang", langOpts(s.session.target_lang, [], TARGET_LANGS))}

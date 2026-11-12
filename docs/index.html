@@ -232,7 +232,7 @@
         <div class="block">
           <h3>What you can configure</h3>
           <ul class="settings">
-            <li><strong>Audio input</strong>: system audio / microphone, and which device. Changes take effect after you stop and start translation again</li>
+            <li><strong>Audio input</strong>: system audio / app audio (one chosen app only) / microphone, and which device. Changes take effect after you stop and start translation again</li>
             <li><strong>Languages</strong>: the spoken language (auto-detect or fixed), the target language, and the language to use when the speech is already in the target language. Changes made while translating apply from the next utterance</li>
             <li><strong>Translation tuning</strong>: Japanese politeness (polite / plain), glossary (one "source=translation" per line), topic (a hint for the translator), use the previous utterance as context. Changes made while translating apply from the next utterance</li>
             <li><strong>Subtitles</strong>: show the source text; background color and opacity for the overlay and for the caption box; font, size, color, weight and line height for the translation; size and color for the original text; caption alignment, vertical position and number of lines; and how long subtitles stay after updates stop. When the lines are taller than the overlay, the scrollbar on the right or the mouse wheel scrolls through them (the wheel moves half a line per notch; with click-through off). While the subtitles keep updating, older lines stay until the line count pushes them out. While translation is stopped, opening this page shows the overlay with a sample caption so you can check your changes live</li>
@@ -371,7 +371,7 @@
           <li><strong>There is no Intel Mac build.</strong> macOS requires Apple Silicon (M1 or later) and macOS 13 or later.</li>
           <li>Windows <strong>runs on the CPU when there is no Vulkan-capable GPU or driver</strong> (with the CPU-tier models, so it is slower); a Vulkan-capable GPU with an up-to-date driver is recommended for real-time speed.</li>
           <li>On macOS, system audio is captured with ScreenCaptureKit. The first use requires the "Screen &amp; System Audio Recording" (macOS 15+) or "Screen Recording" (macOS 13–14) permission and an app restart (see <a href="#faq">FAQ</a>).</li>
-          <li>Capturing a single app only, or processing system audio and the microphone at the same time, is not implemented yet.</li>
+          <li>Processing system audio and the microphone at the same time is not implemented yet.</li>
           <li><strong>Updates are never installed silently.</strong> The app checks for a newer release at startup, notifies you and (unless turned off on the About page) downloads the installer, but you start the installation yourself with "Quit and install". You can also download new versions manually from <a href="https://github.com/sp-yduck/overlaysubs/releases">GitHub Releases</a> (the only distribution channel).</li>
         </ul>
       </div>

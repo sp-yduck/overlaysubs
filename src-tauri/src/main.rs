@@ -259,6 +259,13 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
     })
 }
 
+/// Apps the "app audio" source can capture. Async so the macOS permission prompt it may raise
+/// does not block the main thread.
+#[tauri::command]
+async fn audio_apps() -> Result<Vec<(String, String)>, String> {
+    capture::apps()
+}
+
 /// Check GitHub for a newer release; `None` when up to date or the release is unusable.
 #[tauri::command]
 async fn check_update(app: AppHandle) -> Result<Option<update::UpdateInfo>, String> {
@@ -1053,7 +1060,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, reset_overlay_position, open_url, show_overlay, set_overlay_preview, check_update, download_update, install_update, startup_error
+            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, reset_overlay_position, open_url, show_overlay, set_overlay_preview, check_update, download_update, install_update, startup_error, audio_apps
         ])
         .build(tauri::generate_context!())
         .expect("error while building overlaysubs")
