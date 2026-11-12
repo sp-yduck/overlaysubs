@@ -21,9 +21,13 @@ tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 cpal = "0.18"
-whisper-rs = "0.16"
+# log_backend: whisper.cpp's own messages go to the `log` crate, and from there to the log file.
+whisper-rs = { version = "0.16", features = ["log_backend"] }
 # shortcut: crates.io 0.1.161 predates the plamo3 tokenizer; move back to a release once one includes it.
 llama-cpp-2 = { git = "https://github.com/utilityai/llama-cpp-rs", rev = "0364f5da1c6a6ee37f507031f116ce4a09b28594", features = ["dynamic-link"] }
+# Only for llama_log_set: llama-cpp-2 can drop llama.cpp's messages or send them to `tracing`, not to `log`.
+llama-cpp-sys-2 = { git = "https://github.com/utilityai/llama-cpp-rs", rev = "0364f5da1c6a6ee37f507031f116ce4a09b28594" }
+log = { version = "0.4", features = ["std"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 sha2 = "0.11"
 sysinfo = "0.40"

@@ -13,6 +13,7 @@ use overlaysubs_core::device::Device;
 use overlaysubs_core::endpoint::{EndpointConfig, Endpointer, Event};
 use overlaysubs_core::browser_source;
 use overlaysubs_core::export::{self, Entry};
+use overlaysubs_core::logfile::{self, LogFile};
 use overlaysubs_core::registry::{Registry, Selection};
 use overlaysubs_core::session::{Asr, Caption, Session, SessionConfig, Translator};
 use overlaysubs_core::tier::{self, Hardware, Tier};
@@ -348,7 +349,9 @@ fn ensure_engines(app: &AppHandle, st: &App) -> Result<(), String> {
         return Ok(());
     }
     *eng = None;
+    log::info!("loading models {:?}, asr_gpu {}, gpu_layers {}", cfg.ids, cfg.asr_gpu, cfg.gpu_layers);
     let (asr, mt) = load_engines(app, &s, &cfg)?;
+    log::info!("models loaded");
     *eng = Some(Engines { cfg, asr, mt });
     Ok(())
 }
@@ -372,7 +375,7 @@ fn load_engines(app: &AppHandle, s: &Settings, cfg: &EngineConfig) -> Result<(en
     match load(cfg.asr_gpu, cfg.gpu_layers) {
         Ok(engines) => Ok(engines),
         Err(gpu_err) if cfg.asr_gpu || cfg.gpu_layers > 0 => {
-            eprintln!("loading the models with the GPU failed ({gpu_err}); retrying on the CPU");
+            log::error!("loading the models with the GPU failed ({gpu_err}); retrying on the CPU");
             load(false, 0).map_err(|cpu_err| format!("GPU load failed ({gpu_err}), and the CPU retry failed too ({cpu_err})"))
         }
         Err(err) => Err(err),
@@ -429,6 +432,7 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     }
     ensure_engines(&app, &st)?;
     let s = st.settings.lock().unwrap().clone();
+    log::info!("start: {:?}", s.source);
     let (audio_tx, audio_rx) = mpsc::channel::<Vec<f32>>();
     let (ev_tx, ev_rx) = mpsc::channel::<(Event, usize)>();
     let (stop_tx, stop_rx) = mpsc::channel::<()>();
@@ -446,7 +450,7 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
             pos += chunk.len();
             ep.commit(committed_ep.load(Ordering::SeqCst));
             if let Err(err) = ep.push(&chunk, &mut vad, &mut out) {
-                let _ = vad_app.emit("error", err);
+                report(&vad_app, err);
                 return;
             }
             for e in out.drain(..) {
@@ -497,7 +501,7 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
                 let Some(e) = g.as_mut() else { return };
                 let (asr, mt): (&mut dyn Asr, &mut dyn Translator) = (&mut e.asr, &mut e.mt);
                 if let Err(err) = session.handle(ev, asr, mt, &mut emit) {
-                    let _ = emit_app.emit("error", err);
+                    report(&emit_app, err);
                 }
                 committed.store(session.committed(), Ordering::SeqCst);
             }
@@ -542,8 +546,35 @@ fn toggle(app: &AppHandle) {
     let running = st.running.lock().unwrap().is_some();
     let r = if running { stop(app.clone(), st) } else { start(app.clone(), st) };
     if let Err(e) = r {
-        let _ = app.emit("error", e);
+        report(app, e);
     }
+}
+
+/// Shows an error that no command returns (a hotkey press, a session thread) as a toast, and logs it.
+fn report(app: &AppHandle, err: String) {
+    log::error!("{err}");
+    let _ = app.emit("error", err);
+}
+
+/// An error the settings or overlay page hit: a failed command, with its name, or a script error.
+/// The pages can only show a toast, which is gone before anyone can copy it.
+#[tauri::command]
+fn ui_error(msg: String) {
+    log::error!(target: "overlaysubs::ui", "{msg}");
+}
+
+fn log_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path().app_log_dir().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_log(app: AppHandle) -> Result<String, String> {
+    Ok(logfile::read(&log_dir(&app)?))
+}
+
+#[tauri::command]
+fn save_log(app: AppHandle, path: PathBuf) -> Result<(), String> {
+    std::fs::write(path, logfile::read(&log_dir(&app)?)).map_err(|e| e.to_string())
 }
 
 /// The single entry point for overlay visibility: window, tray check state, overlay
@@ -599,10 +630,10 @@ fn apply_overlay_visible(app: &AppHandle, show: bool) {
         Some(w) => {
             let res = if show { w.show() } else { w.hide() };
             if let Err(e) = res {
-                eprintln!("overlay visibility ({show}): {e}");
+                log::warn!("overlay visibility ({show}): {e}");
             }
         }
-        None => eprintln!("overlay window not found"),
+        None => log::warn!("overlay window not found"),
     }
     st.overlay_visible.store(show, Ordering::SeqCst);
     if !show {
@@ -751,7 +782,7 @@ fn save_overlay_geometry(w: &tauri::Window, moved: Option<tauri::PhysicalPositio
     let json = serde_json::to_string(&SavedPosition::Desktop { x: at(p.x), y: at(p.y), width: Some(width), height: Some(height) }).unwrap();
     let dir = config_dir(w.app_handle());
     if let Err(e) = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join(OVERLAY_POSITION), json)) {
-        eprintln!("{OVERLAY_POSITION}: {e}");
+        log::warn!("{OVERLAY_POSITION}: {e}");
     }
 }
 
@@ -917,6 +948,22 @@ fn set_overlay_preview(app: AppHandle, st: State<App>, on: bool) {
     }
 }
 
+/// Opens the log file and routes everything to it: the app's messages, other crates', whisper.cpp's and
+/// llama.cpp's (see `engine`), and panics, which a GUI build would otherwise lose with its stderr.
+fn start_log(app: &AppHandle) {
+    match log_dir(app).and_then(|dir| LogFile::open(&dir).map_err(|e| format!("{}: {e}", dir.display()))) {
+        Ok(file) => {
+            let _ = log::set_boxed_logger(Box::new(file));
+            log::set_max_level(log::LevelFilter::Info);
+        }
+        Err(e) => eprintln!("no log file: {e}"),
+    }
+    std::panic::set_hook(Box::new(|p| log::error!("panic: {p}")));
+    let os = sysinfo::System::long_os_version().unwrap_or_default();
+    log::info!("OverlaySubs {} on {os} ({}), GPU build: {GPU_BUILD}", app.package_info().version, std::env::consts::ARCH);
+    log::info!("last hardware check: {:?}", hw::cached(&config_dir(app)).map(|c| c.hardware));
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -932,12 +979,13 @@ fn main() {
         .manage(App::default())
         .setup(|app| {
             let h = app.handle().clone();
+            start_log(&h);
             let path = config_dir(&h).join("settings.json");
             let mut s: Settings = match std::fs::read_to_string(&path) {
                 Err(_) => Settings::default(),
                 Ok(j) => serde_json::from_str(&j).unwrap_or_else(|e| {
                     // Keep the unreadable file instead of silently overwriting it on the next save.
-                    eprintln!("settings.json: {e}; moved to settings.json.bak");
+                    log::error!("settings.json: {e}; moved to settings.json.bak");
                     let _ = std::fs::rename(&path, path.with_extension("json.bak"));
                     Settings::default()
                 }),
@@ -945,11 +993,11 @@ fn main() {
             // One-time: turn the removed GPU settings into the per-model choice before anything uses them.
             s.migrate();
             if let Err(e) = h.global_shortcut().register(s.hotkey.as_str()) {
-                eprintln!("hotkey {}: {e}", s.hotkey);
+                log::error!("hotkey {}: {e}", s.hotkey);
             }
             // The settings window does not exist yet, so it asks for the error once it has loaded.
             if let Err(e) = sync_browser_source(&app.state::<App>(), &s) {
-                eprintln!("{e}");
+                log::error!("{e}");
                 *app.state::<App>().startup_error.lock().unwrap() = Some(e);
             }
             *app.state::<App>().settings.lock().unwrap() = s;
@@ -996,7 +1044,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, reset_overlay_position, open_url, show_overlay, set_overlay_preview, check_update, startup_error
+            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, reset_overlay_position, open_url, show_overlay, set_overlay_preview, check_update, startup_error, ui_error, read_log, save_log
         ])
         .build(tauri::generate_context!())
         .expect("error while building overlaysubs")

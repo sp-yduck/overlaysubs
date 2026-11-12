@@ -43,7 +43,7 @@ pub fn start(tx: Sender<Vec<f32>>) -> Result<Arc<AtomicBool>, String> {
                     std::thread::sleep(std::time::Duration::from_millis(50));
                 }
                 if let Err(error) = stream.stop_capture() {
-                    eprintln!("system audio capture stop error: {error}");
+                    log::warn!("system audio capture stop error: {error}");
                 }
                 // Dropping the stream removes the output handler and releases the capture.
             }

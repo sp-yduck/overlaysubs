@@ -2646,6 +2646,8 @@ version = "0.7.0"
 dependencies = [
  "cpal",
  "llama-cpp-2",
+ "llama-cpp-sys-2",
+ "log",
  "overlaysubs-core",
  "reqwest 0.12.28",
  "screencapturekit",
@@ -2664,6 +2666,7 @@ dependencies = [
 name = "overlaysubs-core"
 version = "0.7.0"
 dependencies = [
+ "log",
  "serde",
  "serde_json",
 ]
@@ -4868,6 +4871,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2088172d00f936c348d6a72f488dc2660ab3f507263a195df308a3c2383229f6"
 dependencies = [
  "libc",
+ "log",
  "whisper-rs-sys",
 ]
 

@@ -2,7 +2,13 @@
 // local server sends the same events over SSE and there is no window to drag, scroll or click through.
 const tauri = window.__TAURI__;
 const sse = tauri ? null : new EventSource("/events");
-const invoke = tauri ? tauri.core.invoke : () => Promise.reject(new Error("not in the app"));
+// Failures go to the app's log file: this window has no place to show them.
+const logError = (msg) => tauri.core.invoke("ui_error", { msg: `overlay: ${msg}` }).catch(() => {});
+const invoke = tauri ? (cmd, args) => tauri.core.invoke(cmd, args).catch((e) => { logError(`${cmd}: ${e}`); throw e; }) : () => Promise.reject(new Error("not in the app"));
+if (tauri) {
+  window.addEventListener("error", (e) => logError(`${e.message} (${e.filename}:${e.lineno})`));
+  window.addEventListener("unhandledrejection", (e) => logError(e.reason));
+}
 const listen = tauri ? tauri.event.listen : (name, fn) => sse.addEventListener(name, (e) => fn({ payload: JSON.parse(e.data) }));
 document.body.classList.toggle("source", !tauri);
 

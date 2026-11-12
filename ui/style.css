@@ -112,6 +112,7 @@ button.busy::before { content: ""; display: inline-block; width: 11px; height: 1
 .mstatus { display: flex; gap: 8px; align-items: center; margin: 4px 0 0 calc(min(200px, 40%) + 10px); min-height: 24px; }
 progress { flex: 1; max-width: 320px; accent-color: var(--accent); }
 
+#log { max-height: calc(100vh - 230px); word-break: break-all; }
 pre.license { max-height: 240px; overflow: auto; white-space: pre-wrap; background: var(--bg); border: 1px solid var(--border); padding: 12px; border-radius: 6px; font-size: 12px; margin: 0 0 10px; }
 .terms { max-width: 760px; margin: 0 auto; padding: 24px 20px; }
 .terms ul { margin: 0 0 12px; padding-left: 20px; }

@@ -1,4 +1,10 @@
-const { invoke } = window.__TAURI__.core;
+const rawInvoke = window.__TAURI__.core.invoke;
+/** To the log file (see the Logs page): a toast is gone before it can be copied, and some callers ignore a failure. */
+const logError = (msg) => rawInvoke("ui_error", { msg: String(msg) }).catch(() => {});
+/** Every failed command is logged with its name and the untranslated error. */
+const invoke = (cmd, args) => rawInvoke(cmd, args).catch((e) => { logError(`${cmd}: ${e}`); throw e; });
+window.addEventListener("error", (e) => logError(`settings page: ${e.message} (${e.filename}:${e.lineno})`));
+window.addEventListener("unhandledrejection", (e) => logError(`settings page: ${e.reason}`));
 const { listen } = window.__TAURI__.event;
 const { save: saveDialog, open: openDialog } = window.__TAURI__.dialog;
 
@@ -268,6 +274,20 @@ function historyPage() {
   ${card("", `<div class="hist" data-hist="200"></div>`)}`;
 }
 
+function logsPage() {
+  return `<h2>${t("logs")}</h2><p class="muted">${t("logs_intro")}</p>
+  <div class="row">${btn("log-copy", t("copy"), { cls: "primary" })}${btn("log-save", t("log_save"))}${btn("log-reload", t("log_reload"))}</div>
+  <pre class="license" id="log"></pre>`;
+}
+
+async function loadLog() {
+  const text = await invoke("read_log");
+  const el = $("#log");
+  if (!el) return;
+  el.textContent = text;
+  el.scrollTop = el.scrollHeight;
+}
+
 function aboutPage() {
   return `<h2>${t("about")}</h2>
   ${card("", `<p>OverlaySubs · MIT License. Translation: <b>Built with PLaMo</b> (PLaMo 3 Translate, Preferred Networks). Speech: whisper.cpp. VAD: Silero.</p>
@@ -292,7 +312,7 @@ function showUpdateBanner() {
   if (host && !$(".update-banner")) host.insertAdjacentHTML("afterbegin", updateBanner());
 }
 
-const PAGES = { home: homePage, models: modelsPage, overlay: overlayPage, history: historyPage, about: aboutPage };
+const PAGES = { home: homePage, models: modelsPage, overlay: overlayPage, history: historyPage, logs: logsPage, about: aboutPage };
 
 function render() {
   const s = snap.settings;
@@ -323,6 +343,7 @@ function render() {
   $("#page").scrollTop = keep;
   drawHistory();
   if (page === "about") loadTerms();
+  if (page === "logs") loadLog();
   syncPreview();
 }
 
@@ -491,6 +512,14 @@ async function act(name, id, el) {
     const format = name.slice(7);
     const path = await saveDialog({ defaultPath: `overlaysubs.${format}`, filters: [{ name: format, extensions: [format] }] });
     if (path) { await invoke("export_history", { path, format, withSource: snap.settings.overlay.showSource }); toast(t("exported")); toast(t("output_note"), "warn"); }
+  }
+  if (name === "log-copy") {
+    await navigator.clipboard.writeText(await invoke("read_log"));
+    toast(t("copied"));
+  }
+  if (name === "log-save") {
+    const path = await saveDialog({ defaultPath: "overlaysubs-log.txt", filters: [{ name: "txt", extensions: ["txt"] }] });
+    if (path) { await invoke("save_log", { path }); toast(t("exported")); }
   }
   if (name === "open-release") return invoke("open_url", { url: updateInfo.url }).catch((e) => toast(errText(e), "error"));
   if (name === "dismiss-update") { updateInfo = null; return render(); }
