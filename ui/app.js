@@ -1,5 +1,5 @@
 const rawInvoke = window.__TAURI__.core.invoke;
-/** To the log file (see the Logs page): a toast is gone before it can be copied, and some callers ignore a failure. */
+/** To the log file (shown on the About page): a toast is gone before it can be copied, and some callers ignore a failure. */
 const logError = (msg) => rawInvoke("ui_error", { msg: String(msg) }).catch(() => {});
 /** Every failed command is logged with its name and the untranslated error. */
 const invoke = (cmd, args) => rawInvoke(cmd, args).catch((e) => { logError(`${cmd}: ${e}`); throw e; });
@@ -274,12 +274,6 @@ function historyPage() {
   ${card("", `<div class="hist" data-hist="200"></div>`)}`;
 }
 
-function logsPage() {
-  return `<h2>${t("logs")}</h2><p class="muted">${t("logs_intro")}</p>
-  <div class="row">${btn("log-copy", t("copy"), { cls: "primary" })}${btn("log-save", t("log_save"))}${btn("log-reload", t("log_reload"))}</div>
-  <pre class="license" id="log"></pre>`;
-}
-
 async function loadLog() {
   const text = await invoke("read_log");
   const el = $("#log");
@@ -293,6 +287,9 @@ function aboutPage() {
   ${card("", `<p>OverlaySubs · MIT License. Translation: <b>Built with PLaMo</b> (PLaMo 3 Translate, Preferred Networks). Speech: whisper.cpp. VAD: Silero.</p>
     <p class="muted">${t("about_plamo_license")}</p>
     <p><a href="https://github.com/sp-yduck/overlaysubs" data-external>${t("star")}</a></p>`)}
+  ${card(t("logs"), `<p class="muted">${t("logs_intro")}</p>
+    <div class="row">${btn("log-copy", t("copy"))}${btn("log-save", t("log_save"))}${btn("log-reload", t("log_reload"))}</div>
+    <pre class="license" id="log"></pre>`)}
   ${card(t("terms_title"), `<div class="seg">${btn("terms-en", "English", { cls: termsLang === "en" ? "on" : "" })}${btn("terms-ja", "日本語", { cls: termsLang === "ja" ? "on" : "" })}</div>
     <pre class="license" id="terms"></pre>`)}`;
 }
@@ -312,7 +309,7 @@ function showUpdateBanner() {
   if (host && !$(".update-banner")) host.insertAdjacentHTML("afterbegin", updateBanner());
 }
 
-const PAGES = { home: homePage, models: modelsPage, overlay: overlayPage, history: historyPage, logs: logsPage, about: aboutPage };
+const PAGES = { home: homePage, models: modelsPage, overlay: overlayPage, history: historyPage, about: aboutPage };
 
 function render() {
   const s = snap.settings;
@@ -342,8 +339,7 @@ function render() {
   <section id="page" data-page="${page}">${updateBanner()}${PAGES[page]()}</section>`;
   $("#page").scrollTop = keep;
   drawHistory();
-  if (page === "about") loadTerms();
-  if (page === "logs") loadLog();
+  if (page === "about") { loadTerms(); loadLog(); }
   syncPreview();
 }
 

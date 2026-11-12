@@ -93,7 +93,7 @@ impl Log for LogFile {
     fn flush(&self) {}
 }
 
-/// The end of the previous launch's log and of this one's, for the Logs page and for a bug report.
+/// The end of the previous launch's log and of this one's, for the About page and for a bug report.
 pub fn read(dir: &Path) -> String {
     let tail = |name: &str| {
         let mut f = File::open(dir.join(name)).ok()?;
