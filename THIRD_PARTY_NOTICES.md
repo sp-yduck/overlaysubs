@@ -192,7 +192,7 @@ platforms). The two workspace crates `overlaysubs` and `overlaysubs-core` are
 excluded. The license column reproduces each package's `license` field
 verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 
-- Third-party crates: **507**
+- Third-party crates: **509**
 - Distinct license units: **16**
 - Crates with no `license` field: **0** (every crate declares a license; none required a "see crate" fallback)
 
@@ -428,6 +428,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `ntapi` | 0.4.3 | Apache-2.0 OR MIT | https://github.com/MSxDOS/ntapi |
 | `num-conv` | 0.2.2 | MIT OR Apache-2.0 | https://github.com/jhpratt/num-conv |
 | `num-derive` | 0.4.2 | MIT OR Apache-2.0 | https://github.com/rust-num/num-derive |
+| `num-integer` | 0.1.47 | MIT OR Apache-2.0 | https://github.com/rust-num/num-integer |
 | `num-traits` | 0.2.19 | MIT OR Apache-2.0 | https://github.com/rust-num/num-traits |
 | `num_enum` | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 | https://github.com/illicitonion/num_enum |
 | `num_enum_derive` | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 | https://github.com/illicitonion/num_enum |
@@ -627,6 +628,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `vswhom-sys` | 0.1.3 | MIT | https://github.com/nabijaczleweli/vswhom-sys.rs |
 | `walkdir` | 2.5.0 | Unlicense/MIT | https://github.com/BurntSushi/walkdir |
 | `want` | 0.3.2 | MIT | https://github.com/seanmonstar/want |
+| `wasapi` | 0.27.0 | MIT | https://github.com/HEnquist/wasapi-rs |
 | `wasi` | 0.11.1+wasi-snapshot-preview1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/bytecodealliance/wasi |
 | `wasip2` | 1.0.4+wasi-0.2.12 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/bytecodealliance/wasi-rs |
 | `wasm-bindgen` | 0.2.130 | MIT OR Apache-2.0 | https://github.com/wasm-bindgen/wasm-bindgen |
@@ -719,7 +721,7 @@ The text was taken from the license file of the first crate (alphabetically)
 that offers the license and ships a matching file; the source is noted under
 each section.
 
-### 4.1 MIT (462 crates)
+### 4.1 MIT (464 crates)
 
 Applies to the following crates (name version):
 
@@ -933,6 +935,7 @@ Applies to the following crates (name version):
   ntapi 0.4.3
   num-conv 0.2.2
   num-derive 0.4.2
+  num-integer 0.1.47
   num-traits 0.2.19
   num_enum 0.7.6
   num_enum_derive 0.7.6
@@ -1120,6 +1123,7 @@ Applies to the following crates (name version):
   vswhom-sys 0.1.3
   walkdir 2.5.0
   want 0.3.2
+  wasapi 0.27.0
   wasi 0.11.1+wasi-snapshot-preview1
   wasip2 1.0.4+wasi-0.2.12
   wasm-bindgen 0.2.130
@@ -1214,7 +1218,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### 4.2 Apache-2.0 (351 crates)
+### 4.2 Apache-2.0 (352 crates)
 
 Applies to the following crates (name version):
 
@@ -1371,6 +1375,7 @@ Applies to the following crates (name version):
   ntapi 0.4.3
   num-conv 0.2.2
   num-derive 0.4.2
+  num-integer 0.1.47
   num-traits 0.2.19
   num_enum 0.7.6
   num_enum_derive 0.7.6
