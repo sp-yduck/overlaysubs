@@ -23,6 +23,20 @@ pub struct ModelDef {
     pub default_for: Vec<Tier>,
 }
 
+const HF: &str = "https://huggingface.co";
+
+impl ModelDef {
+    /// The download URL, with the Hugging Face host swapped for a user-chosen mirror (e.g. where
+    /// huggingface.co is unreachable). The pinned sha256 still verifies whatever the mirror serves.
+    pub fn url_via(&self, mirror: &str) -> String {
+        let mirror = mirror.trim().trim_end_matches('/');
+        match self.url.strip_prefix(HF) {
+            Some(path) if !mirror.is_empty() && path.starts_with('/') => format!("{mirror}{path}"),
+            _ => self.url.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Registry {
     pub models: Vec<ModelDef>,
@@ -72,5 +86,17 @@ mod tests {
         assert!(r.models.iter().all(|m| m.sha256.len() == 64 && m.url.starts_with("https://")));
         // A moving ref like `main` lets upstream re-uploads break the pinned sha256.
         assert!(r.models.iter().all(|m| !m.url.contains("/resolve/main/")));
+    }
+
+    #[test]
+    fn mirror_replaces_only_the_hugging_face_host() {
+        let r = Registry::parse(include_str!("../../../models.json")).unwrap();
+        let m = &r.models[0];
+        assert_eq!(m.url_via(""), m.url);
+        assert_eq!(m.url_via("  "), m.url);
+        let path = m.url.strip_prefix("https://huggingface.co").unwrap();
+        assert_eq!(m.url_via(" https://mirror.example/ "), format!("https://mirror.example{path}"));
+        let other = ModelDef { url: "https://example.com/a.bin".into(), ..m.clone() };
+        assert_eq!(other.url_via("https://mirror.example"), other.url);
     }
 }

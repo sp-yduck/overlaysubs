@@ -36,6 +36,8 @@ const GPU_BUILD: bool = cfg!(any(feature = "vulkan", feature = "cuda", feature =
 #[serde(default)]
 struct Settings {
     models_dir: Option<PathBuf>,
+    /// Replaces https://huggingface.co in model URLs when set. Empty downloads from Hugging Face.
+    hf_mirror: String,
     tier: Option<Tier>,
     selection: Option<Selection>,
     source: Source,
@@ -64,6 +66,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             models_dir: None,
+            hf_mirror: String::new(),
             tier: None,
             selection: None,
             source: Source::System { device: None },
@@ -299,7 +302,7 @@ async fn download(app: AppHandle, ids: Vec<String>) -> Result<(), String> {
         for id in ids {
             let m = reg.get(&id).ok_or(format!("unknown model {id}"))?;
             let mut last = 0;
-            download::fetch(m, &dir, &mut |done, total| {
+            download::fetch(m, &dir, &s.hf_mirror, &mut |done, total| {
                 if done - last > (1 << 22) || done == total {
                     last = done;
                     let _ = app.emit("download", serde_json::json!({ "id": id, "done": done, "total": total }));

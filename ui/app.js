@@ -189,6 +189,8 @@ function modelsPage() {
     <div class="row">${btn("bench", busy.has("bench") ? t("benchmarking") : t("benchmark"), { disabled: !ready })}${benchMsg ? `<span>${esc(benchMsg)}</span>` : ""}</div>`)}
   <details class="card"><summary>${t("advanced")}</summary>
     <div class="f"><span>${t("models_dir")}</span><div class="row"><code>${esc(snap.models_dir)}</code>${btn("dir", t("change"), { cls: "small" })}</div></div>
+    ${field(t("hf_mirror"), "hf_mirror", "url", 'placeholder="https://huggingface.co"')}
+    <p class="muted small">${t("hf_mirror_note")}</p>
   </details>`;
 }
 
