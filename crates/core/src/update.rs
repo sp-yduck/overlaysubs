@@ -56,6 +56,43 @@ pub struct Release {
     pub version: Version,
     pub url: String,
     pub published_at: Option<String>,
+    /// Downloadable files that carry a SHA-256, so a download can be verified before it is run.
+    pub assets: Vec<Asset>,
+}
+
+/// A release file with the checksum GitHub computed for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Asset {
+    pub name: String,
+    pub url: String,
+    pub size: u64,
+    /// Lowercase hex.
+    pub sha256: String,
+}
+
+/// Installers are only ever fetched from this repository's releases.
+const ASSET_URL_PREFIX: &str = "https://github.com/sp-yduck/overlaysubs/releases/download/";
+
+#[derive(Deserialize)]
+struct GitHubAsset {
+    name: String,
+    browser_download_url: String,
+    size: u64,
+    digest: Option<String>,
+}
+
+impl GitHubAsset {
+    /// None when the file cannot be verified or does not come from this repository's releases.
+    fn verified(self) -> Option<Asset> {
+        let sha256 = self.digest?.strip_prefix("sha256:")?.to_string();
+        let hex = sha256.len() == 64 && sha256.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
+        (hex && self.browser_download_url.starts_with(ASSET_URL_PREFIX)).then_some(Asset {
+            name: self.name,
+            url: self.browser_download_url,
+            size: self.size,
+            sha256,
+        })
+    }
 }
 
 /// Subset of GitHub's release object; unknown fields are ignored.
@@ -68,6 +105,8 @@ struct GitHubRelease {
     draft: bool,
     #[serde(default)]
     prerelease: bool,
+    #[serde(default)]
+    assets: Vec<GitHubAsset>,
 }
 
 /// Return the newest release iff it is strictly newer than `current`.
@@ -98,6 +137,11 @@ pub fn newer_release(current: &str, json: &str) -> Result<Option<Release>, Strin
         version,
         url: raw.html_url,
         published_at: raw.published_at,
+        assets: raw
+            .assets
+            .into_iter()
+            .filter_map(GitHubAsset::verified)
+            .collect(),
     }))
 }
 
@@ -245,6 +289,31 @@ mod tests {
             "https://github.com/sp-yduck/overlaysubs/releases/tag/v0.2.0"
         );
         assert_eq!(r.published_at.as_deref(), Some("2026-10-01T12:34:56Z"));
+    }
+
+    #[test]
+    fn only_verifiable_assets_from_this_repository_are_offered() {
+        let sha = "a".repeat(64);
+        let dl = "https://github.com/sp-yduck/overlaysubs/releases/download/v0.2.0";
+        let body = format!(
+            r#"{{"tag_name": "v0.2.0", "html_url": "https://github.com/sp-yduck/overlaysubs/releases/tag/v0.2.0", "assets": [
+                {{"name": "ok.dmg", "browser_download_url": "{dl}/ok.dmg", "size": 7, "digest": "sha256:{sha}"}},
+                {{"name": "no-digest.exe", "browser_download_url": "{dl}/no-digest.exe", "size": 7, "digest": null}},
+                {{"name": "md5.exe", "browser_download_url": "{dl}/md5.exe", "size": 7, "digest": "md5:{sha}"}},
+                {{"name": "short.exe", "browser_download_url": "{dl}/short.exe", "size": 7, "digest": "sha256:abc"}},
+                {{"name": "elsewhere.exe", "browser_download_url": "https://example.com/elsewhere.exe", "size": 7, "digest": "sha256:{sha}"}}
+            ]}}"#
+        );
+        let r = newer_release("0.1.0", &body).unwrap().unwrap();
+        assert_eq!(
+            r.assets,
+            vec![Asset {
+                name: "ok.dmg".into(),
+                url: format!("{dl}/ok.dmg"),
+                size: 7,
+                sha256: sha
+            }]
+        );
     }
 
     #[test]
