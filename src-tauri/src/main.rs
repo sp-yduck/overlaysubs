@@ -579,6 +579,15 @@ fn toggle_overlay(app: &AppHandle) {
     }
 }
 
+/// Brings the settings window to the front, for the tray menu and for a click on the Dock icon.
+fn show_settings(app: &AppHandle) {
+    let Some(w) = app.get_webview_window("main") else { return };
+    // On macOS `set_focus` does nothing for a minimized window, so restore the window first.
+    let _ = w.unminimize();
+    let _ = w.show();
+    let _ = w.set_focus();
+}
+
 /// Hides the overlay only if `session_id` is still the current session, so a stop that
 /// overlaps a quick restart does not hide the new session's overlay.
 fn hide_overlay_if_session(app: &AppHandle, session_id: u64) {
@@ -981,12 +990,7 @@ fn main() {
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "toggle" => toggle(app),
                     "overlay" => toggle_overlay(app),
-                    "show" => {
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
-                    }
+                    "show" => show_settings(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -1007,12 +1011,17 @@ fn main() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building overlaysubs")
-        .run(|app, event| {
+        .run(|app, event| match event {
             // Free the models before the process exits. ggml's Metal backend aborts in its exit-time cleanup
             // (ggml_metal_rsets_free) while a loaded model still holds GPU buffers, so every quit crashed.
-            if let tauri::RunEvent::Exit = event {
+            tauri::RunEvent::Exit => {
                 app.state::<App>().engines.lock().unwrap().take();
             }
+            // A click on the Dock icon. The overlay is on every Space and counts as a visible window, so macOS
+            // neither switches to the Space of the settings window nor restores it from the Dock by itself.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen { .. } => show_settings(app),
+            _ => {}
         });
 }
 
