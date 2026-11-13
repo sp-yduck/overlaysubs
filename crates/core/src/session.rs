@@ -11,14 +11,24 @@ pub struct Transcript {
     pub word_ends: Vec<(usize, usize)>,
 }
 
+/// Byte offsets where words end: before a space or the end and, as Japanese and Chinese have no spaces,
+/// before every kana or CJK ideograph.
+/// shortcut: kana and CJK ideographs only; add ranges if Thai, Lao, Khmer or Burmese captions repeat words.
+fn word_ends(text: &str) -> impl Iterator<Item = usize> + '_ {
+    let unspaced = |c: char| matches!(c, '\u{3040}'..='\u{30ff}' | '\u{3400}'..='\u{9fff}');
+    text.char_indices().filter_map(move |(i, c)| {
+        let e = i + c.len_utf8();
+        let next = text[e..].chars().next();
+        (!c.is_whitespace() && next.is_none_or(|n| n.is_whitespace() || unspaced(n))).then_some(e)
+    })
+}
+
 /// Byte offset in `text` where what follows `overlap` begins: `overlap` is committed text whose audio is
 /// heard again after the cut, so a transcript starts with (roughly) those words. 0 when no word prefix of
 /// `text` is close to it.
 fn strip_overlap(overlap: &str, text: &str) -> usize {
-    let mut ends = vec![0];
-    ends.extend(text.split_whitespace().map(|w| w.as_ptr() as usize - text.as_ptr() as usize + w.len()));
-    let n = overlap.split_whitespace().count() + 4;
-    match ends.iter().take(n + 1).map(|&e| (crate::metrics::cer(overlap, &text[..e]), e)).min_by(|a, b| a.0.total_cmp(&b.0)) {
+    let n = word_ends(overlap).count() + 4;
+    match std::iter::once(0).chain(word_ends(text)).take(n + 1).map(|e| (crate::metrics::cer(overlap, &text[..e]), e)).min_by(|a, b| a.0.total_cmp(&b.0)) {
         Some((d, e)) if d <= 0.4 => e,
         _ => 0,
     }
@@ -386,7 +396,12 @@ mod tests {
             let text = self.0.remove(0).to_string();
             let kana = text.chars().any(|c| ('\u{3040}'..='\u{30ff}').contains(&c));
             let lang = if text.is_ascii() { "en" } else if kana { "ja" } else { "zh" }.to_string();
-            let word_ends = text.match_indices(' ').map(|(i, _)| i).chain(std::iter::once(text.len())).enumerate().map(|(n, o)| (o, (n + 1) * SEC)).collect();
+            // One word per second; Japanese has no spaces, so there four characters per second.
+            let word_ends = if kana {
+                text.char_indices().enumerate().map(|(n, (i, c))| (i + c.len_utf8(), (n + 1) * SEC / 4)).collect()
+            } else {
+                text.match_indices(' ').map(|(i, _)| i).chain(std::iter::once(text.len())).enumerate().map(|(n, o)| (o, (n + 1) * SEC)).collect()
+            };
             Ok(Transcript { text, lang, word_ends })
         }
     }
@@ -500,6 +515,20 @@ mod tests {
         let sources: Vec<_> = s.entries.iter().map(|e| e.source.as_str()).collect();
         assert_eq!(sources, ["Hello there, my friend.", "How are you doing today?"], "the repeated word is dropped");
         assert_eq!(s.handle(Event::Final { pcm: vec![0.0; 2 * SEC], start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |_| {}), Ok(()), "audio that is all committed is skipped");
+    }
+
+    #[test]
+    fn japanese_sentence_is_cut_at_its_own_end_and_the_repeated_characters_are_dropped() {
+        let mut s = Session::new(SessionConfig::default());
+        let mut caps = vec![];
+        // The sentence ends at 2.75 s (11 characters), so the cut is at 1.75 s and "います。" is heard again.
+        let mut a = asr(vec!["ありがとうございます。まず", "ありがとうございます。まず、来月の", "います。まず、来月の納品です。"]);
+        part(&mut s, &mut a, &mut caps);
+        part(&mut s, &mut a, &mut caps);
+        assert_eq!((s.committed(), s.overlap.as_deref()), (7 * SEC / 4, Some("います。")), "not at the end of the partial's audio (#78)");
+        s.handle(Event::Final { pcm: vec![0.0; 6 * SEC], start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        let sources: Vec<_> = s.entries.iter().map(|e| e.source.as_str()).collect();
+        assert_eq!(sources, ["ありがとうございます。", "まず、来月の納品です。"]);
     }
 
     #[test]
