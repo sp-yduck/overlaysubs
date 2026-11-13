@@ -892,18 +892,21 @@ fn restore_saved_overlay_geometry(app: &AppHandle) {
         *app.state::<App>().overlay_default_position.lock().unwrap() = Some((at(p.x), at(p.y)));
     }
     let Ok(j) = std::fs::read_to_string(config_dir(app).join(OVERLAY_POSITION)) else { return };
-    let saved = match serde_json::from_str::<SavedPosition>(&j) {
+    let (saved, size) = match serde_json::from_str::<SavedPosition>(&j) {
         Ok(SavedPosition::Desktop { x, y, width, height }) => {
             // Before the position, which is fitted to a display with the size the overlay will have.
-            if let Some((width, height)) = usable_size(width, height) {
+            let size = usable_size(width, height);
+            if let Some((width, height)) = size {
                 let _ = w.set_size(tauri::LogicalSize::new(width, height));
             }
-            (x, y)
+            ((x, y), size)
         }
-        Ok(SavedPosition::Physical(x, y)) => legacy_to_desktop(&w, x, y),
+        Ok(SavedPosition::Physical(x, y)) => (legacy_to_desktop(&w, x, y), None),
         Err(_) => return,
     };
-    let Some(size) = overlay_size(&w) else { return };
+    // The saved size itself, not read back: on macOS `outer_size()` still gives the size from before `set_size`
+    // here, so the position would be fitted with the launch size (#77).
+    let Some(size) = size.or_else(|| overlay_size(&w)) else { return };
     if let Some(p) = fit_on_screen(saved, size, &displays(&w)) {
         let _ = w.set_position(desktop_position(p));
     }
