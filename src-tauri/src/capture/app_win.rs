@@ -33,18 +33,79 @@ pub fn apps() -> Result<Vec<(String, String)>, String> {
     .map_err(|_| "audio session thread panicked".to_string())?
     .map_err(|e| e.to_string())?;
     let sys = processes()?;
-    // Pid 0 is the system sounds session; it has no process to capture.
-    let mut names: Vec<String> = pids.into_iter().filter_map(|pid| Some(sys.process(Pid::from_u32(pid))?.name().to_string_lossy().into_owned())).collect();
-    names.sort();
-    names.dedup();
-    Ok(names.into_iter().map(|n| (n.clone(), n)).collect())
+    let own = std::process::id();
+    let own_name = sys.process(Pid::from_u32(own)).map(|p| p.name().to_owned());
+    let mut apps: Vec<(String, String)> = Vec::new();
+    for pid in pids {
+        // Pid 0 is the system sounds session: sysinfo lists it as "[System Process]", but process
+        // loopback rejects it with E_INVALIDARG. Our own audio is not worth translating either.
+        if pid == 0 || pid == own {
+            continue;
+        }
+        let Some(p) = sys.process(Pid::from_u32(pid)) else { continue };
+        if own_name.as_deref() == Some(p.name()) {
+            continue;
+        }
+        let id = p.name().to_string_lossy().into_owned();
+        if apps.iter().any(|(i, _)| i.eq_ignore_ascii_case(&id)) {
+            continue;
+        }
+        let label = p.exe().and_then(display_name).unwrap_or_else(|| id.clone());
+        apps.push((id, label));
+    }
+    // Two executables with one description (e.g. a launcher and its helper) stay distinguishable.
+    let labels: Vec<String> = apps.iter().map(|(_, l)| l.to_lowercase()).collect();
+    for (id, label) in &mut apps {
+        if labels.iter().filter(|l| **l == label.to_lowercase()).count() > 1 && !label.eq_ignore_ascii_case(id) {
+            *label = format!("{label} ({id})");
+        }
+    }
+    apps.sort_by_key(|(_, l)| l.to_lowercase());
+    Ok(apps)
+}
+
+/// The FileDescription (or ProductName) in the version info of the executable at `path`.
+fn display_name(path: &std::path::Path) -> Option<String> {
+    use windows::core::{HSTRING, PCWSTR};
+    use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
+    let file = HSTRING::from(path.as_os_str());
+    let size = unsafe { GetFileVersionInfoSizeW(PCWSTR(file.as_ptr()), None) };
+    if size == 0 {
+        return None;
+    }
+    let mut data = vec![0u8; size as usize];
+    unsafe { GetFileVersionInfoW(PCWSTR(file.as_ptr()), None, size, data.as_mut_ptr().cast()) }.ok()?;
+    // `len` counts bytes for the translation table but UTF-16 units for strings.
+    let query = |sub: &str, unit: usize| -> Option<&[u8]> {
+        let sub = HSTRING::from(sub);
+        let (mut ptr, mut len) = (std::ptr::null_mut(), 0u32);
+        unsafe { VerQueryValueW(data.as_ptr().cast(), PCWSTR(sub.as_ptr()), &mut ptr, &mut len) }.as_bool().then_some(())?;
+        (!ptr.is_null() && len > 0).then(|| unsafe { std::slice::from_raw_parts(ptr as *const u8, len as usize * unit) })
+    };
+    // The language/code page pairs the string tables are keyed by, then the usual US English ones.
+    let mut langs: Vec<String> = query(r"\VarFileInfo\Translation", 1)
+        .map(|t| t.chunks_exact(4).map(|c| format!("{:04x}{:04x}", u16::from_le_bytes([c[0], c[1]]), u16::from_le_bytes([c[2], c[3]]))).collect())
+        .unwrap_or_default();
+    langs.extend(["040904b0".into(), "040904e4".into()]);
+    for key in ["FileDescription", "ProductName"] {
+        for lang in &langs {
+            let Some(raw) = query(&format!(r"\StringFileInfo\{lang}\{key}"), 2) else { continue };
+            let wide: Vec<u16> = raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).take_while(|&c| c != 0).collect();
+            let name = String::from_utf16_lossy(&wide).trim().to_string();
+            if !name.is_empty() {
+                return Some(name);
+            }
+        }
+    }
+    None
 }
 
 /// The top process named `name`: browsers play audio from a child process, and process loopback
 /// follows the tree downwards only.
 /// shortcut: two separate instances of one app capture only the first; store a pid per instance if that matters.
 fn root_pid(sys: &System, name: &str) -> Option<u32> {
-    let named = |p: &Process| p.name().eq_ignore_ascii_case(name);
+    // Pid 0 ("[System Process]", saved by older versions) cannot be captured.
+    let named = |p: &Process| p.pid().as_u32() != 0 && p.name().eq_ignore_ascii_case(name);
     sys.processes().values().find(|p| named(p) && !p.parent().and_then(|parent| sys.process(parent)).is_some_and(named)).map(|p| p.pid().as_u32())
 }
 

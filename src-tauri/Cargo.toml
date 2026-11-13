@@ -40,6 +40,8 @@ screencapturekit = { version = "11.1.2", features = ["macos_13_0"] }
 # Per-app capture needs WASAPI process loopback, which cpal does not expose.
 [target.'cfg(windows)'.dependencies]
 wasapi = "0.27"
+# Friendly app names from the executables' version info.
+windows = { version = "0.62", features = ["Win32_Storage_FileSystem"] }
 
 [features]
 vulkan = ["whisper-rs/vulkan", "llama-cpp-2/vulkan"]
