@@ -59,6 +59,8 @@ struct Settings {
     /// Serve the overlay to a streaming app's browser source at http://127.0.0.1:<browser_source_port>/.
     browser_source: bool,
     browser_source_port: u16,
+    /// Download the installer of a newer release in the background. It is only run when the user asks.
+    auto_update: bool,
 }
 
 impl Default for Settings {
@@ -78,6 +80,7 @@ impl Default for Settings {
             overlay: serde_json::json!({}),
             browser_source: false,
             browser_source_port: 17777,
+            auto_update: true,
         }
     }
 }
@@ -153,6 +156,8 @@ struct App {
     source_server: Mutex<Option<browser_source::Server>>,
     /// Why the browser source server did not start at launch, until the settings window has shown it.
     startup_error: Mutex<Option<String>>,
+    /// The newer release the last check found, for `download_update` and `install_update`.
+    update: Mutex<Option<update::UpdateInfo>>,
 }
 
 /// What the browser source loads: the overlay page itself, which works outside Tauri too.
@@ -266,7 +271,58 @@ async fn audio_apps() -> Result<Vec<(String, String)>, String> {
 #[tauri::command]
 async fn check_update(app: AppHandle) -> Result<Option<update::UpdateInfo>, String> {
     let current = app.package_info().version.to_string();
-    tauri::async_runtime::spawn_blocking(move || update::fetch(&current)).await.map_err(|e| e.to_string())?
+    let info = tauri::async_runtime::spawn_blocking(move || update::fetch(&current)).await.map_err(|e| e.to_string())??;
+    if info.is_none() {
+        // Up to date: the installer that got us here is no longer needed.
+        let _ = std::fs::remove_dir_all(updates_dir(&app)?);
+    }
+    *app.state::<App>().update.lock().unwrap() = info.clone();
+    Ok(info)
+}
+
+/// Where downloaded installers are kept until they are run.
+fn updates_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app.path().app_cache_dir().map_err(|e| e.to_string())?.join("updates"))
+}
+
+/// Downloads the installer of the release `check_update` found, verified with the SHA-256 GitHub publishes for it.
+#[tauri::command]
+async fn download_update(app: AppHandle) -> Result<(), String> {
+    let info = app.state::<App>().update.lock().unwrap().clone();
+    let (Some(a), Some(file)) = (info.as_ref().and_then(|i| i.installer.clone()), info.as_ref().and_then(|i| i.installer_file())) else {
+        return Err("no installer for this platform".into());
+    };
+    let dir = updates_dir(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        // Installers of older releases; this one's `.part` is kept so the download resumes.
+        for e in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+            if !e.file_name().to_string_lossy().starts_with(&file) {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
+        let mut last = 0;
+        download::fetch_file(&a.url, &file, a.size, &a.sha256, &dir, &mut |done, total| {
+            if done - last > (1 << 20) || done == total {
+                last = done;
+                let _ = app.emit("update-download", serde_json::json!({ "done": done, "total": total }));
+            }
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Starts the downloaded installer and quits, so the installer can replace the app's files.
+#[tauri::command]
+fn install_update(app: AppHandle, st: State<App>) -> Result<(), String> {
+    let file = st.update.lock().unwrap().as_ref().and_then(|i| i.installer_file()).ok_or("no update downloaded")?;
+    let path = updates_dir(&app)?.join(file);
+    if !path.exists() {
+        return Err("no update downloaded".into());
+    }
+    update::launch(&path)?;
+    app.exit(0);
+    Ok(())
 }
 
 #[tauri::command]
@@ -1057,7 +1113,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, reset_overlay_position, open_url, show_overlay, set_overlay_preview, check_update, startup_error, audio_apps, ui_error, read_log, save_log
+            snapshot, save_settings, detect, download, delete_model, benchmark, start, stop, history, export_history, terms_text, accept_terms, set_click_through, reset_overlay_position, open_url, show_overlay, set_overlay_preview, check_update, download_update, install_update, startup_error, audio_apps, ui_error, read_log, save_log
         ])
         .build(tauri::generate_context!())
         .expect("error while building overlaysubs")
