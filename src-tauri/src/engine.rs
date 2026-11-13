@@ -52,11 +52,11 @@ impl Asr for Whisper {
             p.set_initial_prompt(&prompt);
         }
         p.set_single_segment(true);
-        // Word-level segments (the text is the same), so each word's end time is known; whisper.cpp maps
+        // Token-level segments (the text is the same), so each token's end time is known; whisper.cpp maps
         // segment times back past the silence its VAD removed, which token times are not.
+        // Not split_on_word: it splits only before a space, so Japanese came back as one segment (#78).
         p.set_token_timestamps(true);
         p.set_max_len(1);
-        p.set_split_on_word(true);
         p.set_suppress_blank(true);
         p.set_suppress_nst(true);
         p.set_print_progress(false);
@@ -67,16 +67,21 @@ impl Asr for Whisper {
         p.set_vad_params(WhisperVadParams::new());
         p.enable_vad(true);
         st.full(p, pcm).map_err(|e| e.to_string())?;
-        let (mut raw, mut ends) = (String::new(), vec![]);
+        // Bytes, not strings: a token can end in the middle of a UTF-8 character.
+        let (mut raw, mut ends) = (Vec::new(), vec![]);
         for seg in (0..st.full_n_segments()).filter_map(|i| st.get_segment(i)) {
-            raw.push_str(&seg.to_string());
+            raw.extend_from_slice(seg.to_bytes().map_err(|e| e.to_string())?);
             // Centiseconds into `pcm` -> samples.
             ends.push((raw.len(), (seg.end_timestamp().max(0) as usize * 160).min(pcm.len())));
         }
+        let raw = String::from_utf8_lossy(&raw).into_owned();
+        let lang = whisper_rs::get_lang_str(st.full_lang_id_from_state()).unwrap_or("en").to_string();
+        // Languages written without spaces: every token ends a word. Elsewhere a word ends before a space.
+        let unspaced = matches!(lang.as_str(), "ja" | "zh" | "yue" | "th" | "lo" | "km" | "my");
+        let word_end = |o: usize| raw.is_char_boundary(o) && (unspaced || raw[o..].chars().next().is_none_or(char::is_whitespace));
         let lead = raw.len() - raw.trim_start().len();
         let text = raw.trim().to_string();
-        let word_ends = ends.into_iter().filter(|&(o, _)| o > lead).map(|(o, t)| ((o - lead).min(text.len()), t)).collect();
-        let lang = whisper_rs::get_lang_str(st.full_lang_id_from_state()).unwrap_or("en").to_string();
+        let word_ends = ends.into_iter().filter(|&(o, _)| o > lead && word_end(o)).map(|(o, t)| ((o - lead).min(text.len()), t)).collect();
         Ok(Transcript { text, lang, word_ends })
     }
 }
