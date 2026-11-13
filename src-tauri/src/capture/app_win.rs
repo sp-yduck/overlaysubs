@@ -80,7 +80,7 @@ pub fn start(app: &str, tx: Sender<Vec<f32>>) -> Result<Arc<AtomicBool>, String>
             }
             while capture.get_next_packet_size().ok().flatten().unwrap_or(0) > 0 {
                 if let Err(e) = capture.read_from_device_to_deque(&mut bytes) {
-                    eprintln!("capture error: {e}");
+                    log::error!("capture error: {e}");
                     break;
                 }
             }

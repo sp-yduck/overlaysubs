@@ -50,7 +50,7 @@ fn windows_gpu() -> Option<Gpu> {
 /// Spawns nvidia-smi / PowerShell, so it only runs when [`detect`] is called.
 fn probe() -> Hardware {
     // sysinfo 0.40 can fail on unsupported platforms; fall back to 0 RAM / no CPU name.
-    let mut sys = sysinfo::System::new().map_err(|e| eprintln!("sysinfo: {e}")).ok();
+    let mut sys = sysinfo::System::new().map_err(|e| log::warn!("sysinfo: {e}")).ok();
     if let Some(s) = sys.as_mut() {
         s.refresh_memory();
         s.refresh_cpu_all();
@@ -82,6 +82,7 @@ pub fn cached_or_detect(dir: &Path) -> Hardware {
 /// Probes the machine and caches the result, so the setup screen can show it on later launches.
 pub fn detect(dir: &Path) -> Hardware {
     let hardware = probe();
+    log::info!("hardware: {hardware:?}");
     // Best effort: if the cache cannot be written, the next launch simply probes again.
     save(dir, &HardwareCache::new(hardware.clone()));
     hardware

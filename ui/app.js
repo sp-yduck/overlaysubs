@@ -1,4 +1,10 @@
-const { invoke } = window.__TAURI__.core;
+const rawInvoke = window.__TAURI__.core.invoke;
+/** To the log file (shown on the About page): a toast is gone before it can be copied, and some callers ignore a failure. */
+const logError = (msg) => rawInvoke("ui_error", { msg: String(msg) }).catch(() => {});
+/** Every failed command is logged with its name and the untranslated error. */
+const invoke = (cmd, args) => rawInvoke(cmd, args).catch((e) => { logError(`${cmd}: ${e}`); throw e; });
+window.addEventListener("error", (e) => logError(`settings page: ${e.message} (${e.filename}:${e.lineno})`));
+window.addEventListener("unhandledrejection", (e) => logError(`settings page: ${e.reason}`));
 const { listen } = window.__TAURI__.event;
 const { save: saveDialog, open: openDialog } = window.__TAURI__.dialog;
 
@@ -296,12 +302,23 @@ function historyPage() {
   ${card("", `<div class="hist" data-hist="200"></div>`)}`;
 }
 
+async function loadLog() {
+  const text = await invoke("read_log");
+  const el = $("#log");
+  if (!el) return;
+  el.textContent = text;
+  el.scrollTop = el.scrollHeight;
+}
+
 function aboutPage() {
   return `<h2>${t("about")}</h2>
   ${card("", `<p>OverlaySubs · MIT License. Translation: <b>Built with PLaMo</b> (PLaMo 3 Translate, Preferred Networks). Speech: whisper.cpp. VAD: Silero.</p>
     <p class="muted">${t("about_plamo_license")}</p>
     <p><a href="https://github.com/sp-yduck/overlaysubs" data-external>${t("star")}</a></p>`)}
   ${card(t("updates"), `${field(t("auto_update"), "auto_update", "check")}<p class="muted small">${t("auto_update_note")}</p>`)}
+  ${card(t("logs"), `<p class="muted">${t("logs_intro")}</p>
+    <div class="row">${btn("log-copy", t("copy"))}${btn("log-save", t("log_save"))}${btn("log-reload", t("log_reload"))}</div>
+    <pre class="license" id="log"></pre>`)}
   ${card(t("terms_title"), `<div class="seg">${btn("terms-en", "English", { cls: termsLang === "en" ? "on" : "" })}${btn("terms-ja", "日本語", { cls: termsLang === "ja" ? "on" : "" })}</div>
     <pre class="license" id="terms"></pre>`)}`;
 }
@@ -361,7 +378,7 @@ function render() {
   <section id="page" data-page="${page}">${updateBanner()}${PAGES[page]()}</section>`;
   $("#page").scrollTop = keep;
   drawHistory();
-  if (page === "about") loadTerms();
+  if (page === "about") { loadTerms(); loadLog(); }
   syncPreview();
 }
 
@@ -530,6 +547,14 @@ async function act(name, id, el) {
     const format = name.slice(7);
     const path = await saveDialog({ defaultPath: `overlaysubs.${format}`, filters: [{ name: format, extensions: [format] }] });
     if (path) { await invoke("export_history", { path, format, withSource: snap.settings.overlay.showSource }); toast(t("exported")); toast(t("output_note"), "warn"); }
+  }
+  if (name === "log-copy") {
+    await navigator.clipboard.writeText(await invoke("read_log"));
+    toast(t("copied"));
+  }
+  if (name === "log-save") {
+    const path = await saveDialog({ defaultPath: "overlaysubs-log.txt", filters: [{ name: "txt", extensions: ["txt"] }] });
+    if (path) { await invoke("save_log", { path }); toast(t("exported")); }
   }
   if (name === "open-release") return invoke("open_url", { url: updateInfo.url }).catch((e) => toast(errText(e), "error"));
   // Not awaited: the banner shows the progress, and the click handler must not hold the page busy meanwhile.
