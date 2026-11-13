@@ -10,21 +10,43 @@ use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::sampling::LlamaSampler;
 use std::num::NonZeroU32;
 use std::path::Path;
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperVadContext, WhisperVadContextParams, WhisperVadParams};
+use whisper_rs::{DtwMode, DtwModelPreset, DtwParameters, FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperVadContext, WhisperVadContextParams, WhisperVadParams};
 
 pub struct Whisper {
     pub(crate) ctx: WhisperContext,
     pub vad_path: String,
     threads: i32,
+    /// Token end times come from DTW (aligning the text to the audio), not from whisper.cpp's own estimate.
+    dtw: bool,
 }
 
 impl Whisper {
     pub fn load(model: &Path, vad: &Path, use_gpu: bool, threads: usize) -> Result<Self, String> {
         let mut p = WhisperContextParameters::default();
         p.use_gpu(use_gpu);
+        let preset = model.file_name().and_then(|f| dtw_preset(&f.to_string_lossy()));
+        let dtw = preset.is_some();
+        if let Some(model_preset) = preset {
+            p.dtw_parameters(DtwParameters { mode: DtwMode::ModelPreset { model_preset }, ..Default::default() });
+        }
         let ctx = WhisperContext::new_with_params(model, p).map_err(|e| e.to_string())?;
-        Ok(Self { ctx, vad_path: vad.to_string_lossy().into_owned(), threads: threads.min(8) as i32 })
+        Ok(Self { ctx, vad_path: vad.to_string_lossy().into_owned(), threads: threads.min(8) as i32, dtw })
     }
+}
+
+/// DTW alignment heads for a model, from its file name in models.json. None for an unknown model, which then
+/// keeps whisper.cpp's own token times.
+fn dtw_preset(file: &str) -> Option<DtwModelPreset> {
+    use DtwModelPreset::*;
+    let en = file.contains(".en");
+    Some(match file {
+        f if f.contains("large-v3-turbo") => LargeV3Turbo,
+        f if f.contains("large-v3") => LargeV3,
+        f if f.contains("medium") => if en { MediumEn } else { Medium },
+        f if f.contains("small") => if en { SmallEn } else { Small },
+        f if f.contains("base") => if en { BaseEn } else { Base },
+        _ => return None,
+    })
 }
 
 impl Whisper {
@@ -67,12 +89,19 @@ impl Asr for Whisper {
         p.set_vad_params(WhisperVadParams::new());
         p.enable_vad(true);
         st.full(p, pcm).map_err(|e| e.to_string())?;
+        let eot = self.ctx.token_eot();
         // Bytes, not strings: a token can end in the middle of a UTF-8 character.
         let (mut raw, mut ends) = (Vec::new(), vec![]);
         for seg in (0..st.full_n_segments()).filter_map(|i| st.get_segment(i)) {
             raw.extend_from_slice(seg.to_bytes().map_err(|e| e.to_string())?);
+            // whisper.cpp's own estimate puts a sentence-final "。" and every token after it at the end of the
+            // audio, so an early commit cut into the next sentence and lost its first words (#84); DTW times are
+            // right there. They are not mapped past the silence whisper.cpp's VAD removed, so they can only be
+            // early: the cut moves earlier and more audio is heard again, none is lost.
+            let last_text = (0..seg.n_tokens()).rev().filter_map(|k| seg.get_token(k)).map(|t| t.token_data()).find(|d| d.id < eot);
+            let dtw = last_text.filter(|_| self.dtw).map(|d| d.t_dtw).filter(|&t| t >= 0);
             // Centiseconds into `pcm` -> samples.
-            ends.push((raw.len(), (seg.end_timestamp().max(0) as usize * 160).min(pcm.len())));
+            ends.push((raw.len(), (dtw.unwrap_or_else(|| seg.end_timestamp()).max(0) as usize * 160).min(pcm.len())));
         }
         let raw = String::from_utf8_lossy(&raw).into_owned();
         let lang = whisper_rs::get_lang_str(st.full_lang_id_from_state()).unwrap_or("en").to_string();
@@ -225,6 +254,18 @@ mod tests {
             }
             eprintln!("{name}: {:?} for {:.1}s of audio", t0.elapsed(), pos as f32 / 16_000.0);
         }
+    }
+
+    #[test]
+    fn every_whisper_model_has_dtw_heads() {
+        let reg = Registry::parse(include_str!("../../models.json")).unwrap();
+        let whisper: Vec<_> = reg.models.iter().filter(|m| m.file.starts_with("ggml-") && !m.file.contains("silero")).collect();
+        assert!(!whisper.is_empty());
+        for m in whisper {
+            assert!(dtw_preset(&m.file).is_some(), "{}", m.file);
+        }
+        assert!(matches!(dtw_preset("ggml-large-v3-turbo-q5_0.bin"), Some(DtwModelPreset::LargeV3Turbo)));
+        assert!(matches!(dtw_preset("ggml-base.en.bin"), Some(DtwModelPreset::BaseEn)));
     }
 
     /// Downloads ~0.7 GB. Run: OVERLAYSUBS_WAV=path/to/16k-mono.wav cargo test -p overlaysubs -- --ignored
