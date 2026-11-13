@@ -175,7 +175,11 @@ jobs:
     steps:
       - run: git config --global core.longpaths true
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      # shortcut: pinned to the last Rust with the old build directory layout. Rust 1.100 puts build script
+      # output in target/<profile>/build/<crate>/<hash>/out, and llama-cpp-sys-2's build script, the DLL copy
+      # below and scripts/stage-dylibs.sh all expect build/<crate>-<hash>/out. Go back to stable once
+      # llama-cpp-rs supports the new layout and those two paths are updated.
+      - uses: dtolnay/rust-toolchain@1.99.0
       # Keeps the whisper.cpp / llama.cpp builds between runs.
       # Caches the Cargo registry and the target dir. On Windows the build uses
       # CARGO_TARGET_DIR=C:\t (short path for the Vulkan shader build), and this
