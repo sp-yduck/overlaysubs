@@ -123,7 +123,7 @@ fn start_cpal(src: &Source, tx: Sender<Vec<f32>>) -> Result<Capture, String> {
     std::thread::spawn(move || {
         let channels = config.channels() as usize;
         let mut rs = Resampler::new(config.sample_rate() as usize);
-        let err = |e| eprintln!("capture error: {e}");
+        let err = |e| log::error!("capture error: {e}");
         let cfg = config.config();
         let stream = match config.sample_format() {
             cpal::SampleFormat::F32 => device.build_input_stream(cfg, move |d: &[f32], _: &_| { let _ = tx.send(rs.push(d, channels)); }, err, None),

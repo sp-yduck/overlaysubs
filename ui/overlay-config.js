@@ -36,7 +36,7 @@ const OVERLAY_LIMITS = {
   bgOpacity: [0, 1],
   capOpacity: [0, 1],
   fontSize: [12, 96],
-  lineHeight: [0.8, 2.2],
+  lineHeight: [1, 2.2],
   srcSize: [8, 48],
   lines: [1, 50],
   linger: [1, 60],

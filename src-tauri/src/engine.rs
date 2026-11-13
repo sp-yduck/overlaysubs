@@ -8,9 +8,43 @@ use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::sampling::LlamaSampler;
+use std::ffi::{c_char, c_void, CStr};
 use std::num::NonZeroU32;
 use std::path::Path;
+use std::sync::Mutex;
 use whisper_rs::{DtwMode, DtwModelPreset, DtwParameters, FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperVadContext, WhisperVadContextParams, WhisperVadParams};
+
+/// Sends whisper.cpp's and llama.cpp's own messages to the `log` crate, which the app writes to its log file.
+/// They are the only place the reason for a failed load or allocation is given, and a GUI build has no stderr
+/// to show them. Every load calls this; repeating it is harmless.
+fn install_log_hooks() {
+    whisper_rs::install_logging_hooks();
+    // Also sets the logger of the ggml that llama.cpp links.
+    unsafe { llama_cpp_sys_2::llama_log_set(Some(llama_log), std::ptr::null_mut()) };
+}
+
+unsafe extern "C" fn llama_log(level: llama_cpp_sys_2::ggml_log_level, text: *const c_char, _: *mut c_void) {
+    // A message without a trailing newline is continued by the next call.
+    static LINE: Mutex<(log::Level, String)> = Mutex::new((log::Level::Info, String::new()));
+    if text.is_null() {
+        return;
+    }
+    // Never panic here: unwinding into llama.cpp aborts the process.
+    let mut line = LINE.lock().unwrap_or_else(|e| e.into_inner());
+    if line.1.is_empty() {
+        line.0 = match level {
+            llama_cpp_sys_2::GGML_LOG_LEVEL_ERROR => log::Level::Error,
+            llama_cpp_sys_2::GGML_LOG_LEVEL_WARN => log::Level::Warn,
+            llama_cpp_sys_2::GGML_LOG_LEVEL_DEBUG => log::Level::Debug,
+            _ => log::Level::Info,
+        };
+    }
+    line.1.push_str(&CStr::from_ptr(text).to_string_lossy());
+    if line.1.ends_with('\n') {
+        log::log!(target: "llama.cpp", line.0, "{}", line.1.trim_end());
+        line.1.clear();
+    }
+}
 
 pub struct Whisper {
     pub(crate) ctx: WhisperContext,
@@ -22,6 +56,7 @@ pub struct Whisper {
 
 impl Whisper {
     pub fn load(model: &Path, vad: &Path, use_gpu: bool, threads: usize) -> Result<Self, String> {
+        install_log_hooks();
         let mut p = WhisperContextParameters::default();
         p.use_gpu(use_gpu);
         let preset = model.file_name().and_then(|f| dtw_preset(&f.to_string_lossy()));
@@ -126,8 +161,7 @@ const CONTEXT: usize = 16 * FRAME; // ~0.5 s
 
 impl Silero {
     pub fn load(path: &str) -> Result<Self, String> {
-        // Without a log backend feature this discards whisper.cpp's per-call INFO lines.
-        whisper_rs::install_logging_hooks();
+        install_log_hooks();
         let mut p = WhisperVadContextParams::new();
         p.set_n_threads(1);
         Ok(Self { ctx: WhisperVadContext::new(path, p).map_err(|e| e.to_string())?, history: vec![] })
@@ -157,8 +191,8 @@ const MAX_NEW: usize = 256;
 
 impl Plamo {
     pub fn load(model: &Path, gpu_layers: u32, threads: usize) -> Result<Self, String> {
-        let mut backend = LlamaBackend::init().map_err(|e| e.to_string())?;
-        backend.void_logs();
+        install_log_hooks();
+        let backend = LlamaBackend::init().map_err(|e| e.to_string())?;
         let params = LlamaModelParams::default().with_n_gpu_layers(gpu_layers);
         let model = LlamaModel::load_from_file(&backend, model, &params).map_err(|e| e.to_string())?;
         Ok(Self { backend, model, threads: threads.min(8) as i32 })
@@ -220,6 +254,31 @@ mod tests {
     use overlaysubs_core::endpoint::{EndpointConfig, Endpointer, Event};
     use overlaysubs_core::registry::Registry;
     use overlaysubs_core::session::{Session, SessionConfig, Stage};
+
+    /// The reason a native library gives for a failure reaches the `log` crate, and so the log file.
+    #[test]
+    fn native_messages_reach_the_log() {
+        struct Lines(Mutex<Vec<String>>);
+        impl log::Log for Lines {
+            fn enabled(&self, _: &log::Metadata) -> bool {
+                true
+            }
+            fn log(&self, r: &log::Record) {
+                self.0.lock().unwrap().push(format!("{} {} {}", r.target(), r.level(), r.args()));
+            }
+            fn flush(&self) {}
+        }
+        static LINES: Lines = Lines(Mutex::new(Vec::new()));
+        log::set_logger(&LINES).unwrap();
+        log::set_max_level(log::LevelFilter::Info);
+        let bad = std::env::temp_dir().join("overlaysubs-not-a-model.bin");
+        std::fs::write(&bad, "not a model").unwrap();
+        assert!(Plamo::load(&bad, 0, 1).is_err() && Whisper::load(&bad, &bad, false, 1).is_err());
+        let lines = LINES.0.lock().unwrap();
+        for from in ["llama.cpp ERROR", "whisper_rs::whisper_logging_hook ERROR"] {
+            assert!(lines.iter().any(|l| l.starts_with(from)), "no {from} line in {lines:#?}");
+        }
+    }
 
     /// A 16 kHz mono s16 WAV.
     fn wav(path: impl AsRef<Path>) -> Vec<f32> {

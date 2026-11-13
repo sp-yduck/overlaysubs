@@ -2651,10 +2651,12 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "overlaysubs"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "cpal",
  "llama-cpp-2",
+ "llama-cpp-sys-2",
+ "log",
  "overlaysubs-core",
  "reqwest 0.12.28",
  "screencapturekit",
@@ -2668,12 +2670,14 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "wasapi",
  "whisper-rs",
+ "windows",
 ]
 
 [[package]]
 name = "overlaysubs-core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
+ "log",
  "serde",
  "serde_json",
 ]
@@ -4891,6 +4895,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2088172d00f936c348d6a72f488dc2660ab3f507263a195df308a3c2383229f6"
 dependencies = [
  "libc",
+ "log",
  "whisper-rs-sys",
 ]
 
