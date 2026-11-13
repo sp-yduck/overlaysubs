@@ -17,6 +17,11 @@ const MAX_BYTES: u64 = 8 << 20;
 const RECENT: usize = 200;
 /// Distinct warnings of other crates that are written once each; see [`LogFile`]. Past this they are only held back.
 const WARNED: usize = 256;
+/// Messages a native library logs as an ERROR although nothing failed; they are treated as warnings. Without this,
+/// every log would hold a line that looks like the cause of the problem, and every model load would write the held
+/// lines. whisper.cpp's ggml logs this one on Macs where its Metal tensor API probe does not compile; it then runs
+/// on Metal without that API (seen on an M5 Max, macOS 26.5).
+const NOT_A_FAILURE: &[&str] = &["ggml_metal_library_init_from_source: error compiling source"];
 /// How much of each file [`read`] returns.
 const TAIL_BYTES: u64 = 512 << 10;
 
@@ -73,7 +78,10 @@ impl Log for LogFile {
             return;
         }
         // Seconds since launch: enough to order events, and needs no date library.
-        let line = format!("[{:9.3}] {:5} {}: {}", self.start.elapsed().as_secs_f64(), r.level(), r.target(), r.args());
+        let msg = r.args().to_string();
+        let level = if NOT_A_FAILURE.iter().any(|m| msg.contains(m)) { Level::Warn } else { r.level() };
+        // One line per message, each with its time: llama.cpp prints a token that is a newline.
+        let line = format!("[{:9.3}] {:5} {}: {}", self.start.elapsed().as_secs_f64(), level, r.target(), msg.replace('\n', "\\n"));
         let line = match &self.home {
             Some(home) => line.replace(home.as_str(), "~"),
             None => line,
@@ -81,9 +89,13 @@ impl Log for LogFile {
         // Never panic here: llama.cpp calls this through a C callback.
         let mut s = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let app = r.target().starts_with("overlaysubs");
-        let repeated = !app && r.level() == Level::Warn && (s.warned.len() >= WARNED || !s.warned.insert(format!("{} {}", r.target(), r.args())));
-        if (r.level() <= Level::Warn && !repeated) || app {
-            if r.level() == Level::Error {
+        let repeated = !app && level == Level::Warn && (s.warned.len() >= WARNED || !s.warned.insert(format!("{} {msg}", r.target())));
+        if (level <= Level::Warn && !repeated) || app {
+            if level == Level::Error {
+                if !s.recent.is_empty() {
+                    // They cannot go where they belong: the lines above are already in the file.
+                    s.write("    held back until the error below; these lines are older than the lines above:");
+                }
                 while let Some(l) = s.recent.pop_front() {
                     s.write(&l);
                 }
@@ -144,6 +156,14 @@ mod tests {
         assert!(text.find("quiet detail").unwrap() < text.find("failed to initialize the context").unwrap());
         assert_eq!(text.matches("a warning").count(), 2, "the held warning is written with the error");
         assert!(!text.contains("debug noise"));
+        assert!(text.find("held back until").unwrap() < text.find("quiet detail").unwrap(), "held lines are announced");
+
+        log(&f, Level::Info, "llama.cpp", "held again");
+        log(&f, Level::Error, "whisper_rs", "ggml_metal_library_init_from_source: error compiling source");
+        let text = read(&dir);
+        assert!(text.contains("WARN  whisper_rs: ggml_metal_library_init_from_source") && !text.contains("held again"), "a known harmless error is a warning");
+        log(&f, Level::Info, "overlaysubs", "LF token = '\n'");
+        assert!(read(&dir).contains("LF token = '\\n'"), "a newline in a message does not start a line");
 
         // The next launch keeps this one as the previous log.
         drop(f);
