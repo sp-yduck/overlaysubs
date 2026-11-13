@@ -268,7 +268,7 @@ function overlayPage() {
       ${colorField(t("text_color"), "overlay.color")}
       ${field(t("font"), "overlay.font")}
       ${select(t("font_weight"), "overlay.fontWeight", opts([[400, t("weight_normal")], [500, t("weight_medium")], [600, t("weight_semibold")], [700, t("weight_bold")]], s.overlay.fontWeight), "number")}
-      ${rangeField(t("line_height"), "overlay.lineHeight", 0.8, 2.2, 0.05)}`)}
+      ${rangeField(t("line_height"), "overlay.lineHeight", 1, 2.2, 0.05)}`)}
     ${card(t("group_source"), `${field(t("show_source"), "overlay.showSource", "check")}
       ${rangeField(t("src_size"), "overlay.srcSize", 8, 48, 1, "px")}
       ${colorField(t("src_color"), "overlay.srcColor")}`)}
