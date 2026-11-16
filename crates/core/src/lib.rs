@@ -10,5 +10,6 @@ pub mod metrics;
 pub mod pfml;
 pub mod registry;
 pub mod session;
+pub mod speaker;
 pub mod tier;
 pub mod update;

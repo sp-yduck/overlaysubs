@@ -7,6 +7,15 @@ pub struct Entry {
     pub lang: String,
     pub source: String,
     pub translation: String,
+    /// Who said it, when speakers are told apart.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speaker: Option<u32>,
+}
+
+/// "A", "B", … for speaker 0, 1, …
+pub fn speaker_label(n: u32) -> String {
+    let (letter, round) = ((b'A' + (n % 26) as u8) as char, n / 26);
+    if round == 0 { letter.to_string() } else { format!("{letter}{round}") }
 }
 
 fn ts(ms: u64) -> String {
@@ -18,7 +27,8 @@ pub fn to_srt(entries: &[Entry], with_source: bool) -> String {
         .iter()
         .enumerate()
         .map(|(i, e)| {
-            let body = if with_source { format!("{}\n{}", e.source, e.translation) } else { e.translation.clone() };
+            let who = e.speaker.map_or(String::new(), |n| format!("[{}] ", speaker_label(n)));
+            let body = if with_source { format!("{who}{}\n{who}{}", e.source, e.translation) } else { format!("{who}{}", e.translation) };
             format!("{}\n{} --> {}\n{}\n", i + 1, ts(e.start_ms), ts(e.end_ms), body)
         })
         .collect::<Vec<_>>()
@@ -35,7 +45,9 @@ mod tests {
 
     #[test]
     fn srt_format() {
-        let e = [Entry { start_ms: 3_723_004, end_ms: 3_725_000, lang: "en".into(), source: "Hi".into(), translation: "やあ".into() }];
+        let e = [Entry { start_ms: 3_723_004, end_ms: 3_725_000, lang: "en".into(), source: "Hi".into(), translation: "やあ".into(), speaker: None }];
         assert_eq!(to_srt(&e, true), "1\n01:02:03,004 --> 01:02:05,000\nHi\nやあ\n");
+        let e = [Entry { speaker: Some(1), ..e[0].clone() }];
+        assert_eq!(to_srt(&e, false), "1\n01:02:03,004 --> 01:02:05,000\n[B] やあ\n");
     }
 }
