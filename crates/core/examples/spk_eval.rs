@@ -230,13 +230,29 @@ fn offline(segs: &[Segment], threshold: f32) -> Vec<Option<u32>> {
     label
 }
 
+/// Fixed thresholds, fixed thresholds after centering, and thresholds that follow the recording.
 fn grid() -> Vec<ClusterConfig> {
     let mut out = vec![];
+    let base = ClusterConfig { stick: 0.0, merge: 0.7, ..Default::default() };
     for assign in [0.3f32, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7] {
         for gap in [0.05f32, 0.1, 0.15, 0.2] {
-            for stick in [0.0f32, 0.05, 0.1] {
-                for merge in [0.7f32, 0.8, 0.9] {
-                    out.push(ClusterConfig { assign, new_speaker: assign - gap, stick, merge, ..Default::default() });
+            for stick in [0.0f32, 0.05] {
+                out.push(ClusterConfig { assign, new_speaker: assign - gap, stick, ..base });
+            }
+        }
+    }
+    for center in [0.5f32, 1.0] {
+        for assign in [-0.1f32, 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6] {
+            for gap in [0.05f32, 0.1, 0.2, 0.3] {
+                out.push(ClusterConfig { assign, new_speaker: assign - gap, center, merge: 0.8, ..base });
+            }
+        }
+    }
+    for center in [0.0f32, 0.5] {
+        for ag in [0.1f32, 0.15, 0.2, 0.25, 0.3, 0.35] {
+            for extra in [0.05f32, 0.1, 0.15, 0.2] {
+                for prior in [0.6f32, 0.7] {
+                    out.push(ClusterConfig { adaptive: true, adapt_assign_gap: ag, adapt_new_gap: ag + extra, within_prior: prior, center, merge: 0.8, ..base });
                 }
             }
         }
@@ -244,11 +260,27 @@ fn grid() -> Vec<ClusterConfig> {
     out
 }
 
+fn family(c: &ClusterConfig) -> usize {
+    match (c.adaptive, c.center > 0.0) {
+        (false, false) => 0,
+        (false, true) => 1,
+        (true, _) => 2,
+    }
+}
+
+fn desc(c: &ClusterConfig) -> String {
+    match c.adaptive {
+        false => format!("fixed{} assign {:.2} new {:.2} stick {:.2}", if c.center > 0.0 { format!(" centered {:.1}", c.center) } else { String::new() }, c.assign, c.new_speaker, c.stick),
+        true => format!("adaptive{} gaps {:.2}/{:.2} prior {:.1}", if c.center > 0.0 { format!(" centered {:.1}", c.center) } else { String::new() }, c.adapt_assign_gap, c.adapt_new_gap, c.within_prior),
+    }
+}
+
 fn cv(a: &[String]) {
     let pct = |x: f64| format!("{:5.1}%", x * 100.0);
     let cfgs = grid();
     // Per clip: name, then (spk err, caption acc, speakers, reference speakers) for every setting.
     let mut table: Vec<(String, Vec<(f64, f64, usize)>, usize)> = vec![];
+    let _ = pct;
     for t in a.chunks(3) {
         let report: Report = serde_json::from_str(&std::fs::read_to_string(&t[0]).unwrap()).unwrap();
         let rttm = std::fs::read_to_string(&t[1]).unwrap();
@@ -259,16 +291,30 @@ fn cv(a: &[String]) {
             let ok = scored(&r, 0.25);
             let n_ref = names.iter().enumerate().filter(|(i, _)| r.iter().any(|f| f.contains(i))).count();
             let row = cfgs.iter().map(|&c| { let s = score(&r, &ok, names.len(), &clip.segments, &online_as_shown(&clip.segments, c)); (s.spk_err, s.caption_acc, s.n_hyp) }).collect();
-            table.push((format!("{} ({})", clip.name, t[0]), row, n_ref));
+            let file = std::path::Path::new(&t[0]).file_stem().map_or(String::new(), |f| f.to_string_lossy().into_owned());
+            table.push((file, row, n_ref));
         }
     }
+    let _n = table.len();
+    let all = table.clone();
+    for fam in 0..3 {
+        let keep: Vec<usize> = (0..cfgs.len()).filter(|&k| family(&cfgs[k]) == fam).collect();
+        let sub: Vec<_> = all.iter().map(|(name, row, r)| (name.clone(), keep.iter().map(|&k| row[k]).collect::<Vec<_>>(), *r)).collect();
+        let sub_cfgs: Vec<_> = keep.iter().map(|&k| cfgs[k]).collect();
+        println!("\n=== {} ===", ["fixed thresholds", "centered, fixed thresholds", "adaptive thresholds"][fam]);
+        cv_table(&sub, &sub_cfgs, fam == 0);
+    }
+}
+
+fn cv_table(table: &[(String, Vec<(f64, f64, usize)>, usize)], cfgs: &[ClusterConfig], with_default: bool) {
+    let pct = |x: f64| format!("{:5.1}%", x * 100.0);
     let n = table.len();
     let mean = |k: usize, skip: Option<usize>| (0..n).filter(|&i| Some(i) != skip).map(|i| table[i].1[k].0).sum::<f64>() / (n - skip.map_or(0, |_| 1)).max(1) as f64;
     let argmin = |skip: Option<usize>| (0..cfgs.len()).min_by(|&x, &y| mean(x, skip).total_cmp(&mean(y, skip))).unwrap();
-    let d = cfgs.iter().position(|c| c.assign == 0.5 && (c.new_speaker - 0.35).abs() < 1e-6 && c.stick == 0.05 && c.merge == 0.8).unwrap();
-    let desc = |c: &ClusterConfig| format!("assign {:.2} new {:.2} stick {:.2} merge {:.1}", c.assign, c.new_speaker, c.stick, c.merge);
+    // The round-1 default is not in the grid any more; the nearest fixed setting stands in (or the first).
+    let d = if with_default { cfgs.iter().position(|c| c.assign == 0.5 && (c.new_speaker - 0.35).abs() < 1e-6 && c.stick == 0.05).unwrap_or(0) } else { 0 };
     println!("{n} clips; spk err = wrong speaker share of frames where one reference speaker and the captions both speak\n");
-    println!("{:<60} {:>14} {:>14} {:>14}", "held-out clip", "default", "tuned on rest", "own best");
+    println!("{:<60} {:>14} {:>14} {:>14}", "held-out clip", if with_default { "0.50/0.35" } else { "first" }, "tuned on rest", "own best");
     let (mut sd, mut sc, mut so) = (0.0, 0.0, 0.0);
     for i in 0..n {
         let k = argmin(Some(i));
@@ -279,9 +325,18 @@ fn cv(a: &[String]) {
     }
     let m = n as f64;
     println!("{:<60} {:>14} {:>14} {:>14}", "mean", pct(sd / m), pct(sc / m), pct(so / m));
+    // SPK_TRAIN=k: one setting chosen on the first k clips, scored on the others (e.g. clean -> shifted audio).
+    if let Some(k) = std::env::var("SPK_TRAIN").ok().and_then(|v| v.parse::<usize>().ok()).filter(|&k| k > 0 && k < n) {
+        let train = |c: usize| (0..k).map(|i| table[i].1[c].0).sum::<f64>() / k as f64;
+        let best = (0..cfgs.len()).min_by(|&x, &y| train(x).total_cmp(&train(y))).unwrap();
+        println!("\nchosen on the first {k} clips: {} (their mean {}); on the others:", desc(&cfgs[best]), pct(train(best)));
+        for (name, row, n_ref) in &table[k..] {
+            println!("  {:<58} spk err {}  caption acc {}  speakers {}/{}", name, pct(row[best].0), pct(row[best].1), row[best].2, n_ref);
+        }
+    }
     let g = argmin(None);
     println!("\nbest single setting on all clips: {} (mean spk err {})", desc(&cfgs[g]), pct(mean(g, None)));
-    for (name, row, n_ref) in &table {
+    for (name, row, n_ref) in table {
         println!("  {:<58} spk err {}  caption acc {}  speakers {}/{}", name, pct(row[g].0), pct(row[g].1), row[g].2, n_ref);
     }
 }
