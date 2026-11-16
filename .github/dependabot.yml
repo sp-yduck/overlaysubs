@@ -32,6 +32,13 @@ updates:
       - "github-actions"
     commit-message:
       prefix: "chore(ci)"
+    ignore:
+      # release.yml pins dtolnay/rust-toolchain to 1.99.0 on purpose (the last Rust with the
+      # build/<crate>-<hash>/out layout that llama-cpp-sys-2 and our DLL/dylib copy steps need;
+      # see the comment there). The action also has branches for Rust versions that are not
+      # released yet (e.g. 1.120.0), so Dependabot proposes bumps that fail at install time.
+      # Update this pin by hand once llama-cpp-rs supports the new layout.
+      - dependency-name: "dtolnay/rust-toolchain"
     groups:
       github-actions:
         applies-to: "version-updates"
