@@ -132,6 +132,12 @@ impl Clusterer {
         id
     }
 
+    /// The speaker `assign` would give, without changing anything: for drafts, which are heard again.
+    /// A voice nobody has yet gets the id the next new speaker will have.
+    pub fn peek(&self, emb: Option<&[f32]>, dur_s: f32) -> Option<u32> {
+        self.clone().assign(emb, dur_s).0
+    }
+
     /// Labels one segment of `dur_s` seconds; `emb` is None when it was too short or failed to embed.
     /// Returns the speaker (None until the first speaker is known), the best similarity and the decision.
     pub fn assign(&mut self, emb: Option<&[f32]>, dur_s: f32) -> (Option<u32>, f32, Decision) {

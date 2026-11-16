@@ -336,6 +336,8 @@ impl Session {
             let audio = Audio { pcm: &pcm, start, skip, word_ends: &word_ends };
             return self.finalize(text, t.lang, start_ms, self.pos_ms, audio, mt, emit);
         }
+        // Where the draft's own audio starts in `pcm`.
+        let mut draft_from = skip;
         let prev = self.prev.take().filter(|_| self.early_commit);
         if let Some((b, end)) = prev.and_then(|prev| stable_head(&prev, &text, &word_ends)).filter(|&(_, end)| end > 0 && end <= pcm.len()) {
             let (head, tail) = (text[..b].trim().to_string(), text[b..].trim().to_string());
@@ -356,6 +358,7 @@ impl Session {
                 });
             }
             self.early_commits += 1;
+            draft_from = end;
             text = tail;
         }
         self.prev = Some(text.clone());
@@ -367,10 +370,26 @@ impl Session {
         }
         let translation = self.translate(&text, &t.lang, mt, &mut |_| {})?;
         if has_words(&translation) {
-            let speaker = self.embedder.as_ref().and(self.speakers.last());
+            let speaker = self.draft_speaker(&pcm[draft_from.min(pcm.len())..]);
             emit(Caption { id: self.next_id, stage: Stage::Partial, lang: t.lang, source: text, translation, speaker });
         }
         Ok(())
+    }
+
+    /// Who is speaking in a draft, from its most recent audio (the draft follows the current speaker, and its last
+    /// seconds are cheap to embed); nothing is learned from it. Too little audio keeps the last speaker.
+    fn draft_speaker(&mut self, pcm: &[f32]) -> Option<u32> {
+        const RECENT: usize = 6 * RATE;
+        let embedder = self.embedder.as_mut()?;
+        let pcm = &pcm[pcm.len().saturating_sub(RECENT)..];
+        let dur = pcm.len() as f32 / RATE as f32;
+        if dur < self.speakers.cfg.min_embed_s {
+            return self.speakers.last();
+        }
+        let t0 = std::time::Instant::now();
+        let emb = embedder.embed(pcm).ok();
+        self.embed_s += t0.elapsed().as_secs_f64();
+        self.speakers.peek(emb.as_deref(), dur)
     }
 
     /// The speaker of `audio.pcm[from..to]`; None without an embedder. A failed embedding is treated as too short.
@@ -799,5 +818,22 @@ mod tests {
         assert_eq!(ends.iter().map(|&e| &text[..e]).collect::<Vec<_>>(), ["Hello there.", "Hello there.  Hi!  This is it"], "a short sentence joins the next");
         let ja = "ありがとうございます。まず、来月の納品です。";
         assert_eq!(sentence_ends(ja, &split_sentences(ja)), [33, ja.len()]);
+    }
+
+    #[test]
+    fn a_draft_follows_the_current_voice_without_learning_from_it() {
+        let mut s = Session::new(SessionConfig::default());
+        s.embedder = Some(Box::new(LevelVoice));
+        let mut caps = vec![];
+        let mut a = asr(vec!["Hello there my friend.", "So what do you", "So what do you think"]);
+        s.handle(Event::Final { pcm: voices(&[(0.1, 4)]), start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        // A new voice talks: its draft gets a new id right away, before anything is committed.
+        s.handle(Event::Partial { pcm: voices(&[(0.2, 4)]), start: 4 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        let last = caps.last().unwrap();
+        assert_eq!((last.stage, last.speaker), (Stage::Partial, Some(1)));
+        assert_eq!(s.speakers.speakers(), 1, "a draft does not create the speaker");
+        // Under a second of draft audio keeps the last speaker.
+        s.handle(Event::Partial { pcm: voices(&[(0.2, 4)])[..SEC / 2].to_vec(), start: 4 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        assert_eq!(caps.last().unwrap().speaker, Some(0));
     }
 }
