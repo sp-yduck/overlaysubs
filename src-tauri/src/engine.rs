@@ -180,6 +180,31 @@ impl Vad for Silero {
     }
 }
 
+/// Speaker embeddings from a sherpa-onnx speaker model (3D-Speaker CAM++, WeSpeaker ResNet, …), on the CPU.
+#[cfg(feature = "diarize")]
+pub struct Voice(sherpa_onnx::SpeakerEmbeddingExtractor);
+
+#[cfg(feature = "diarize")]
+impl Voice {
+    pub fn load(model: &Path, threads: usize) -> Result<Self, String> {
+        let cfg = sherpa_onnx::SpeakerEmbeddingExtractorConfig { model: Some(model.to_string_lossy().into_owned()), num_threads: threads as i32, ..Default::default() };
+        sherpa_onnx::SpeakerEmbeddingExtractor::create(&cfg).map(Self).ok_or_else(|| format!("cannot load speaker model {}", model.display()))
+    }
+}
+
+#[cfg(feature = "diarize")]
+impl overlaysubs_core::speaker::Embedder for Voice {
+    fn embed(&mut self, pcm: &[f32]) -> Result<Vec<f32>, String> {
+        let st = self.0.create_stream().ok_or("cannot create a speaker stream")?;
+        st.accept_waveform(16_000, pcm);
+        st.input_finished();
+        if !self.0.is_ready(&st) {
+            return Err("too little audio for a speaker embedding".into());
+        }
+        self.0.compute(&st).ok_or_else(|| "speaker embedding failed".into())
+    }
+}
+
 pub struct Plamo {
     backend: LlamaBackend,
     model: LlamaModel,
@@ -457,12 +482,20 @@ mod tests {
         /// Against `<clip>.txt` / `<clip>.tr.txt` next to the WAV, when present.
         cer: Option<f64>,
         tr_cer: Option<f64>,
+        /// With OVERLAYSUBS_SPK: seconds embedding, speakers found and every labelled sentence.
+        #[serde(default)]
+        embed_s: f64,
+        #[serde(default)]
+        speakers: usize,
+        #[serde(default)]
+        segments: Vec<overlaysubs_core::speaker::Segment>,
     }
 
     /// Speed and quality of the whole pipeline on recorded clips, replayed as live audio.
     /// Run it with scripts/bench.sh, which documents the inputs. Env: OVERLAYSUBS_WAV (a 16 kHz mono WAV or a
     /// folder of them), OVERLAYSUBS_OUT (report path), OVERLAYSUBS_BASELINE (an earlier report to compare with),
-    /// OVERLAYSUBS_ASR / OVERLAYSUBS_MT (model ids), OVERLAYSUBS_GPU=1.
+    /// OVERLAYSUBS_ASR / OVERLAYSUBS_MT (model ids), OVERLAYSUBS_GPU=1, OVERLAYSUBS_SPK (a sherpa-onnx speaker
+    /// model; needs `--features diarize`) with OVERLAYSUBS_SPK_CFG (a JSON `ClusterConfig`, optional).
     #[test]
     #[ignore]
     fn bench_report() {
@@ -505,6 +538,13 @@ mod tests {
             let vad_s = t0.elapsed().as_secs_f64();
             (asr.1, mt.1) = (Duration::ZERO, Duration::ZERO);
             let mut s = Session::new(SessionConfig::default());
+            #[cfg(feature = "diarize")]
+            if let Ok(spk) = std::env::var("OVERLAYSUBS_SPK") {
+                s.embedder = Some(Box::new(Voice::load(Path::new(&spk), 2).unwrap()));
+                if let Ok(cfg) = std::env::var("OVERLAYSUBS_SPK_CFG") {
+                    s.speakers.cfg = serde_json::from_str(&cfg).unwrap();
+                }
+            }
             let mut seen = 0;
             let mut r = replay(evs, |(ev, pos)| {
                 s.tick(pos - seen);
@@ -533,6 +573,9 @@ mod tests {
                 tr_cer: reference("tr.txt", &translation),
                 source,
                 translation,
+                embed_s: s.embed_s,
+                speakers: s.speakers.speakers(),
+                segments: std::mem::take(&mut s.segments),
             });
         }
 
@@ -555,6 +598,10 @@ mod tests {
             row("asr s", c.asr_s, b.map(|b| b.asr_s));
             row("translate s", c.mt_s, b.map(|b| b.mt_s));
             row("vad s", c.vad_s, b.map(|b| b.vad_s));
+            if !c.segments.is_empty() {
+                row("embed s", c.embed_s, b.map(|b| b.embed_s));
+                row("speakers", c.speakers as f64, b.map(|b| b.speakers as f64));
+            }
             row("partials run", c.partials_run as f64, b.map(|b| b.partials_run as f64));
             row("partials skipped", c.partials_skipped as f64, b.map(|b| b.partials_skipped as f64));
             match b {
