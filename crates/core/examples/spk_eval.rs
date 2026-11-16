@@ -4,6 +4,10 @@
 //!
 //! cargo run -p overlaysubs-core --example spk_eval -- <report.json> <ref.rttm> [offset_s] [collar_s]
 //! offset_s: where the clip starts in the RTTM's recording.
+//!
+//! cargo run -p overlaysubs-core --example spk_eval -- --cv <report.json> <ref.rttm> <offset_s> [<report> <rttm> <offset> ...]
+//! Leave-one-out: settings chosen on all other clips, scored on the one left out, so the numbers say how fixed
+//! settings do on audio they were not tuned on.
 use overlaysubs_core::speaker::{ClusterConfig, Clusterer, Segment};
 use serde::Deserialize;
 
@@ -226,8 +230,67 @@ fn offline(segs: &[Segment], threshold: f32) -> Vec<Option<u32>> {
     label
 }
 
+fn grid() -> Vec<ClusterConfig> {
+    let mut out = vec![];
+    for assign in [0.3f32, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7] {
+        for gap in [0.05f32, 0.1, 0.15, 0.2] {
+            for stick in [0.0f32, 0.05, 0.1] {
+                for merge in [0.7f32, 0.8, 0.9] {
+                    out.push(ClusterConfig { assign, new_speaker: assign - gap, stick, merge, ..Default::default() });
+                }
+            }
+        }
+    }
+    out
+}
+
+fn cv(a: &[String]) {
+    let pct = |x: f64| format!("{:5.1}%", x * 100.0);
+    let cfgs = grid();
+    // Per clip: name, then (spk err, caption acc, speakers, reference speakers) for every setting.
+    let mut table: Vec<(String, Vec<(f64, f64, usize)>, usize)> = vec![];
+    for t in a.chunks(3) {
+        let report: Report = serde_json::from_str(&std::fs::read_to_string(&t[0]).unwrap()).unwrap();
+        let rttm = std::fs::read_to_string(&t[1]).unwrap();
+        let offset: f64 = t[2].parse().unwrap();
+        for clip in &report.clips {
+            let frames = (clip.audio_s / FRAME_S) as usize;
+            let (r, names) = reference(&rttm, offset, frames);
+            let ok = scored(&r, 0.25);
+            let n_ref = names.iter().enumerate().filter(|(i, _)| r.iter().any(|f| f.contains(i))).count();
+            let row = cfgs.iter().map(|&c| { let s = score(&r, &ok, names.len(), &clip.segments, &online_as_shown(&clip.segments, c)); (s.spk_err, s.caption_acc, s.n_hyp) }).collect();
+            table.push((format!("{} ({})", clip.name, t[0]), row, n_ref));
+        }
+    }
+    let n = table.len();
+    let mean = |k: usize, skip: Option<usize>| (0..n).filter(|&i| Some(i) != skip).map(|i| table[i].1[k].0).sum::<f64>() / (n - skip.map_or(0, |_| 1)).max(1) as f64;
+    let argmin = |skip: Option<usize>| (0..cfgs.len()).min_by(|&x, &y| mean(x, skip).total_cmp(&mean(y, skip))).unwrap();
+    let d = cfgs.iter().position(|c| c.assign == 0.5 && (c.new_speaker - 0.35).abs() < 1e-6 && c.stick == 0.05 && c.merge == 0.8).unwrap();
+    let desc = |c: &ClusterConfig| format!("assign {:.2} new {:.2} stick {:.2} merge {:.1}", c.assign, c.new_speaker, c.stick, c.merge);
+    println!("{n} clips; spk err = wrong speaker share of frames where one reference speaker and the captions both speak\n");
+    println!("{:<60} {:>14} {:>14} {:>14}", "held-out clip", "default", "tuned on rest", "own best");
+    let (mut sd, mut sc, mut so) = (0.0, 0.0, 0.0);
+    for i in 0..n {
+        let k = argmin(Some(i));
+        let own = (0..cfgs.len()).min_by(|&x, &y| table[i].1[x].0.total_cmp(&table[i].1[y].0)).unwrap();
+        let cell = |k: usize| format!("{} ({}/{})", pct(table[i].1[k].0), table[i].1[k].2, table[i].2);
+        println!("{:<60} {:>14} {:>14} {:>14}   rest-best: {}", table[i].0, cell(d), cell(k), cell(own), desc(&cfgs[k]));
+        (sd, sc, so) = (sd + table[i].1[d].0, sc + table[i].1[k].0, so + table[i].1[own].0);
+    }
+    let m = n as f64;
+    println!("{:<60} {:>14} {:>14} {:>14}", "mean", pct(sd / m), pct(sc / m), pct(so / m));
+    let g = argmin(None);
+    println!("\nbest single setting on all clips: {} (mean spk err {})", desc(&cfgs[g]), pct(mean(g, None)));
+    for (name, row, n_ref) in &table {
+        println!("  {:<58} spk err {}  caption acc {}  speakers {}/{}", name, pct(row[g].0), pct(row[g].1), row[g].2, n_ref);
+    }
+}
+
 fn main() {
     let a: Vec<String> = std::env::args().collect();
+    if a.get(1).map(String::as_str) == Some("--cv") {
+        return cv(&a[2..]);
+    }
     assert!(a.len() >= 3, "usage: spk_eval <report.json> <ref.rttm> [offset_s] [collar_s]");
     let report: Report = serde_json::from_str(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();
     let rttm = std::fs::read_to_string(&a[2]).unwrap();
