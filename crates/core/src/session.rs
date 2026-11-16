@@ -243,6 +243,10 @@ pub struct Session {
     pub early_commit: bool,
     /// How many times sentences were committed before the final.
     pub early_commits: usize,
+    /// Commit at a change of speaker inside a draft (needs an embedder). Off by default.
+    pub speaker_commit: bool,
+    /// How many times that happened.
+    pub speaker_commits: usize,
     /// Stream position (samples) before which the audio is committed and no longer transcribed.
     committed: usize,
     /// The previous partial's text.
@@ -260,7 +264,7 @@ pub struct Session {
 
 impl Session {
     pub fn new(cfg: SessionConfig) -> Self {
-        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0, early_commit: true, early_commits: 0, committed: 0, prev: None, overlap: None, embedder: None, speakers: Clusterer::default(), segments: vec![], embed_s: 0.0 }
+        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0, early_commit: true, early_commits: 0, speaker_commit: false, speaker_commits: 0, committed: 0, prev: None, overlap: None, embedder: None, speakers: Clusterer::default(), segments: vec![], embed_s: 0.0 }
     }
 
     /// Advance the wall clock used for history timestamps (call with every captured chunk).
@@ -339,7 +343,14 @@ impl Session {
         // Where the draft's own audio starts in `pcm`.
         let mut draft_from = skip;
         let prev = self.prev.take().filter(|_| self.early_commit);
-        if let Some((b, end)) = prev.and_then(|prev| stable_head(&prev, &text, &word_ends)).filter(|&(_, end)| end > 0 && end <= pcm.len()) {
+        let stable = prev.and_then(|prev| stable_head(&prev, &text, &word_ends)).filter(|&(_, end)| end > 0 && end <= pcm.len());
+        // Someone else started talking before the sentence ended (no full stop, no pause): their first words
+        // start a new caption, and what came before is committed as the previous speaker's.
+        let turn = match stable {
+            None if self.speaker_commit => self.speaker_change(&pcm, draft_from, &text, &word_ends),
+            _ => None,
+        };
+        if let Some((b, end)) = stable.or(turn) {
             let (head, tail) = (text[..b].trim().to_string(), text[b..].trim().to_string());
             let head_words: Vec<_> = word_ends.iter().copied().filter(|&(o, _)| o <= b).collect();
             let audio = Audio { pcm: &pcm[..end], start, skip, word_ends: &head_words };
@@ -357,7 +368,10 @@ impl Session {
                     None => head,
                 });
             }
-            self.early_commits += 1;
+            match stable {
+                Some(_) => self.early_commits += 1,
+                None => self.speaker_commits += 1,
+            }
             draft_from = end;
             text = tail;
         }
@@ -374,6 +388,50 @@ impl Session {
             emit(Caption { id: self.next_id, stage: Stage::Partial, lang: t.lang, source: text, translation, speaker });
         }
         Ok(())
+    }
+
+    /// Where the speaker changes in a draft, as (byte offset in `text`, sample offset in `pcm`) of the last word
+    /// before the change: the draft's start and its last seconds sound like different speakers, and 2 s windows
+    /// every 0.5 s (labelled in order on a copy of the clusterer, so a voice heard for the first time gets an id of
+    /// its own) end with at least 3 s of the new voice after at least 1.5 s of the old one. Short replies inside a
+    /// turn are shorter than that and do not cut it.
+    fn speaker_change(&mut self, pcm: &[f32], from: usize, text: &str, word_ends: &[(usize, usize)]) -> Option<(usize, usize)> {
+        const WIN: usize = 2 * RATE;
+        const HOP: usize = RATE / 2;
+        const MIN_NEW: usize = 3 * RATE;
+        const MIN_OLD: usize = 3 * RATE / 2;
+        const SCAN: usize = 10 * RATE;
+        let from = from.min(pcm.len());
+        if pcm.len() - from < MIN_OLD + MIN_NEW || self.embedder.is_none() {
+            return None;
+        }
+        let t0 = std::time::Instant::now();
+        let mut embed = |s: &mut Self, a: usize, b: usize| s.embedder.as_mut().and_then(|e| e.embed(&pcm[a..b]).ok());
+        // Cheap check first: the draft's opening and its end.
+        let mut quick = self.speakers.clone();
+        let (head, tail) = (embed(self, from, from + WIN), embed(self, pcm.len() - WIN, pcm.len()));
+        let (a, b) = (quick.assign(head.as_deref(), 2.0).0, quick.assign(tail.as_deref(), 2.0).0);
+        let found = if a == b || a.is_none() {
+            None
+        } else {
+            let mut c = self.speakers.clone();
+            let starts: Vec<usize> = (pcm.len().saturating_sub(SCAN).max(from)..=pcm.len() - WIN).step_by(HOP).collect();
+            let labels: Vec<Option<u32>> = starts.iter().map(|&w| {
+                let e = embed(self, w, w + WIN);
+                c.assign(e.as_deref(), 2.0).0
+            }).collect();
+            let last = *labels.last()?;
+            let run = labels.iter().rev().take_while(|&&l| l == last).count();
+            let first_new = starts[labels.len() - run];
+            let change = first_new + WIN / 2;
+            let old_ok = labels.len() > run && change - from >= MIN_OLD;
+            (old_ok && pcm.len() - change >= MIN_NEW && last != labels[labels.len() - run - 1])
+                .then(|| word_ends.iter().copied().filter(|&(_, t)| t <= change + RATE / 5).last())
+                .flatten()
+                .filter(|&(o, _)| text[..o].trim().chars().count() >= MIN_SENTENCE_CHARS && has_words(&text[o..]))
+        };
+        self.embed_s += t0.elapsed().as_secs_f64();
+        found
     }
 
     /// Who is speaking in a draft, from its most recent audio (the draft follows the current speaker, and its last
@@ -835,5 +893,35 @@ mod tests {
         // Under a second of draft audio keeps the last speaker.
         s.handle(Event::Partial { pcm: voices(&[(0.2, 4)])[..SEC / 2].to_vec(), start: 4 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
         assert_eq!(caps.last().unwrap().speaker, Some(0));
+    }
+
+    #[test]
+    fn a_new_voice_inside_a_sentence_commits_what_came_before() {
+        let mut s = Session::new(SessionConfig::default());
+        s.embedder = Some(Box::new(LevelVoice));
+        s.speaker_commit = true;
+        let mut caps = vec![];
+        // One word per second; the first voice says five words, then the second interrupts. No full stop anywhere.
+        let mut a = asr(vec!["Hello there.", "so I was going to say that we could maybe", "that we could maybe"]);
+        s.handle(Event::Final { pcm: voices(&[(0.1, 3)]), start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        s.handle(Event::Partial { pcm: voices(&[(0.1, 5), (0.2, 5)]), start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        assert_eq!(s.speaker_commits, 1);
+        let committed: Vec<_> = s.entries.iter().map(|e| (e.source.as_str(), e.speaker)).collect();
+        assert_eq!(committed, [("Hello there.", Some(0)), ("so I was going to.", Some(0))], "cut at the change, about 5 s in");
+        let last = caps.last().unwrap();
+        assert_eq!((last.stage, last.source.as_str(), last.speaker), (Stage::Partial, "say that we could maybe", Some(1)));
+        assert_eq!(s.committed(), 3 * SEC + 4 * SEC, "the cut is a second before the change, as for an early commit");
+    }
+
+    #[test]
+    fn a_short_reply_does_not_cut_a_turn() {
+        let mut s = Session::new(SessionConfig::default());
+        s.embedder = Some(Box::new(LevelVoice));
+        s.speaker_commit = true;
+        let mut a = asr(vec!["Hello there.", "so I was going to say that we could maybe"]);
+        s.handle(Event::Final { pcm: voices(&[(0.1, 3)]), start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |_| {}).unwrap();
+        // Two seconds of the other voice at the end: under the 3 s needed.
+        s.handle(Event::Partial { pcm: voices(&[(0.1, 8), (0.2, 2)]), start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |_| {}).unwrap();
+        assert_eq!((s.speaker_commits, s.entries.len()), (0, 1));
     }
 }

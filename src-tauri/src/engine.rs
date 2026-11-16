@@ -488,6 +488,10 @@ mod tests {
         #[serde(default)]
         speakers: usize,
         #[serde(default)]
+        early_commits: usize,
+        #[serde(default)]
+        speaker_commits: usize,
+        #[serde(default)]
         segments: Vec<overlaysubs_core::speaker::Segment>,
     }
 
@@ -495,7 +499,7 @@ mod tests {
     /// Run it with scripts/bench.sh, which documents the inputs. Env: OVERLAYSUBS_WAV (a 16 kHz mono WAV or a
     /// folder of them), OVERLAYSUBS_OUT (report path), OVERLAYSUBS_BASELINE (an earlier report to compare with),
     /// OVERLAYSUBS_ASR / OVERLAYSUBS_MT (model ids), OVERLAYSUBS_GPU=1, OVERLAYSUBS_SPK (a sherpa-onnx speaker
-    /// model; needs `--features diarize`) with OVERLAYSUBS_SPK_CFG (a JSON `ClusterConfig`, optional).
+    /// model; needs `--features diarize`) with OVERLAYSUBS_SPK_CFG (a JSON `ClusterConfig`, optional) and OVERLAYSUBS_SPK_COMMIT=1 (commit at speaker changes).
     #[test]
     #[ignore]
     fn bench_report() {
@@ -541,6 +545,7 @@ mod tests {
             #[cfg(feature = "diarize")]
             if let Ok(spk) = std::env::var("OVERLAYSUBS_SPK") {
                 s.embedder = Some(Box::new(Voice::load(Path::new(&spk), 2).unwrap()));
+                s.speaker_commit = std::env::var("OVERLAYSUBS_SPK_COMMIT").is_ok_and(|v| v == "1");
                 if let Ok(cfg) = std::env::var("OVERLAYSUBS_SPK_CFG") {
                     s.speakers.cfg = serde_json::from_str(&cfg).unwrap();
                 }
@@ -575,6 +580,8 @@ mod tests {
                 translation,
                 embed_s: s.embed_s,
                 speakers: s.speakers.speakers(),
+                early_commits: s.early_commits,
+                speaker_commits: s.speaker_commits,
                 segments: std::mem::take(&mut s.segments),
             });
         }
@@ -601,6 +608,8 @@ mod tests {
             if !c.segments.is_empty() {
                 row("embed s", c.embed_s, b.map(|b| b.embed_s));
                 row("speakers", c.speakers as f64, b.map(|b| b.speakers as f64));
+                row("early commits", c.early_commits as f64, b.map(|b| b.early_commits as f64));
+                row("speaker commits", c.speaker_commits as f64, b.map(|b| b.speaker_commits as f64));
             }
             row("partials run", c.partials_run as f64, b.map(|b| b.partials_run as f64));
             row("partials skipped", c.partials_skipped as f64, b.map(|b| b.partials_skipped as f64));
