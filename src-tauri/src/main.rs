@@ -599,6 +599,8 @@ fn load_speaker_model(session: &mut Session, dir: &std::path::Path) {
         Ok(v) => {
             session.embedder = Some(Box::new(v));
             session.speakers.cfg = overlaysubs_core::speaker::ClusterConfig::recommended();
+            // PoC: a change of speaker inside a sentence starts a new caption (OVERLAYSUBS_SPK_COMMIT=0 turns it off).
+            session.speaker_commit = std::env::var("OVERLAYSUBS_SPK_COMMIT").map_or(true, |v| v != "0");
             log::info!("speaker labels on");
         }
         Err(e) => log::error!("speaker labels off: {e}"),
