@@ -537,7 +537,9 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     let source_hub = st.source_hub.clone();
     let session_id = st.session_seq.fetch_add(1, Ordering::SeqCst) + 1;
     let session_thread = std::thread::spawn(move || {
-        let mut session = Session::new(s.session);
+        let mut session = Session::new(s.session.clone());
+        #[cfg(feature = "diarize")]
+        load_speaker_model(&mut session, &models_dir(&emit_app, &s));
         let mut seen = 0;
         let mut emit = |c: Caption| {
             let _ = emit_app.emit("caption", &c);
@@ -581,6 +583,26 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     st.overlay_hide_pending.store(false, Ordering::SeqCst);
     set_overlay_visible(&app, true);
     app.emit("running", true).map_err(|e| e.to_string())
+}
+
+/// Speaker labels (PoC, `diarize` builds): on when a sherpa-onnx speaker model is in the models folder (or
+/// OVERLAYSUBS_SPK names one). Without one, captions have no speaker, as before.
+#[cfg(feature = "diarize")]
+fn load_speaker_model(session: &mut Session, dir: &std::path::Path) {
+    const FILE: &str = "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx";
+    let path = std::env::var_os("OVERLAYSUBS_SPK").map(PathBuf::from).unwrap_or_else(|| dir.join(FILE));
+    if !path.exists() {
+        log::info!("speaker labels off: no speaker model at {}", path.display());
+        return;
+    }
+    match engine::Voice::load(&path, 2) {
+        Ok(v) => {
+            session.embedder = Some(Box::new(v));
+            session.speakers.cfg = overlaysubs_core::speaker::ClusterConfig::recommended();
+            log::info!("speaker labels on");
+        }
+        Err(e) => log::error!("speaker labels off: {e}"),
+    }
 }
 
 #[tauri::command]

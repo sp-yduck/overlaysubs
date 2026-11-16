@@ -44,6 +44,14 @@ impl Default for ClusterConfig {
     }
 }
 
+impl ClusterConfig {
+    /// The PoC's pick (AMI meetings plus noise and telephone-band copies, leave-one-out): half the session's mean
+    /// voice off, then fixed thresholds. Plain fixed thresholds fell apart on audio unlike what they were tuned on.
+    pub fn recommended() -> Self {
+        Self { assign: 0.20, new_speaker: 0.15, stick: 0.0, merge: 0.8, center: 0.5, center_after: 5, ..Self::default() }
+    }
+}
+
 fn normalized(v: &[f32]) -> Vec<f32> {
     let n = v.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-12);
     v.iter().map(|x| x / n).collect()
