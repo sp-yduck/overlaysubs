@@ -601,7 +601,20 @@ fn load_speaker_model(session: &mut Session, dir: &std::path::Path) {
             session.speakers.cfg = overlaysubs_core::speaker::ClusterConfig::recommended();
             // PoC: a change of speaker inside a sentence starts a new caption (OVERLAYSUBS_SPK_COMMIT=0 turns it off).
             session.speaker_commit = std::env::var("OVERLAYSUBS_SPK_COMMIT").map_or(true, |v| v != "0");
-            log::info!("speaker labels on");
+            // The change is found with the segmentation model when it is in the models folder
+            // (OVERLAYSUBS_SPK_SEG=0 falls back to comparing embeddings, or names another file).
+            const SEG: &str = "pyannote-segmentation-3.0.onnx";
+            let seg = match std::env::var_os("OVERLAYSUBS_SPK_SEG") {
+                Some(v) if v == "0" => None,
+                Some(v) => Some(PathBuf::from(v)),
+                None => Some(dir.join(SEG)),
+            };
+            match seg.filter(|p| p.exists()).map(|p| engine::Segmentation::load(&p, 2)) {
+                Some(Ok(s)) => session.segmenter = Some(Box::new(s)),
+                Some(Err(e)) => log::error!("speaker segmentation off: {e}"),
+                None => log::info!("speaker segmentation off: no {SEG}"),
+            }
+            log::info!("speaker labels on (segmentation: {})", session.segmenter.is_some());
         }
         Err(e) => log::error!("speaker labels off: {e}"),
     }

@@ -205,6 +205,51 @@ impl overlaysubs_core::speaker::Embedder for Voice {
     }
 }
 
+/// Speaker segmentation (pyannote segmentation-3.0 ONNX) on the CPU, run with the ONNX Runtime that sherpa-onnx
+/// ships next to the exe. The model gives, per 270-sample frame, one of 7 classes: nobody, one of 3 local
+/// voices, or a pair of them.
+#[cfg(feature = "diarize")]
+pub struct Segmentation(ort::session::Session);
+
+#[cfg(feature = "diarize")]
+impl Segmentation {
+    pub fn load(model: &Path, threads: usize) -> Result<Self, String> {
+        static ENV: std::sync::OnceLock<Result<ort::environment::Environment, String>> = std::sync::OnceLock::new();
+        // The exe's own copy (Windows would find a System32 one first by name).
+        let dll = std::env::var_os("ORT_DYLIB_PATH").map(std::path::PathBuf::from).unwrap_or_else(|| {
+            let name = if cfg!(windows) { "onnxruntime.dll" } else if cfg!(target_os = "macos") { "libonnxruntime.dylib" } else { "libonnxruntime.so" };
+            std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join(name))).unwrap_or_else(|| std::path::PathBuf::from(name))
+        });
+        let env = ENV
+            .get_or_init(|| ort::init_from(&dll).map_err(|e| format!("cannot load {}: {e}", dll.display()))?.build().map_err(|e| e.to_string()))
+            .as_ref()
+            .map_err(|e| e.clone())?;
+        let session = ort::session::Session::builder(env)
+            .map_err(|e| e.to_string())?
+            .with_intra_threads(threads)
+            .map_err(|e| e.to_string())?
+            .with_inter_threads(1)
+            .map_err(|e| e.to_string())?
+            .commit_from_file(model)
+            .map_err(|e| format!("cannot load segmentation model {}: {e}", model.display()))?;
+        Ok(Self(session))
+    }
+}
+
+#[cfg(feature = "diarize")]
+impl overlaysubs_core::speaker::Segmenter for Segmentation {
+    fn segment(&mut self, pcm: &[f32]) -> Result<(Vec<u8>, usize), String> {
+        // Powerset classes -> local voice bit masks: {}, {0}, {1}, {2}, {0,1}, {0,2}, {1,2}.
+        const MASKS: [u8; 7] = [0, 1, 2, 4, 3, 5, 6];
+        let x = ort::value::Tensor::from_array(([1usize, 1, pcm.len()], pcm.to_vec())).map_err(|e| e.to_string())?;
+        let out = self.0.run(ort::inputs!["x" => x]).map_err(|e| e.to_string())?;
+        let (shape, y) = out["y"].try_extract_tensor::<f32>().map_err(|e| e.to_string())?;
+        let classes = *shape.last().ok_or("no output shape")? as usize;
+        let frames = y.chunks(classes).map(|c| MASKS[c.iter().enumerate().max_by(|a, b| a.1.total_cmp(b.1)).map_or(0, |(i, _)| i).min(6)]).collect();
+        Ok((frames, 270))
+    }
+}
+
 pub struct Plamo {
     backend: LlamaBackend,
     model: LlamaModel,
@@ -491,6 +536,9 @@ mod tests {
         early_commits: usize,
         #[serde(default)]
         speaker_commits: usize,
+        /// With OVERLAYSUBS_SPK_SEG: seconds in the speaker segmentation model.
+        #[serde(default)]
+        segment_s: f64,
         #[serde(default)]
         segments: Vec<overlaysubs_core::speaker::Segment>,
     }
@@ -499,7 +547,7 @@ mod tests {
     /// Run it with scripts/bench.sh, which documents the inputs. Env: OVERLAYSUBS_WAV (a 16 kHz mono WAV or a
     /// folder of them), OVERLAYSUBS_OUT (report path), OVERLAYSUBS_BASELINE (an earlier report to compare with),
     /// OVERLAYSUBS_ASR / OVERLAYSUBS_MT (model ids), OVERLAYSUBS_GPU=1, OVERLAYSUBS_SPK (a sherpa-onnx speaker
-    /// model; needs `--features diarize`) with OVERLAYSUBS_SPK_CFG (a JSON `ClusterConfig`, optional) and OVERLAYSUBS_SPK_COMMIT=1 (commit at speaker changes).
+    /// model; needs `--features diarize`) with OVERLAYSUBS_SPK_CFG (a JSON `ClusterConfig`, optional) and OVERLAYSUBS_SPK_COMMIT=1 (commit at speaker changes; found with the segmentation model OVERLAYSUBS_SPK_SEG when set).
     #[test]
     #[ignore]
     fn bench_report() {
@@ -549,6 +597,9 @@ mod tests {
                 if let Ok(cfg) = std::env::var("OVERLAYSUBS_SPK_CFG") {
                     s.speakers.cfg = serde_json::from_str(&cfg).unwrap();
                 }
+                if let Ok(seg) = std::env::var("OVERLAYSUBS_SPK_SEG") {
+                    s.segmenter = Some(Box::new(Segmentation::load(Path::new(&seg), 2).unwrap()));
+                }
             }
             let mut seen = 0;
             let mut r = replay(evs, |(ev, pos)| {
@@ -582,6 +633,7 @@ mod tests {
                 speakers: s.speakers.speakers(),
                 early_commits: s.early_commits,
                 speaker_commits: s.speaker_commits,
+                segment_s: s.segment_s,
                 segments: std::mem::take(&mut s.segments),
             });
         }
@@ -610,6 +662,7 @@ mod tests {
                 row("speakers", c.speakers as f64, b.map(|b| b.speakers as f64));
                 row("early commits", c.early_commits as f64, b.map(|b| b.early_commits as f64));
                 row("speaker commits", c.speaker_commits as f64, b.map(|b| b.speaker_commits as f64));
+                row("segment s", c.segment_s, b.map(|b| b.segment_s));
             }
             row("partials run", c.partials_run as f64, b.map(|b| b.partials_run as f64));
             row("partials skipped", c.partials_skipped as f64, b.map(|b| b.partials_skipped as f64));

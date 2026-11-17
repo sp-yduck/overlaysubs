@@ -2,7 +2,7 @@
 use crate::endpoint::{Event, RATE};
 use crate::export::Entry;
 use crate::pfml::{Form, TranslateRequest};
-use crate::speaker::{Clusterer, Embedder, Segment};
+use crate::speaker::{Clusterer, Embedder, Segment, Segmenter};
 use serde::{Deserialize, Serialize};
 
 pub struct Transcript {
@@ -257,6 +257,11 @@ pub struct Session {
     overlap: Option<String>,
     /// Tells speakers apart when set.
     pub embedder: Option<Box<dyn Embedder>>,
+    /// Finds changes of speaker inside a draft when set (with `speaker_commit`); without one, windows of the
+    /// embedder are compared instead.
+    pub segmenter: Option<Box<dyn Segmenter>>,
+    /// Seconds spent in the segmenter.
+    pub segment_s: f64,
     pub speakers: Clusterer,
     /// Every committed sentence's speaker decision, for the benchmark.
     pub segments: Vec<Segment>,
@@ -266,7 +271,7 @@ pub struct Session {
 
 impl Session {
     pub fn new(cfg: SessionConfig) -> Self {
-        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0, early_commit: true, early_commits: 0, speaker_commit: false, speaker_commits: 0, pending_turn: None, committed: 0, prev: None, overlap: None, embedder: None, speakers: Clusterer::default(), segments: vec![], embed_s: 0.0 }
+        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0, early_commit: true, early_commits: 0, speaker_commit: false, speaker_commits: 0, pending_turn: None, committed: 0, prev: None, overlap: None, embedder: None, segmenter: None, segment_s: 0.0, speakers: Clusterer::default(), segments: vec![], embed_s: 0.0 }
     }
 
     /// Advance the wall clock used for history timestamps (call with every captured chunk).
@@ -351,7 +356,10 @@ impl Session {
         // A change is acted on only when two partials in a row put it in the same place (within half a second).
         let turn = match stable {
             None if self.speaker_commit => {
-                let found = self.speaker_change(&pcm, draft_from, &text, &word_ends);
+                let found = match self.segmenter.is_some() {
+                    true => self.voice_change(&pcm, draft_from, &text, &word_ends),
+                    false => self.speaker_change(&pcm, draft_from, &text, &word_ends),
+                };
                 let pending = self.pending_turn.take();
                 match found {
                     Some((_, end)) if pending.is_some_and(|p| p.abs_diff(start + end) <= RATE / 2) => found,
@@ -452,6 +460,31 @@ impl Session {
         };
         self.embed_s += t0.elapsed().as_secs_f64();
         found
+    }
+
+    /// Like `speaker_change`, from the segmenter over the draft's last 10 s: the main voice changes to one that
+    /// then talks at least 1.5 s, after at least 0.5 s of the previous one. The cut is the end of the last word
+    /// that ends at or before the change.
+    fn voice_change(&mut self, pcm: &[f32], from: usize, text: &str, word_ends: &[(usize, usize)]) -> Option<(usize, usize)> {
+        const SCAN: usize = 10 * RATE;
+        const MIN_NEW: usize = 3 * RATE / 2;
+        const MIN_OLD: usize = RATE / 2;
+        let from = from.min(pcm.len());
+        if pcm.len() - from < MIN_OLD + MIN_NEW {
+            return None;
+        }
+        let a = pcm.len().saturating_sub(SCAN).max(from);
+        let t0 = std::time::Instant::now();
+        let seg = self.segmenter.as_mut()?.segment(&pcm[a..]).map_err(|e| log::warn!("speaker segmentation: {e}")).ok();
+        self.segment_s += t0.elapsed().as_secs_f64();
+        let (frames, step) = seg?;
+        let change = a + crate::speaker::voice_change(&frames, step, MIN_NEW, MIN_OLD)?;
+        word_ends
+            .iter()
+            .copied()
+            .filter(|&(_, t)| t <= change)
+            .last()
+            .filter(|&(o, _)| text[..o].trim().chars().count() >= MIN_SENTENCE_CHARS && has_words(&text[o..]))
     }
 
     /// Who is speaking in a draft, from its most recent audio (the draft follows the current speaker, and its last
@@ -933,6 +966,50 @@ mod tests {
         let last = caps.last().unwrap();
         assert_eq!((last.stage, last.source.as_str(), last.speaker), (Stage::Partial, "say that we could maybe now", Some(1)));
         assert_eq!(s.committed(), 3 * SEC + 5 * SEC, "cut right at the change, nothing heard again");
+    }
+
+    /// Segmentation from the audio's level, like `LevelVoice`: 0.1 is local voice 0, 0.2 voice 1; 0.1 s frames.
+    struct LevelSegmenter;
+    impl Segmenter for LevelSegmenter {
+        fn segment(&mut self, pcm: &[f32]) -> Result<(Vec<u8>, usize), String> {
+            Ok((pcm.chunks(SEC / 10).map(|c| if c[0] == 0.0 { 0 } else if c[0] < 0.15 { 1 } else { 2 }).collect(), SEC / 10))
+        }
+    }
+
+    #[test]
+    fn the_segmenter_finds_the_change_and_two_partials_confirm_it() {
+        let mut s = Session::new(SessionConfig::default());
+        s.embedder = Some(Box::new(LevelVoice));
+        s.segmenter = Some(Box::new(LevelSegmenter));
+        s.speaker_commit = true;
+        let mut caps = vec![];
+        let mut a = asr(vec!["Hello there.", "so I was going to say that we could maybe", "so I was going to say that we could maybe now"]);
+        s.handle(Event::Final { pcm: voices(&[(0.1, 3)]), start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        // The new voice talks 2 s (over the 1.5 s needed): found, but one partial alone does not cut.
+        s.handle(Event::Partial { pcm: voices(&[(0.1, 5), (0.2, 2)]), start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        assert_eq!(s.speaker_commits, 0);
+        s.handle(Event::Partial { pcm: voices(&[(0.1, 5), (0.2, 3)]), start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
+        assert_eq!(s.speaker_commits, 1);
+        let committed: Vec<_> = s.entries.iter().map(|e| (e.source.as_str(), e.speaker)).collect();
+        assert_eq!(committed, [("Hello there.", Some(0)), ("so I was going to.", Some(0))], "cut at the last word end before the change (5 s)");
+        assert_eq!(s.committed(), 3 * SEC + 5 * SEC, "cut right at it, nothing heard again");
+        assert!(s.segment_s > 0.0);
+        let last = caps.last().unwrap();
+        assert_eq!((last.source.as_str(), last.speaker), ("say that we could maybe now", Some(1)));
+    }
+
+    #[test]
+    fn the_segmenter_ignores_a_short_reply() {
+        let mut s = Session::new(SessionConfig::default());
+        s.embedder = Some(Box::new(LevelVoice));
+        s.segmenter = Some(Box::new(LevelSegmenter));
+        s.speaker_commit = true;
+        let mut a = asr(vec!["Hello there.", "so I was going to say that we could maybe", "so I was going to say that we could maybe"]);
+        s.handle(Event::Final { pcm: voices(&[(0.1, 3)]), start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |_| {}).unwrap();
+        for _ in 0..2 {
+            s.handle(Event::Partial { pcm: voices(&[(0.1, 8), (0.2, 1), (0.1, 1)]), start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |_| {}).unwrap();
+        }
+        assert_eq!((s.speaker_commits, s.entries.len()), (0, 1));
     }
 
     #[test]

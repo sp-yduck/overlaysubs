@@ -7,6 +7,52 @@ pub trait Embedder: Send {
     fn embed(&mut self, pcm: &[f32]) -> Result<Vec<f32>, String>;
 }
 
+/// Who talks when, inside a short stretch of audio: a speaker segmentation model (pyannote segmentation-3.0)
+/// telling up to three local voices apart frame by frame. "Local": ids hold within one call only.
+pub trait Segmenter: Send {
+    /// One bit mask per frame (bit k: local voice k talks), and the frame step in samples. Frame i covers
+    /// about `i * step .. (i + 1) * step`.
+    fn segment(&mut self, pcm: &[f32]) -> Result<(Vec<u8>, usize), String>;
+}
+
+/// Where the main voice changes in `frames` (from `Segmenter::segment`, the audio starting at sample 0): the
+/// sample where a voice that then talks at least `min_new` samples takes over from one that talked at least
+/// `min_old` samples before it. Frames with no voice or two voices are skipped; gaps up to 0.3 s inside one
+/// voice's run are bridged. The last change wins.
+pub fn voice_change(frames: &[u8], step: usize, min_new: usize, min_old: usize) -> Option<usize> {
+    const RATE: usize = 16_000;
+    let bridge = RATE * 3 / 10;
+    // (start, end, voice) runs of frames with exactly one voice.
+    let mut runs: Vec<(usize, usize, u8)> = vec![];
+    for (i, &m) in frames.iter().enumerate() {
+        if m.count_ones() != 1 {
+            continue;
+        }
+        let (a, b) = (i * step, (i + 1) * step);
+        match runs.last_mut() {
+            Some(r) if r.2 == m && a <= r.1 + bridge => r.1 = b,
+            _ => runs.push((a, b, m)),
+        }
+    }
+    let mut found = None;
+    for j in 1..runs.len() {
+        let (new, old) = (runs[j], runs[j - 1]);
+        if new.2 == old.2 || new.1 - new.0 < min_new {
+            continue;
+        }
+        // The previous voice's own talking before the change, gaps and all, back to another voice's long run.
+        let stretch: Vec<_> = runs[..j].iter().rev().take_while(|r| r.2 == old.2 || r.1 - r.0 < min_new).collect();
+        let talked: usize = stretch.iter().filter(|r| r.2 == old.2).map(|r| r.1 - r.0).sum();
+        // A short interjection between two runs of the same voice is not a change of turn, either way.
+        let before = runs[..j - stretch.len()].last();
+        let interjection = talked < min_new && before.is_some_and(|b| b.2 == new.2);
+        if talked >= min_old && !interjection {
+            found = Some(new.0);
+        }
+    }
+    found
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ClusterConfig {
@@ -250,6 +296,32 @@ pub struct Segment {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Frames of 0.1 s with the given (voice bit mask, seconds) parts.
+    fn frames(parts: &[(u8, f32)]) -> Vec<u8> {
+        parts.iter().flat_map(|&(m, s)| std::iter::repeat_n(m, (s * 10.0).round() as usize)).collect()
+    }
+    const STEP: usize = 1600;
+
+    #[test]
+    fn a_voice_change_needs_enough_of_both_voices() {
+        let (new, old) = (24_000, 8_000); // 1.5 s, 0.5 s
+        assert_eq!(voice_change(&frames(&[(1, 3.0), (2, 2.0)]), STEP, new, old), Some(48_000));
+        assert_eq!(voice_change(&frames(&[(1, 3.0), (2, 1.0)]), STEP, new, old), None, "1 s of the new voice is a reply");
+        assert_eq!(voice_change(&frames(&[(1, 0.3), (2, 3.0)]), STEP, new, old), None, "0.3 s of the old voice is not a turn");
+        assert_eq!(voice_change(&frames(&[(2, 4.0)]), STEP, new, old), None);
+    }
+
+    #[test]
+    fn silence_and_overlap_do_not_break_a_voice_run() {
+        let (new, old) = (24_000, 8_000);
+        // Old voice, a short pause, old again, overlap, then the new voice with a short pause inside.
+        let f = frames(&[(1, 2.0), (0, 0.2), (1, 1.0), (3, 0.5), (2, 1.0), (0, 0.2), (2, 1.0)]);
+        assert_eq!(voice_change(&f, STEP, new, old), Some(37 * STEP), "the change is where the new voice starts alone");
+        // A 1 s backchannel by the other voice inside a long turn does not count, nor split the turn.
+        let f = frames(&[(1, 3.0), (2, 1.0), (1, 3.0)]);
+        assert_eq!(voice_change(&f, STEP, new, old), None);
+    }
 
     /// A unit vector along `axis` with a little of `noise_axis`.
     fn v(axis: usize, noise_axis: usize, noise: f32) -> Vec<f32> {

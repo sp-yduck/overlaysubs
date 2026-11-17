@@ -34,6 +34,8 @@ sysinfo = "0.40"
 # Speaker embeddings (PoC, `diarize` feature). Shared: the static Windows build links the static CRT (/MT),
 # which the rest of the app does not.
 sherpa-onnx = { version = "=2.0.1", optional = true, default-features = false, features = ["shared"] }
+# Speaker segmentation (pyannote segmentation-3.0, `diarize`): the ONNX Runtime sherpa-onnx ships (1.28), loaded at run time.
+ort = { version = "=2.0.0-rc.15", optional = true, default-features = false, features = ["std", "load-dynamic", "api-28"] }
 
 # macOS system audio comes from ScreenCaptureKit: cpal only sees input devices there, and a
 # loopback/virtual audio driver would have to be installed by the user.
@@ -50,4 +52,4 @@ windows = { version = "0.62", features = ["Win32_Storage_FileSystem"] }
 vulkan = ["whisper-rs/vulkan", "llama-cpp-2/vulkan"]
 cuda = ["whisper-rs/cuda", "llama-cpp-2/cuda"]
 metal = ["whisper-rs/metal", "llama-cpp-2/metal"]
-diarize = ["dep:sherpa-onnx"]
+diarize = ["dep:sherpa-onnx", "dep:ort"]
