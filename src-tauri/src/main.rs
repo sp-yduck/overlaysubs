@@ -33,6 +33,12 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 /// the GPU choices instead of offering a switch that the build cannot honour.
 const GPU_BUILD: bool = cfg!(any(feature = "vulkan", feature = "cuda", feature = "metal"));
 
+/// Speaker labels (`diarize` builds): the speaker embedding model, and the segmentation model that finds where
+/// the speaker changes, both looked up in the models folder.
+const SPEAKER_MODEL: &str = "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx";
+#[cfg(feature = "diarize")]
+const SEGMENTATION_MODEL: &str = "pyannote-segmentation-3.0.onnx";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 struct Settings {
@@ -61,6 +67,9 @@ struct Settings {
     browser_source_port: u16,
     /// Download the installer of a newer release in the background. It is only run when the user asks.
     auto_update: bool,
+    /// Tell speakers apart and color their captions (builds with the `diarize` feature, speaker model in the
+    /// models folder). Read when translation starts.
+    diarize: bool,
 }
 
 impl Default for Settings {
@@ -81,6 +90,7 @@ impl Default for Settings {
             browser_source: false,
             browser_source_port: 17777,
             auto_update: true,
+            diarize: false,
         }
     }
 }
@@ -237,6 +247,9 @@ struct Snapshot {
     hardware: Option<HardwareCache>,
     /// False in a build without a GPU backend; the settings UI then offers Auto / CPU only.
     gpu_build: bool,
+    /// Whether this build can tell speakers apart, and whether its speaker model is in the models folder.
+    diarize_build: bool,
+    diarize_ready: bool,
 }
 
 #[tauri::command]
@@ -252,11 +265,13 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
         settings,
         registry,
         downloaded,
-        models_dir: dir,
         platform: std::env::consts::OS,
         devices: capture::devices(),
         hardware: hw::cached(&config_dir(&app)),
         gpu_build: GPU_BUILD,
+        diarize_build: cfg!(feature = "diarize"),
+        diarize_ready: std::env::var_os("OVERLAYSUBS_SPK").map(PathBuf::from).unwrap_or_else(|| dir.join(SPEAKER_MODEL)).exists(),
+        models_dir: dir,
     })
 }
 
@@ -539,7 +554,9 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     let session_thread = std::thread::spawn(move || {
         let mut session = Session::new(s.session.clone());
         #[cfg(feature = "diarize")]
-        load_speaker_model(&mut session, &models_dir(&emit_app, &s));
+        if s.diarize {
+            load_speaker_model(&mut session, &models_dir(&emit_app, &s));
+        }
         let mut seen = 0;
         let mut emit = |c: Caption| {
             let _ = emit_app.emit("caption", &c);
@@ -589,8 +606,7 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
 /// OVERLAYSUBS_SPK names one). Without one, captions have no speaker, as before.
 #[cfg(feature = "diarize")]
 fn load_speaker_model(session: &mut Session, dir: &std::path::Path) {
-    const FILE: &str = "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx";
-    let path = std::env::var_os("OVERLAYSUBS_SPK").map(PathBuf::from).unwrap_or_else(|| dir.join(FILE));
+    let path = std::env::var_os("OVERLAYSUBS_SPK").map(PathBuf::from).unwrap_or_else(|| dir.join(SPEAKER_MODEL));
     if !path.exists() {
         log::info!("speaker labels off: no speaker model at {}", path.display());
         return;
@@ -603,7 +619,7 @@ fn load_speaker_model(session: &mut Session, dir: &std::path::Path) {
             session.speaker_commit = std::env::var("OVERLAYSUBS_SPK_COMMIT").map_or(true, |v| v != "0");
             // The change is found with the segmentation model when it is in the models folder
             // (OVERLAYSUBS_SPK_SEG=0 falls back to comparing embeddings, or names another file).
-            const SEG: &str = "pyannote-segmentation-3.0.onnx";
+            const SEG: &str = SEGMENTATION_MODEL;
             let seg = match std::env::var_os("OVERLAYSUBS_SPK_SEG") {
                 Some(v) if v == "0" => None,
                 Some(v) => Some(PathBuf::from(v)),

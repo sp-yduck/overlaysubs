@@ -246,10 +246,19 @@ function homePage() {
   <details class="card"><summary>${t("tuning")}</summary>
     ${select(t("form"), "session.form", opts([["", t("form_default")], ["plain", t("plain")], ["polite", t("polite")]], s.session.form), "nullable")}
     ${field(t("context"), "session.use_context", "check")}
+    ${diarizeField()}
     ${field(t("topic"), "session.topic", "text", `placeholder="${esc(t("topic_ph"))}"`)}
     <label class="f top"><span>${t("glossary")}</span><textarea data-k="session.glossary" data-t="glossary" placeholder="source=target">${esc(glossary)}</textarea></label>
   </details>
   ${card(t("recent"), `<div class="hist" data-hist="6"></div>`)}`;
+}
+
+/** Speaker colors: shown only in builds that can tell speakers apart, greyed out without the speaker model. */
+function diarizeField() {
+  if (!snap.diarize_build) return "";
+  const on = snap.settings.diarize && snap.diarize_ready;
+  return `<label class="chk"><input type="checkbox" data-k="diarize" data-t="check" ${on ? "checked" : ""} ${snap.diarize_ready ? "" : "disabled"}> ${esc(t("diarize"))}</label>
+    <p class="muted small">${t(snap.diarize_ready ? "diarize_note" : "diarize_missing")}</p>`;
 }
 
 const sourceUrl = () => `http://127.0.0.1:${snap.settings.browser_source_port}/`;
