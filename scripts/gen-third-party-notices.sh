@@ -309,6 +309,9 @@ term_matches() {
       case "$base" in *lgpl*) return 0 ;; esac
       return 1
       ;;
+    "bzip2-1.0.6")
+      grep -qF 'The original program, "bzip2", the associated library "libbzip2"' "$file"
+      ;;
     *)
       return 1
       ;;
@@ -631,8 +634,7 @@ SECTION2
         ;;
       "MIT-0")
         printf 'Note: `dunce` offers MIT-0 only as one of three alternatives\n'
-        printf '(CC0-1.0 OR MIT-0 OR Apache-2.0). The canonical SPDX text keeps the\n'
-        printf 'placeholder (<YEAR> <COPYRIGHT HOLDER>) copyright line.\n\n'
+        printf '(CC0-1.0 OR MIT-0 OR Apache-2.0).\n\n'
         ;;
     esac
     printf 'Applies to the following crates (name version):\n\n```text\n'
