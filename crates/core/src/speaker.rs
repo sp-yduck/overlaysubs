@@ -20,20 +20,12 @@ pub trait Segmenter: Send {
 /// `min_old` samples before it. Frames with no voice or two voices are skipped; gaps up to 0.3 s inside one
 /// voice's run are bridged. The last change wins.
 pub fn voice_change(frames: &[u8], step: usize, min_new: usize, min_old: usize) -> Option<usize> {
-    const RATE: usize = 16_000;
-    let bridge = RATE * 3 / 10;
-    // (start, end, voice) runs of frames with exactly one voice.
-    let mut runs: Vec<(usize, usize, u8)> = vec![];
-    for (i, &m) in frames.iter().enumerate() {
-        if m.count_ones() != 1 {
-            continue;
-        }
-        let (a, b) = (i * step, (i + 1) * step);
-        match runs.last_mut() {
-            Some(r) if r.2 == m && a <= r.1 + bridge => r.1 = b,
-            _ => runs.push((a, b, m)),
-        }
-    }
+    voice_turn(frames, step, min_new, min_old).map(|(c, _)| c)
+}
+
+/// `voice_change`, with how long (samples) the previous voice talked before the change.
+pub fn voice_turn(frames: &[u8], step: usize, min_new: usize, min_old: usize) -> Option<(usize, usize)> {
+    let runs = voice_runs(frames, step);
     let mut found = None;
     for j in 1..runs.len() {
         let (new, old) = (runs[j], runs[j - 1]);
@@ -47,10 +39,27 @@ pub fn voice_change(frames: &[u8], step: usize, min_new: usize, min_old: usize) 
         let before = runs[..j - stretch.len()].last();
         let interjection = talked < min_new && before.is_some_and(|b| b.2 == new.2);
         if talked >= min_old && !interjection {
-            found = Some(new.0);
+            found = Some((new.0, talked));
         }
     }
     found
+}
+
+/// (start, end, voice mask) runs of frames with exactly one voice, in samples; gaps up to 0.3 s are bridged.
+pub fn voice_runs(frames: &[u8], step: usize) -> Vec<(usize, usize, u8)> {
+    let bridge = 16_000 * 3 / 10;
+    let mut runs: Vec<(usize, usize, u8)> = vec![];
+    for (i, &m) in frames.iter().enumerate() {
+        if m.count_ones() != 1 {
+            continue;
+        }
+        let (a, b) = (i * step, (i + 1) * step);
+        match runs.last_mut() {
+            Some(r) if r.2 == m && a <= r.1 + bridge => r.1 = b,
+            _ => runs.push((a, b, m)),
+        }
+    }
+    runs
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
