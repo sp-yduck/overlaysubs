@@ -373,6 +373,8 @@ function render() {
   page ??= ready ? "home" : "models";
   const prev = $("#page");
   const keep = prev?.dataset.page === page ? prev.scrollTop : 0;
+  // A settings change re-renders the page; sections the user opened (<details>) stay open, matched by position.
+  const opened = prev?.dataset.page === page ? [...prev.querySelectorAll("details")].map((d) => d.open) : [];
   $("#app").className = "";
   $("#app").innerHTML = `
   <aside>
@@ -385,6 +387,7 @@ function render() {
     <select data-k="ui_lang" data-t="str" aria-label="${t("ui_lang")}">${opts([["en", "English"], ["ja", "日本語"], ["zh-hant", "繁體中文"], ["zh-hans", "简体中文"]], s.ui_lang)}</select>
   </aside>
   <section id="page" data-page="${page}">${updateBanner()}${PAGES[page]()}</section>`;
+  $("#page").querySelectorAll("details").forEach((d, i) => { if (opened[i]) d.open = true; });
   $("#page").scrollTop = keep;
   drawHistory();
   if (page === "about") { loadTerms(); loadLog(); }
