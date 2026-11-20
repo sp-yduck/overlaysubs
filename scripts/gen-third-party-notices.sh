@@ -554,7 +554,7 @@ SECTION2
       ggerganov/whisper.cpp) license='MIT (OpenAI Whisper weights, GGML conversion)' ;;
       ggml-org/whisper-vad) license='MIT (Silero VAD)' ;;
       pfnet/plamo-3-translate-*) license='PLaMo Community License, revised 2026-11-09 (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>)' ;;
-      k2-fsa/sherpa-onnx) license='Apache-2.0 (3D-Speaker CAM++, ONNX conversion by sherpa-onnx)' ;;
+      csukuangfj/speaker-embedding-models) license='Apache-2.0 (3D-Speaker CAM++, ONNX conversion by sherpa-onnx)' ;;
       csukuangfj/sherpa-onnx-pyannote-segmentation-3-0) license='MIT (pyannote segmentation-3.0, ONNX conversion)' ;;
       *) license='see model card' ;;
     esac
