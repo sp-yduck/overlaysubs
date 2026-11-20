@@ -258,7 +258,7 @@ function diarizeField() {
   if (!snap.diarize_build) return "";
   const on = snap.settings.diarize && snap.diarize_ready;
   return `<label class="chk"><input type="checkbox" data-k="diarize" data-t="check" ${on ? "checked" : ""} ${snap.diarize_ready ? "" : "disabled"}> ${esc(t("diarize"))}</label>
-    <p class="muted small">${t(snap.diarize_ready ? "diarize_note" : "diarize_missing")}</p>`;
+${snap.diarize_ready ? "" : `<p class="muted small">${t("diarize_missing")}</p>`}`;
 }
 
 const sourceUrl = () => `http://127.0.0.1:${snap.settings.browser_source_port}/`;
