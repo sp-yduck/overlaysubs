@@ -90,7 +90,7 @@ impl Default for ClusterConfig {
     /// mean voice taken off, then fixed thresholds. Thresholds without centering fell apart on audio unlike what
     /// they were tuned on.
     fn default() -> Self {
-        Self { assign: 0.20, new_speaker: 0.15, min_embed_s: 1.0, min_update_s: 2.0, max_speakers: 6, stick: 0.0, merge: 0.8, max_weight_s: 10.0, center: 0.5, center_after: 5 }
+        Self { assign: 0.25, new_speaker: 0.20, min_embed_s: 1.0, min_update_s: 2.0, max_speakers: 6, stick: 0.0, merge: 0.8, max_weight_s: 10.0, center: 0.5, center_after: 5 }
     }
 }
 
