@@ -2,7 +2,7 @@
 use crate::endpoint::{Event, RATE};
 use crate::export::Entry;
 use crate::pfml::{Form, TranslateRequest};
-use crate::speaker::{Clusterer, Embedder, Segment, Segmenter};
+use crate::speaker::{Clusterer, Embedder, Segmenter};
 use serde::{Deserialize, Serialize};
 
 pub struct Transcript {
@@ -99,8 +99,6 @@ pub struct Caption {
 /// The audio of text being committed.
 struct Audio<'a> {
     pcm: &'a [f32],
-    /// Stream position of `pcm[0]`.
-    start: usize,
     /// Samples at the front that belong to text committed before (heard again after an early commit).
     skip: usize,
     /// (byte offset in the text, sample offset in `pcm`) where words end.
@@ -132,12 +130,6 @@ const HALLUCINATIONS: &[&str] = &[
     "字幕",
     "시청해 주셔서 감사합니다",
 ];
-
-/// OVERLAYSUBS_DEBUG_SPK: trace the speaker-change search to stderr.
-fn debug_spk() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("OVERLAYSUBS_DEBUG_SPK").is_some())
-}
 
 pub fn is_hallucination(text: &str) -> bool {
     let t = text.trim().trim_matches(|c: char| c.is_ascii_punctuation() || c == '。' || c == '♪').to_lowercase();
@@ -269,21 +261,18 @@ pub struct Session {
     overlap: Option<String>,
     /// Tells speakers apart when set.
     pub embedder: Option<Box<dyn Embedder>>,
-    /// Finds changes of speaker inside a draft when set (with `speaker_commit`); without one, windows of the
-    /// embedder are compared instead.
+    /// Finds changes of speaker inside a draft (with `speaker_commit` and an embedder).
     pub segmenter: Option<Box<dyn Segmenter>>,
     /// Seconds spent in the segmenter.
     pub segment_s: f64,
     pub speakers: Clusterer,
-    /// Every committed sentence's speaker decision, for the benchmark.
-    pub segments: Vec<Segment>,
     /// Seconds spent embedding.
     pub embed_s: f64,
 }
 
 impl Session {
     pub fn new(cfg: SessionConfig) -> Self {
-        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0, early_commit: true, early_commits: 0, speaker_commit: false, speaker_commits: 0, pending_turn: None, vetoed_turn: None, committed: 0, prev: None, overlap: None, embedder: None, segmenter: None, segment_s: 0.0, speakers: Clusterer::default(), segments: vec![], embed_s: 0.0 }
+        Self { cfg, entries: vec![], history: vec![], next_id: 0, pos_ms: 0, early_commit: true, early_commits: 0, speaker_commit: false, speaker_commits: 0, pending_turn: None, vetoed_turn: None, committed: 0, prev: None, overlap: None, embedder: None, segmenter: None, segment_s: 0.0, speakers: Clusterer::default(), embed_s: 0.0 }
     }
 
     /// Advance the wall clock used for history timestamps (call with every captured chunk).
@@ -356,7 +345,7 @@ impl Session {
         let ago = move |samples: usize| pos_ms.saturating_sub((samples * 1000 / RATE) as u64);
         let start_ms = ago(pcm.len());
         if fin {
-            let audio = Audio { pcm: &pcm, start, skip, word_ends: &word_ends };
+            let audio = Audio { pcm: &pcm, skip, word_ends: &word_ends };
             return self.finalize(text, t.lang, start_ms, self.pos_ms, audio, mt, emit);
         }
         // Where the draft's own audio starts in `pcm`.
@@ -367,55 +356,39 @@ impl Session {
         // start a new caption, and what came before is committed as the previous speaker's.
         // A change is acted on only when two partials in a row put it in the same place (within half a second).
         let turn = match stable {
-            None if self.speaker_commit => {
-                if self.segmenter.is_some() {
-                    // The change point itself must be found twice in a row (within half a second); the cut is then
-                    // taken from the first partial whose words allow one. Whisper often leaves the previous
-                    // speaker's words out of a partial (or gives them odd times), so requiring the cut itself twice
-                    // missed real changes.
-                    let pending = self.pending_turn.filter(|&p| p >= start).map(|p| p - start);
-                    let (mut change, cut) = self.voice_change(&pcm, draft_from, pending, &text, &word_ends);
-                    if change.is_some_and(|c| self.vetoed_turn.is_some_and(|v| v.abs_diff(start + c) <= RATE)) {
-                        change = None;
-                    }
-                    let mut confirmed = change.is_some_and(|c| pending.is_some_and(|p| p.abs_diff(c) <= RATE / 2));
-                    // The segmenter also hears changes inside one speaker's turn (a change of tone, telephone audio):
-                    // cut only when the two sides sound like different speakers to the embedder.
-                    if let (true, Some(c), Some(_)) = (confirmed, change, cut) {
-                        if self.same_speaker_around(&pcm, draft_from, c) {
-                            self.vetoed_turn = Some(start + c);
-                            (change, confirmed) = (None, false);
-                        }
-                    }
-                    if debug_spk() {
-                        eprintln!("SPK partial at {:.2} (stream): change {:?}, pending {:?}, confirmed {confirmed}, cut {:?}", start as f32 / RATE as f32, change.map(|c| (start + c) as f32 / RATE as f32), pending.map(|p| (start + p) as f32 / RATE as f32), cut.map(|(_, e)| (start + e) as f32 / RATE as f32));
-                    }
-                    match change {
-                        // Keep the first place it was heard, so a change that drifts a little stays confirmed.
-                        Some(c) if !confirmed => self.pending_turn = Some(start + c),
-                        None => self.pending_turn = None,
-                        _ => {}
-                    }
-                    if confirmed { cut } else { None }
-                } else {
-                    let found = self.speaker_change(&pcm, draft_from, &text, &word_ends);
-                    let pending = self.pending_turn.take();
-                    match found {
-                        Some((_, end)) if pending.is_some_and(|p| p.abs_diff(start + end) <= RATE / 2) => found,
-                        Some((_, end)) => {
-                            self.pending_turn = Some(start + end);
-                            None
-                        }
-                        None => None,
+            None if self.speaker_commit && self.segmenter.is_some() && self.embedder.is_some() => {
+                // The change point itself must be found twice in a row (within half a second); the cut is then
+                // taken from the first partial whose words allow one. Whisper often leaves the previous
+                // speaker's words out of a partial (or gives them odd times), so requiring the cut itself twice
+                // missed real changes.
+                let pending = self.pending_turn.filter(|&p| p >= start).map(|p| p - start);
+                let (mut change, cut) = self.voice_change(&pcm, draft_from, pending, &text, &word_ends);
+                if change.is_some_and(|c| self.vetoed_turn.is_some_and(|v| v.abs_diff(start + c) <= RATE)) {
+                    change = None;
+                }
+                let mut confirmed = change.is_some_and(|c| pending.is_some_and(|p| p.abs_diff(c) <= RATE / 2));
+                // The segmenter also hears changes inside one speaker's turn (a change of tone, telephone audio):
+                // cut only when the two sides sound like different speakers to the embedder.
+                if let (true, Some(c), Some(_)) = (confirmed, change, cut) {
+                    if self.same_speaker_around(&pcm, draft_from, c) {
+                        self.vetoed_turn = Some(start + c);
+                        (change, confirmed) = (None, false);
                     }
                 }
+                match change {
+                    // Keep the first place it was heard, so a change that drifts a little stays confirmed.
+                    Some(c) if !confirmed => self.pending_turn = Some(start + c),
+                    None => self.pending_turn = None,
+                    _ => {}
+                }
+                if confirmed { cut } else { None }
             }
             _ => None,
         };
         if let Some((b, end)) = stable.or(turn) {
             let (head, tail) = (text[..b].trim().to_string(), text[b..].trim().to_string());
             let head_words: Vec<_> = word_ends.iter().copied().filter(|&(o, _)| o <= b).collect();
-            let audio = Audio { pcm: &pcm[..end], start, skip, word_ends: &head_words };
+            let audio = Audio { pcm: &pcm[..end], skip, word_ends: &head_words };
             self.finalize(head.clone(), t.lang.clone(), start_ms, ago(pcm.len() - end), audio, mt, emit)?;
             let cut = end.saturating_sub(RATE);
             if stable.is_none() {
@@ -459,51 +432,7 @@ impl Session {
         Ok(())
     }
 
-    /// Where the speaker changes in a draft, as (byte offset in `text`, sample offset in `pcm`) of the last word
-    /// before the change: the draft's start and its last seconds sound like different speakers, and 2 s windows
-    /// every 0.5 s (labelled in order on a copy of the clusterer, so a voice heard for the first time gets an id of
-    /// its own) end with at least 2 s of the new voice after at least 1.5 s of the old one. Short replies inside a
-    /// turn are shorter than that and do not cut it.
-    fn speaker_change(&mut self, pcm: &[f32], from: usize, text: &str, word_ends: &[(usize, usize)]) -> Option<(usize, usize)> {
-        const WIN: usize = 2 * RATE;
-        const HOP: usize = RATE / 2;
-        const MIN_NEW: usize = 2 * RATE;
-        const MIN_OLD: usize = 3 * RATE / 2;
-        const SCAN: usize = 10 * RATE;
-        let from = from.min(pcm.len());
-        if pcm.len() - from < MIN_OLD + MIN_NEW || self.embedder.is_none() {
-            return None;
-        }
-        let t0 = std::time::Instant::now();
-        let embed = |s: &mut Self, a: usize, b: usize| s.embedder.as_mut().and_then(|e| e.embed(&pcm[a..b]).ok());
-        // Cheap check first: the draft's opening and its end.
-        let mut quick = self.speakers.clone();
-        let (head, tail) = (embed(self, from, from + WIN), embed(self, pcm.len() - WIN, pcm.len()));
-        let (a, b) = (quick.assign(head.as_deref(), 2.0).0, quick.assign(tail.as_deref(), 2.0).0);
-        let found = if a == b || a.is_none() {
-            None
-        } else {
-            let mut c = self.speakers.clone();
-            let starts: Vec<usize> = (pcm.len().saturating_sub(SCAN).max(from)..=pcm.len() - WIN).step_by(HOP).collect();
-            let labels: Vec<Option<u32>> = starts.iter().map(|&w| {
-                let e = embed(self, w, w + WIN);
-                c.assign(e.as_deref(), 2.0).0
-            }).collect();
-            let last = *labels.last()?;
-            let run = labels.iter().rev().take_while(|&&l| l == last).count();
-            let first_new = starts[labels.len() - run];
-            let change = first_new + WIN / 2;
-            let old_ok = labels.len() > run && change - from >= MIN_OLD;
-            (old_ok && pcm.len() - change >= MIN_NEW && last != labels[labels.len() - run - 1])
-                .then(|| word_ends.iter().copied().rfind(|&(_, t)| t <= change + RATE / 5))
-                .flatten()
-                .filter(|&(o, _)| text[..o].trim().chars().count() >= MIN_SENTENCE_CHARS && has_words(&text[o..]))
-        };
-        self.embed_s += t0.elapsed().as_secs_f64();
-        found
-    }
-
-    /// Like `speaker_change`, from the segmenter over the draft's last 10 s (reaching back to keep a pending change
+    /// Where the speaker changes in a draft, from the segmenter over its last 10 s (reaching back to keep a pending change
     /// and 3 s before it in view): the main voice changes to one that then talks at least 1.5 s, after at least
     /// 0.5 s of the previous one. Returns the change (sample in `pcm`) and the cut: the end of the last word ending
     /// by 0.2 s after the change. A cut is refused when the words before it are too few for how long the previous
@@ -538,16 +467,6 @@ impl Session {
             let head = text[..o].trim();
             head.chars().count() >= MIN_SENTENCE_CHARS && has_words(&text[o..]) && turn.is_some_and(|(_, talked)| covers(head, talked))
         });
-        if debug_spk() {
-            let runs: String = crate::speaker::voice_runs(&frames, step).iter().map(|r| format!(" {:.1}-{:.1}:{}", (a + r.0) as f32 / RATE as f32, (a + r.1) as f32 / RATE as f32, r.2)).collect();
-            let why = match (change, cut, ok) {
-                (None, _, _) => "no change".to_string(),
-                (Some(_), None, _) => "no word end before the change".to_string(),
-                (Some(_), Some((o, t)), None) => format!("rejected cut after {:?} at {:.2} (old voice talked {:.1} s)", &text[..o], t as f32 / RATE as f32, turn.map_or(0.0, |t| t.1 as f32 / RATE as f32)),
-                (Some(_), _, Some((o, t))) => format!("cut after {:?} at {:.2}", &text[..o], t as f32 / RATE as f32),
-            };
-            eprintln!("SPK draft 0-{:.2} (from {:.2}) window {:.2}: change {:?}: {why}; runs{runs}; words {:?}", pcm.len() as f32 / RATE as f32, from as f32 / RATE as f32, a as f32 / RATE as f32, change.map(|c| c as f32 / RATE as f32), word_ends.iter().map(|&(o, t)| (text[..o].rsplit(' ').next().unwrap_or(""), (t as f32 / RATE as f32 * 10.0).round() / 10.0)).collect::<Vec<_>>());
-        }
         (change, ok)
     }
 
@@ -570,9 +489,6 @@ impl Session {
         let mut c = self.speakers.clone();
         let (a, _, _) = c.assign(Some(&h), head.len() as f32 / RATE as f32);
         let b = c.peek(Some(&t), tail.len() as f32 / RATE as f32);
-        if debug_spk() {
-            eprintln!("SPK identity check at {:.2} (in draft): head {a:?} tail {b:?}", change as f32 / RATE as f32);
-        }
         a.is_some() && a == b
     }
 
@@ -593,7 +509,7 @@ impl Session {
     }
 
     /// The speaker of `audio.pcm[from..to]`; None without an embedder. A failed embedding is treated as too short.
-    fn label(&mut self, audio: &Audio, from: usize, to: usize, text: &str) -> Option<u32> {
+    fn label(&mut self, audio: &Audio, from: usize, to: usize) -> Option<u32> {
         let embedder = self.embedder.as_mut()?;
         let pcm = &audio.pcm[from..to];
         let dur = pcm.len() as f32 / RATE as f32;
@@ -605,10 +521,7 @@ impl Session {
         } else {
             None
         };
-        let (speaker, sim, decision) = self.speakers.assign(emb.as_deref(), dur);
-        let embedding = emb.unwrap_or_default();
-        self.segments.push(Segment { start: audio.start + from, end: audio.start + to, speaker, sim: Some(sim).filter(|s| s.is_finite()), decision, text: text.to_string(), embedding });
-        speaker
+        self.speakers.assign(emb.as_deref(), dur).0
     }
 
     /// Stream position (samples) up to which audio is committed; the endpointer can drop it.
@@ -654,7 +567,7 @@ impl Session {
                 None => n,
             }
             .clamp(seg_start, n);
-            let speaker = self.label(&audio, seg_start, seg_end, &source);
+            let speaker = self.label(&audio, seg_start, seg_end);
             seg_start = seg_end;
             let from = start_ms + span * done as u64 / total as u64;
             done += source.chars().count();
@@ -979,12 +892,10 @@ mod tests {
         s.handle(Event::Final { pcm, start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
         let who: Vec<_> = s.entries.iter().map(|e| e.speaker).collect();
         assert_eq!(who, [Some(0), Some(1)]);
-        assert_eq!(s.segments.iter().map(|g| (g.start, g.end)).collect::<Vec<_>>(), [(0, 4 * SEC), (4 * SEC, 9 * SEC)], "the last sentence runs to the end");
         assert!(caps.iter().filter(|c| c.stage == Stage::Final).map(|c| c.speaker).eq([Some(0), Some(1)]));
         // A later utterance by the first voice gets the first id back.
         s.handle(Event::Final { pcm: voices(&[(0.1, 5)]), start: 9 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
         assert_eq!(s.entries[2].speaker, Some(0));
-        assert_eq!(s.segments[2].start, 9 * SEC, "positions are in the stream");
     }
 
     #[test]
@@ -992,7 +903,7 @@ mod tests {
         let mut s = Session::new(SessionConfig::default());
         let mut caps = vec![];
         s.handle(Event::Final { pcm: voices(&[(0.1, 4)]), start: 0 }, &mut asr(vec!["Hello there my friend."]), &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        assert!(caps.iter().all(|c| c.speaker.is_none()) && s.segments.is_empty());
+        assert!(caps.iter().all(|c| c.speaker.is_none() && c.color.is_none()));
         assert!(!serde_json::to_string(&caps[0]).unwrap().contains("speaker"), "the overlay payload is unchanged");
     }
 
@@ -1006,10 +917,10 @@ mod tests {
         for _ in 0..2 {
             s.handle(Event::Partial { pcm: pcm.clone(), start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
         }
-        assert_eq!((s.entries[0].speaker, s.segments[0].end), (Some(0), 4 * SEC), "the head is the audio up to its last word");
+        assert_eq!(s.entries[0].speaker, Some(0), "the head is the audio up to its last word");
         // The final starts at the cut (3 s); "friend." (to 1 s in) was the first speaker's and is left out.
         s.handle(Event::Final { pcm: voices(&[(0.1, 1), (0.2, 5)]), start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        assert_eq!((s.entries[1].speaker, s.segments[1].start), (Some(1), 4 * SEC));
+        assert_eq!(s.entries[1].speaker, Some(1));
     }
 
     #[test]
@@ -1036,26 +947,6 @@ mod tests {
         // Under a second of draft audio keeps the last speaker.
         s.handle(Event::Partial { pcm: voices(&[(0.2, 4)])[..SEC / 2].to_vec(), start: 4 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
         assert_eq!(caps.last().unwrap().speaker, Some(0));
-    }
-
-    #[test]
-    fn a_new_voice_inside_a_sentence_commits_what_came_before() {
-        let mut s = Session::new(SessionConfig::default());
-        s.embedder = Some(Box::new(LevelVoice));
-        s.speaker_commit = true;
-        let mut caps = vec![];
-        // One word per second; the first voice says five words, then the second interrupts. No full stop anywhere.
-        let mut a = asr(vec!["Hello there.", "so I was going to say that we could maybe", "so I was going to say that we could maybe now"]);
-        s.handle(Event::Final { pcm: voices(&[(0.1, 3)]), start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        s.handle(Event::Partial { pcm: voices(&[(0.1, 5), (0.2, 5)]), start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        assert_eq!(s.speaker_commits, 0, "one partial alone does not cut");
-        s.handle(Event::Partial { pcm: voices(&[(0.1, 5), (0.2, 6)]), start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |c| caps.push(c)).unwrap();
-        assert_eq!(s.speaker_commits, 1, "the next one confirms the change");
-        let committed: Vec<_> = s.entries.iter().map(|e| (e.source.as_str(), e.speaker)).collect();
-        assert_eq!(committed, [("Hello there.", Some(0)), ("so I was going to.", Some(0))], "cut at the change, about 5 s in");
-        let last = caps.last().unwrap();
-        assert_eq!((last.stage, last.source.as_str(), last.speaker), (Stage::Partial, "say that we could maybe now", Some(1)));
-        assert_eq!(s.committed(), 3 * SEC + 5 * SEC, "cut right at the change, nothing heard again");
     }
 
     /// Segmentation from the audio's level, like `LevelVoice`: 0.1 is local voice 0, 0.2 voice 1; 0.1 s frames.
@@ -1165,20 +1056,6 @@ mod tests {
         s.handle(Event::Final { pcm: voices(&[(0.1, 3)]), start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |_| {}).unwrap();
         for _ in 0..2 {
             s.handle(Event::Partial { pcm: voices(&[(0.1, 8), (0.2, 1), (0.1, 1)]), start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |_| {}).unwrap();
-        }
-        assert_eq!((s.speaker_commits, s.entries.len()), (0, 1));
-    }
-
-    #[test]
-    fn a_short_reply_does_not_cut_a_turn() {
-        let mut s = Session::new(SessionConfig::default());
-        s.embedder = Some(Box::new(LevelVoice));
-        s.speaker_commit = true;
-        let mut a = asr(vec!["Hello there.", "so I was going to say that we could maybe", "so I was going to say that we could maybe"]);
-        s.handle(Event::Final { pcm: voices(&[(0.1, 3)]), start: 0 }, &mut a, &mut FakeMt(vec![]), &mut |_| {}).unwrap();
-        // One second of the other voice at the end, twice: under the 2 s needed.
-        for _ in 0..2 {
-            s.handle(Event::Partial { pcm: voices(&[(0.1, 9), (0.2, 1)]), start: 3 * SEC }, &mut a, &mut FakeMt(vec![]), &mut |_| {}).unwrap();
         }
         assert_eq!((s.speaker_commits, s.entries.len()), (0, 1));
     }

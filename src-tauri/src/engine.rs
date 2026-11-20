@@ -216,10 +216,7 @@ impl Segmentation {
     pub fn load(model: &Path, threads: usize) -> Result<Self, String> {
         static ENV: std::sync::OnceLock<Result<ort::environment::Environment, String>> = std::sync::OnceLock::new();
         // The exe's own copy (Windows would find a System32 one first by name).
-        let dll = std::env::var_os("ORT_DYLIB_PATH").map(std::path::PathBuf::from).unwrap_or_else(|| {
-            let name = if cfg!(windows) { "onnxruntime.dll" } else if cfg!(target_os = "macos") { "libonnxruntime.dylib" } else { "libonnxruntime.so" };
-            std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join(name))).unwrap_or_else(|| std::path::PathBuf::from(name))
-        });
+        let dll = onnxruntime_library();
         let env = ENV
             .get_or_init(|| ort::init_from(&dll).map_err(|e| format!("cannot load {}: {e}", dll.display()))?.build().map_err(|e| e.to_string()))
             .as_ref()
@@ -234,6 +231,26 @@ impl Segmentation {
             .map_err(|e| format!("cannot load segmentation model {}: {e}", model.display()))?;
         Ok(Self(session))
     }
+}
+
+/// The ONNX Runtime library sherpa-onnx ships with the app: next to the exe (Windows; System32 has an unrelated
+/// onnxruntime.dll that Windows would otherwise find first), or in the bundle's Frameworks (macOS), where its name
+/// carries the version.
+#[cfg(feature = "diarize")]
+fn onnxruntime_library() -> std::path::PathBuf {
+    let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)).unwrap_or_default();
+    if cfg!(windows) {
+        return exe_dir.join("onnxruntime.dll");
+    }
+    let (dirs, prefix, ext) = match cfg!(target_os = "macos") {
+        true => (vec![exe_dir.join("../Frameworks"), exe_dir.clone()], "libonnxruntime", ".dylib"),
+        false => (vec![exe_dir.clone()], "libonnxruntime", ".so"),
+    };
+    let found = dirs.iter().flat_map(|d| std::fs::read_dir(d).into_iter().flatten().flatten()).map(|e| e.path()).find(|p| {
+        let n = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        n.starts_with(prefix) && n.contains(ext) && !n.contains("providers")
+    });
+    found.unwrap_or_else(|| exe_dir.join(format!("{prefix}{ext}")))
 }
 
 #[cfg(feature = "diarize")]
@@ -527,7 +544,7 @@ mod tests {
         /// Against `<clip>.txt` / `<clip>.tr.txt` next to the WAV, when present.
         cer: Option<f64>,
         tr_cer: Option<f64>,
-        /// With OVERLAYSUBS_SPK: seconds embedding, speakers found and every labelled sentence.
+        /// With OVERLAYSUBS_DIARIZE=1: seconds in the speaker models, speakers found, cuts at speaker changes.
         #[serde(default)]
         embed_s: f64,
         #[serde(default)]
@@ -536,18 +553,15 @@ mod tests {
         early_commits: usize,
         #[serde(default)]
         speaker_commits: usize,
-        /// With OVERLAYSUBS_SPK_SEG: seconds in the speaker segmentation model.
         #[serde(default)]
         segment_s: f64,
-        #[serde(default)]
-        segments: Vec<overlaysubs_core::speaker::Segment>,
     }
 
     /// Speed and quality of the whole pipeline on recorded clips, replayed as live audio.
     /// Run it with scripts/bench.sh, which documents the inputs. Env: OVERLAYSUBS_WAV (a 16 kHz mono WAV or a
     /// folder of them), OVERLAYSUBS_OUT (report path), OVERLAYSUBS_BASELINE (an earlier report to compare with),
-    /// OVERLAYSUBS_ASR / OVERLAYSUBS_MT (model ids), OVERLAYSUBS_GPU=1, OVERLAYSUBS_SPK (a sherpa-onnx speaker
-    /// model; needs `--features diarize`) with OVERLAYSUBS_SPK_CFG (a JSON `ClusterConfig`, optional) and OVERLAYSUBS_SPK_COMMIT=1 (commit at speaker changes; found with the segmentation model OVERLAYSUBS_SPK_SEG when set).
+    /// OVERLAYSUBS_ASR / OVERLAYSUBS_MT (model ids), OVERLAYSUBS_GPU=1, OVERLAYSUBS_DIARIZE=1 (speaker colors as with the
+    /// setting on; needs `--features diarize`, downloads the speaker models).
     #[test]
     #[ignore]
     fn bench_report() {
@@ -591,15 +605,16 @@ mod tests {
             (asr.1, mt.1) = (Duration::ZERO, Duration::ZERO);
             let mut s = Session::new(SessionConfig::default());
             #[cfg(feature = "diarize")]
-            if let Ok(spk) = std::env::var("OVERLAYSUBS_SPK") {
-                s.embedder = Some(Box::new(Voice::load(Path::new(&spk), 2).unwrap()));
-                s.speaker_commit = std::env::var("OVERLAYSUBS_SPK_COMMIT").is_ok_and(|v| v == "1");
-                if let Ok(cfg) = std::env::var("OVERLAYSUBS_SPK_CFG") {
-                    s.speakers.cfg = serde_json::from_str(&cfg).unwrap();
-                }
-                if let Ok(seg) = std::env::var("OVERLAYSUBS_SPK_SEG") {
-                    s.segmenter = Some(Box::new(Segmentation::load(Path::new(&seg), 2).unwrap()));
-                }
+            if env("OVERLAYSUBS_DIARIZE", "") == "1" {
+                use overlaysubs_core::registry::Kind;
+                let file = |k: Kind| {
+                    let m = reg.models.iter().find(|m| m.kind == k).unwrap();
+                    crate::download::fetch(m, &dir, &mut |_, _| {}).unwrap();
+                    dir.join(&m.file)
+                };
+                s.embedder = Some(Box::new(Voice::load(&file(Kind::Speaker), 2).unwrap()));
+                s.segmenter = Some(Box::new(Segmentation::load(&file(Kind::Segmentation), 2).unwrap()));
+                s.speaker_commit = true;
             }
             let mut seen = 0;
             let mut r = replay(evs, |(ev, pos)| {
@@ -634,7 +649,6 @@ mod tests {
                 early_commits: s.early_commits,
                 speaker_commits: s.speaker_commits,
                 segment_s: s.segment_s,
-                segments: std::mem::take(&mut s.segments),
             });
         }
 
@@ -657,7 +671,7 @@ mod tests {
             row("asr s", c.asr_s, b.map(|b| b.asr_s));
             row("translate s", c.mt_s, b.map(|b| b.mt_s));
             row("vad s", c.vad_s, b.map(|b| b.vad_s));
-            if !c.segments.is_empty() {
+            if c.speakers > 0 {
                 row("embed s", c.embed_s, b.map(|b| b.embed_s));
                 row("speakers", c.speakers as f64, b.map(|b| b.speakers as f64));
                 row("early commits", c.early_commits as f64, b.map(|b| b.early_commits as f64));

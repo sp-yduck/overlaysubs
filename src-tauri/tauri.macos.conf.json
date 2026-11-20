@@ -4,7 +4,8 @@
   },
   "bundle": {
     "resources": {
-      "../THIRD_PARTY_NOTICES.md": "./"
+      "../THIRD_PARTY_NOTICES.md": "./",
+      "../licenses/onnxruntime/ThirdPartyNotices.txt": "./onnxruntime-ThirdPartyNotices.txt"
     },
     "macOS": {
       "files": {

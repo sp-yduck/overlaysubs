@@ -33,12 +33,6 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 /// the GPU choices instead of offering a switch that the build cannot honour.
 const GPU_BUILD: bool = cfg!(any(feature = "vulkan", feature = "cuda", feature = "metal"));
 
-/// Speaker labels (`diarize` builds): the speaker embedding model, and the segmentation model that finds where
-/// the speaker changes, both looked up in the models folder.
-const SPEAKER_MODEL: &str = "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx";
-#[cfg(feature = "diarize")]
-const SEGMENTATION_MODEL: &str = "pyannote-segmentation-3.0.onnx";
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 struct Settings {
@@ -247,9 +241,8 @@ struct Snapshot {
     hardware: Option<HardwareCache>,
     /// False in a build without a GPU backend; the settings UI then offers Auto / CPU only.
     gpu_build: bool,
-    /// Whether this build can tell speakers apart, and whether its speaker model is in the models folder.
+    /// Whether this build can tell speakers apart (its models are in `registry`, kinds speaker and segmentation).
     diarize_build: bool,
-    diarize_ready: bool,
 }
 
 #[tauri::command]
@@ -270,7 +263,6 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
         hardware: hw::cached(&config_dir(&app)),
         gpu_build: GPU_BUILD,
         diarize_build: cfg!(feature = "diarize"),
-        diarize_ready: std::env::var_os("OVERLAYSUBS_SPK").map(PathBuf::from).unwrap_or_else(|| dir.join(SPEAKER_MODEL)).exists(),
         models_dir: dir,
     })
 }
@@ -555,7 +547,7 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
         let mut session = Session::new(s.session.clone());
         #[cfg(feature = "diarize")]
         if s.diarize {
-            load_speaker_model(&mut session, &models_dir(&emit_app, &s));
+            load_speaker_models(&emit_app, &s, &mut session);
         }
         let mut seen = 0;
         let mut emit = |c: Caption| {
@@ -602,37 +594,29 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     app.emit("running", true).map_err(|e| e.to_string())
 }
 
-/// Speaker labels (PoC, `diarize` builds): on when a sherpa-onnx speaker model is in the models folder (or
-/// OVERLAYSUBS_SPK names one). Without one, captions have no speaker, as before.
+/// Speaker colors (`diarize` builds, the setting on): the speaker embedding model labels each sentence's
+/// speaker, and the segmentation model finds where the speaker changes inside a draft so the caption is cut
+/// there. Both are downloaded from the settings page; with either missing or failing to load, captions have no
+/// speaker, as with the setting off.
 #[cfg(feature = "diarize")]
-fn load_speaker_model(session: &mut Session, dir: &std::path::Path) {
-    let path = std::env::var_os("OVERLAYSUBS_SPK").map(PathBuf::from).unwrap_or_else(|| dir.join(SPEAKER_MODEL));
-    if !path.exists() {
-        log::info!("speaker labels off: no speaker model at {}", path.display());
-        return;
-    }
-    match engine::Voice::load(&path, 2) {
-        Ok(v) => {
+fn load_speaker_models(app: &AppHandle, s: &Settings, session: &mut Session) {
+    use overlaysubs_core::registry::Kind;
+    let (reg, dir) = match registry(app) {
+        Ok(r) => (r, models_dir(app, s)),
+        Err(e) => return log::error!("speaker labels off: {e}"),
+    };
+    let path = |k: Kind| reg.models.iter().find(|m| m.kind == k).map(|m| dir.join(&m.file)).filter(|p| p.exists());
+    let (Some(voice), Some(seg)) = (path(Kind::Speaker), path(Kind::Segmentation)) else {
+        return log::info!("speaker labels off: the speaker models are not downloaded");
+    };
+    match (engine::Voice::load(&voice, 2), engine::Segmentation::load(&seg, 2)) {
+        (Ok(v), Ok(g)) => {
             session.embedder = Some(Box::new(v));
-            session.speakers.cfg = overlaysubs_core::speaker::ClusterConfig::recommended();
-            // PoC: a change of speaker inside a sentence starts a new caption (OVERLAYSUBS_SPK_COMMIT=0 turns it off).
-            session.speaker_commit = std::env::var("OVERLAYSUBS_SPK_COMMIT").map_or(true, |v| v != "0");
-            // The change is found with the segmentation model when it is in the models folder
-            // (OVERLAYSUBS_SPK_SEG=0 falls back to comparing embeddings, or names another file).
-            const SEG: &str = SEGMENTATION_MODEL;
-            let seg = match std::env::var_os("OVERLAYSUBS_SPK_SEG") {
-                Some(v) if v == "0" => None,
-                Some(v) => Some(PathBuf::from(v)),
-                None => Some(dir.join(SEG)),
-            };
-            match seg.filter(|p| p.exists()).map(|p| engine::Segmentation::load(&p, 2)) {
-                Some(Ok(s)) => session.segmenter = Some(Box::new(s)),
-                Some(Err(e)) => log::error!("speaker segmentation off: {e}"),
-                None => log::info!("speaker segmentation off: no {SEG}"),
-            }
-            log::info!("speaker labels on (segmentation: {})", session.segmenter.is_some());
+            session.segmenter = Some(Box::new(g));
+            session.speaker_commit = true;
+            log::info!("speaker labels on");
         }
-        Err(e) => log::error!("speaker labels off: {e}"),
+        (Err(e), _) | (_, Err(e)) => log::error!("speaker labels off: {e}"),
     }
 }
 

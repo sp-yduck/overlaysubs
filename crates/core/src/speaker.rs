@@ -1,6 +1,5 @@
 //! Who is speaking: each committed sentence's audio gets a speaker embedding, and an online clusterer turns the
 //! embeddings into stable speaker numbers. Overlapping speech (backchannels over someone else) is not handled.
-use serde::{Deserialize, Serialize};
 
 pub trait Embedder: Send {
     /// A fixed-size voice fingerprint of 16 kHz mono audio; need not be normalized.
@@ -62,8 +61,7 @@ pub fn voice_runs(frames: &[u8], step: usize) -> Vec<(usize, usize, u8)> {
     runs
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(default)]
+#[derive(Debug, Clone, Copy)]
 pub struct ClusterConfig {
     /// Cosine similarity to a speaker at or above which a segment is theirs and refines their voice.
     pub assign: f32,
@@ -85,25 +83,14 @@ pub struct ClusterConfig {
     /// segments are in: what every voice of a recording shares is mostly the room, microphone or channel. 0 is off.
     pub center: f32,
     pub center_after: usize,
-    /// Thresholds follow the recording: `assign` and `new_speaker` become this much below the running mean
-    /// similarity of segments to their own speaker (which starts at `within_prior`).
-    pub adaptive: bool,
-    pub adapt_assign_gap: f32,
-    pub adapt_new_gap: f32,
-    pub within_prior: f32,
 }
 
 impl Default for ClusterConfig {
+    /// Chosen by leave-one-out over AMI meetings plus noisy and telephone-band copies of them: half the session's
+    /// mean voice taken off, then fixed thresholds. Thresholds without centering fell apart on audio unlike what
+    /// they were tuned on.
     fn default() -> Self {
-        Self { assign: 0.5, new_speaker: 0.35, min_embed_s: 1.0, min_update_s: 2.0, max_speakers: 6, stick: 0.05, merge: 0.75, max_weight_s: 10.0, center: 0.0, center_after: 5, adaptive: false, adapt_assign_gap: 0.2, adapt_new_gap: 0.3, within_prior: 0.7 }
-    }
-}
-
-impl ClusterConfig {
-    /// The PoC's pick (AMI meetings plus noise and telephone-band copies, leave-one-out): half the session's mean
-    /// voice off, then fixed thresholds. Plain fixed thresholds fell apart on audio unlike what they were tuned on.
-    pub fn recommended() -> Self {
-        Self { assign: 0.20, new_speaker: 0.15, stick: 0.0, merge: 0.8, center: 0.5, center_after: 5, ..Self::default() }
+        Self { assign: 0.20, new_speaker: 0.15, min_embed_s: 1.0, min_update_s: 2.0, max_speakers: 6, stick: 0.0, merge: 0.8, max_weight_s: 10.0, center: 0.5, center_after: 5 }
     }
 }
 
@@ -137,9 +124,8 @@ impl Speaker {
     }
 }
 
-/// How a segment was labelled, for the benchmark dump.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+/// How a segment was labelled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Decision {
     /// Too short to embed (or no embedding): the previous speaker.
     Inherited,
@@ -161,8 +147,6 @@ pub struct Clusterer {
     seen_sum: Vec<f32>,
     seen_w: f32,
     seen_n: usize,
-    /// Running mean similarity of segments to the speaker they were assigned to, for `adaptive`.
-    within: Option<f32>,
     /// Each current speaker's color slot (0..COLORS): the first slot nobody uses when they appear, freed when
     /// they are merged into another speaker.
     colors: Vec<(u32, u8)>,
@@ -230,10 +214,7 @@ impl Clusterer {
             .map(|(i, s)| (i, dot(&s.dir(&m), &ec) + if Some(s.id) == self.last { self.cfg.stick } else { 0.0 }))
             .max_by(|a, b| a.1.total_cmp(&b.1));
         let updatable = dur_s >= self.cfg.min_update_s;
-        let (assign, new_speaker) = match (self.cfg.adaptive, self.within.unwrap_or(self.cfg.within_prior)) {
-            (true, within) => (within - self.cfg.adapt_assign_gap, within - self.cfg.adapt_new_gap),
-            (false, _) => (self.cfg.assign, self.cfg.new_speaker),
-        };
+        let (assign, new_speaker) = (self.cfg.assign, self.cfg.new_speaker);
         if self.seen_sum.is_empty() {
             self.seen_sum = vec![0.0; e.len()];
         }
@@ -243,10 +224,6 @@ impl Clusterer {
         (self.seen_w, self.seen_n) = (self.seen_w + w, self.seen_n + 1);
         let (id, sim, decision) = match best {
             Some((i, sim)) if sim >= assign => {
-                if updatable {
-                    let own = sim - if Some(self.speakers[i].id) == self.last { self.cfg.stick } else { 0.0 };
-                    self.within = Some(self.within.map_or(own, |v| 0.9 * v + 0.1 * own));
-                }
                 if updatable {
                     self.speakers[i].add(&e, w);
                 }
@@ -314,19 +291,6 @@ impl Clusterer {
     }
 }
 
-/// One labelled segment, kept for the benchmark: stream positions in samples.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Segment {
-    pub start: usize,
-    pub end: usize,
-    pub speaker: Option<u32>,
-    pub sim: Option<f32>,
-    pub decision: Decision,
-    pub text: String,
-    /// Empty when not embedded.
-    pub embedding: Vec<f32>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -365,9 +329,15 @@ mod tests {
         e
     }
 
+    /// Merging scenarios with hand-made vectors: wider thresholds and no centering, so a similarity of 0.3 is a new
+    /// speaker and the vectors are compared as they are.
+    fn merging(merge: f32) -> ClusterConfig {
+        ClusterConfig { assign: 0.5, new_speaker: 0.35, stick: 0.05, merge, center: 0.0, ..Default::default() }
+    }
+
     #[test]
     fn colors_go_in_order_and_a_merged_speakers_color_is_reused() {
-        let mut c = Clusterer::new(ClusterConfig { merge: 0.6, ..Default::default() });
+        let mut c = Clusterer::new(merging(0.6));
         let a = c.assign(Some(&v(0, 7, 0.0)), 3.0).0.unwrap();
         let b = c.assign(Some(&v(1, 7, 0.0)), 3.0).0.unwrap();
         // A third voice close to the first one at first, so it is heard as new, then merged into it.
@@ -418,7 +388,7 @@ mod tests {
 
     #[test]
     fn speakers_that_drift_together_merge_into_the_older_id() {
-        let mut c = Clusterer::new(ClusterConfig { merge: 0.6, ..Default::default() });
+        let mut c = Clusterer::new(merging(0.6));
         c.assign(Some(&v(0, 1, 0.0)), 3.0);
         // Similarity to speaker 0 is about 0.3: a new speaker.
         assert_eq!(c.assign(Some(&v(1, 0, 0.3)), 3.0).0, Some(1));
@@ -449,16 +419,5 @@ mod tests {
         let got: Vec<_> = segs.iter().map(|e| c.assign(Some(e), 3.0).0.unwrap()).collect();
         assert_eq!(c.speakers(), 2);
         assert!(got[4..].iter().enumerate().all(|(k, &id)| id == got[4 + k % 2]), "alternating speakers once centered: {got:?}");
-    }
-
-    #[test]
-    fn adaptive_thresholds_follow_the_within_speaker_similarity() {
-        // Same-speaker cosine about 0.95, other speaker about 0.8: fixed defaults merge them, adaptive does not.
-        let cfg = ClusterConfig { adaptive: true, adapt_assign_gap: 0.05, adapt_new_gap: 0.1, within_prior: 0.95, ..Default::default() };
-        let mut c = Clusterer::new(cfg);
-        for _ in 0..3 {
-            c.assign(Some(&channel(0, 3, 0.1)), 3.0);
-        }
-        assert_eq!(c.assign(Some(&channel(1, 3, 0.1)), 3.0).2, Decision::New);
     }
 }
