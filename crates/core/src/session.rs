@@ -495,7 +495,7 @@ impl Session {
             let change = first_new + WIN / 2;
             let old_ok = labels.len() > run && change - from >= MIN_OLD;
             (old_ok && pcm.len() - change >= MIN_NEW && last != labels[labels.len() - run - 1])
-                .then(|| word_ends.iter().copied().filter(|&(_, t)| t <= change + RATE / 5).last())
+                .then(|| word_ends.iter().copied().rfind(|&(_, t)| t <= change + RATE / 5))
                 .flatten()
                 .filter(|&(o, _)| text[..o].trim().chars().count() >= MIN_SENTENCE_CHARS && has_words(&text[o..]))
         };
@@ -528,7 +528,7 @@ impl Session {
         let Some((frames, step)) = seg else { return (None, None) };
         let turn = crate::speaker::voice_turn(&frames, step, MIN_NEW, MIN_OLD).map(|(c, talked)| (a + c, talked));
         let change = turn.map(|(c, _)| c);
-        let cut = change.and_then(|change| word_ends.iter().copied().filter(|&(_, t)| t <= change + RATE / 5).last());
+        let cut = change.and_then(|change| word_ends.iter().copied().rfind(|&(_, t)| t <= change + RATE / 5));
         let covers = |head: &str, talked: usize| {
             let secs = talked as f32 / RATE as f32;
             let words = head.split_whitespace().count();
