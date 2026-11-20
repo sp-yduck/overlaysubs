@@ -20,11 +20,16 @@
   .cap { align-self: var(--cap-align, center); max-width: 100%; text-align: var(--align, center); padding: 4px 14px; border-radius: 8px; background: var(--cap-bg, rgba(0,0,0,0.55)); color: var(--fg, #fff); font-size: var(--size, 28px); font-weight: var(--weight, 400); line-height: var(--line-height, 1.3); text-shadow: 0 1px 3px #000; }
   .cap .src { display: block; font-size: var(--src-size, 17px); color: var(--src-color, #cfd6e2); font-weight: 400; }
   .cap.partial .tr, .cap.streaming .tr { opacity: 0.6; }
-  /* Speaker labels (diarize builds): a small colored badge before the caption. */
-  .cap .spk { display: inline-block; min-width: 1.4em; margin-right: 0.4em; padding: 0 0.3em; border-radius: 4px; font-size: 0.6em; font-weight: 700; line-height: 1.5; text-align: center; vertical-align: 0.25em; color: #111; text-shadow: none; }
-  .cap.partial .spk { opacity: 0.6; }
-  .spk-0 { background: #7cc4ff; } .spk-1 { background: #ffb36b; } .spk-2 { background: #8ee08e; }
-  .spk-3 { background: #e79be7; } .spk-4 { background: #f2e26b; } .spk-5 { background: #ff8a8a; }
+  /* Speaker colors (diarize builds): each caption carries spk-N, and its original and translation take the
+     speaker's color. The first speaker keeps the stock white; no red, for color-blind viewers. */
+  .cap.spk-0 { --spk: #ffffff; }
+  .cap.spk-1 { --spk: #ffc86b; }
+  .cap.spk-2 { --spk: #7fd0ff; }
+  .cap.spk-3 { --spk: #9ee69e; }
+  .cap.spk-4 { --spk: #f0a6f0; }
+  .cap.spk-5 { --spk: #c3b1ff; }
+  .cap[class*="spk-"] .tr, .cap[class*="spk-"] .src { color: var(--spk); }
+  .cap[class*="spk-"] .src { opacity: 0.8; }
   /* Top-aligned captions start below the drag grip drawn over the top of the overlay. */
   body.top #lines { padding-top: 26px; }
   #grip { position: fixed; left: 0; top: 0; right: 0; height: 18px; font: 11px/18px system-ui, sans-serif; color: #fff; text-align: center; text-shadow: 0 1px 2px #000; }

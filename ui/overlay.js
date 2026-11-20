@@ -80,12 +80,11 @@ function apply(settings) {
   restoreAnchor(anchor);
 }
 
-/** "A", "B", … for speaker 0, 1, … (as in the exported SRT). */
-const speakerLabel = (n) => String.fromCharCode(65 + (n % 26)) + (n >= 26 ? Math.floor(n / 26) : "");
-const speakerHtml = (c) => (c.speaker == null ? "" : `<span class="spk spk-${c.speaker % 6}">${speakerLabel(c.speaker)}</span>`);
+/** Speaker colors: the caption gets spk-N (speakers past six reuse the colors), see overlay.html. */
+const speakerClass = (c) => (c.speaker == null ? "" : ` spk-${c.speaker % 6}`);
 
 const captionHtml = (c) =>
-  `<div class="cap ${c.stage}"${c.id == null ? "" : ` data-id="${c.id}"`}>${speakerHtml(c)}${cfg.showSource ? `<span class="src">${esc(c.source)}</span>` : ""}<span class="tr">${esc(c.translation)}</span></div>`;
+  `<div class="cap ${c.stage}${speakerClass(c)}"${c.id == null ? "" : ` data-id="${c.id}"`}>${cfg.showSource ? `<span class="src">${esc(c.source)}</span>` : ""}<span class="tr">${esc(c.translation)}</span></div>`;
 
 /** Two sample captions so the "lines" setting is previewed too (real captions take priority). */
 function previewHtml() {
