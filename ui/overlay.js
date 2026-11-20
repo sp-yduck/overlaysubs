@@ -80,8 +80,8 @@ function apply(settings) {
   restoreAnchor(anchor);
 }
 
-/** Speaker colors: the caption gets spk-N (speakers past six reuse the colors), see overlay.html. */
-const speakerClass = (c) => (c.speaker == null ? "" : ` spk-${c.speaker % 6}`);
+/** Speaker colors: the caption gets spk-N from its color slot (see overlay.html); the session hands out free slots. */
+const speakerClass = (c) => (c.color == null ? "" : ` spk-${c.color % 6}`);
 
 const captionHtml = (c) =>
   `<div class="cap ${c.stage}${speakerClass(c)}"${c.id == null ? "" : ` data-id="${c.id}"`}>${cfg.showSource ? `<span class="src">${esc(c.source)}</span>` : ""}<span class="tr">${esc(c.translation)}</span></div>`;

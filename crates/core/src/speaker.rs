@@ -163,7 +163,13 @@ pub struct Clusterer {
     seen_n: usize,
     /// Running mean similarity of segments to the speaker they were assigned to, for `adaptive`.
     within: Option<f32>,
+    /// Each current speaker's color slot (0..COLORS): the first slot nobody uses when they appear, freed when
+    /// they are merged into another speaker.
+    colors: Vec<(u32, u8)>,
 }
+
+/// How many speaker colors the overlay has (`max_speakers` defaults to the same).
+pub const COLORS: u8 = 6;
 
 impl Clusterer {
     pub fn new(cfg: ClusterConfig) -> Self {
@@ -185,6 +191,20 @@ impl Clusterer {
             id = to;
         }
         id
+    }
+
+    /// The color slot of speaker `id` (resolved through merges). A speaker not created yet, like the id `peek`
+    /// gives a new voice, gets the slot they will get. None when every slot is taken.
+    pub fn color(&self, id: u32) -> Option<u8> {
+        let id = self.resolve(id);
+        match self.colors.iter().find(|(s, _)| *s == id) {
+            Some(&(_, c)) => Some(c),
+            None => self.free_color(),
+        }
+    }
+
+    fn free_color(&self) -> Option<u8> {
+        (0..COLORS).find(|c| !self.colors.iter().any(|(_, used)| used == c))
     }
 
     /// The speaker `assign` would give, without changing anything: for drafts, which are heard again.
@@ -256,6 +276,9 @@ impl Clusterer {
         let mut s = Speaker { id, sum: vec![0.0; e.len()], weight: 0.0 };
         s.add(e, w);
         self.speakers.push(s);
+        if let Some(c) = self.free_color() {
+            self.colors.push((id, c));
+        }
         id
     }
 
@@ -282,6 +305,8 @@ impl Clusterer {
             keep.weight += gone.weight;
             let to = keep.id;
             self.merged.push((gone.id, to));
+            // The newer speaker's color is free again for the next new voice.
+            self.colors.retain(|(id, _)| *id != gone.id);
             if self.last == Some(gone.id) {
                 self.last = Some(to);
             }
@@ -338,6 +363,26 @@ mod tests {
         e[axis] = 1.0;
         e[noise_axis] += noise;
         e
+    }
+
+    #[test]
+    fn colors_go_in_order_and_a_merged_speakers_color_is_reused() {
+        let mut c = Clusterer::new(ClusterConfig { merge: 0.6, ..Default::default() });
+        let a = c.assign(Some(&v(0, 7, 0.0)), 3.0).0.unwrap();
+        let b = c.assign(Some(&v(1, 7, 0.0)), 3.0).0.unwrap();
+        // A third voice close to the first one at first, so it is heard as new, then merged into it.
+        let x = c.assign(Some(&v(0, 2, 2.8)), 3.0).0.unwrap();
+        assert_eq!([c.color(a), c.color(b), c.color(x)], [Some(0), Some(1), Some(2)]);
+        assert_eq!(c.color(c.next_id), Some(3), "a voice not heard yet would get the next free color");
+        for _ in 0..4 {
+            c.assign(Some(&v(0, 2, 1.0)), 3.0);
+        }
+        assert_eq!(c.resolve(x), a, "the third speaker was merged into the first");
+        assert_eq!(c.color(x), Some(0), "and shows in the first one's color");
+        // The next new voice takes the freed color, not a fourth one.
+        let d = c.assign(Some(&v(3, 7, 0.0)), 3.0).0.unwrap();
+        assert_ne!(d, x);
+        assert_eq!(c.color(d), Some(2));
     }
 
     #[test]

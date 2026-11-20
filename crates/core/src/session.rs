@@ -90,6 +90,10 @@ pub struct Caption {
     /// Who said it (0, 1, …) when speakers are told apart; on a draft, the speaker so far.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speaker: Option<u32>,
+    /// The speaker's color slot (0..`speaker::COLORS`): the first free one when they appeared, so two current
+    /// speakers never share one; the overlay maps it to a color.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<u8>,
 }
 
 /// The audio of text being committed.
@@ -449,7 +453,8 @@ impl Session {
         let translation = self.translate(&text, &t.lang, mt, &mut |_| {})?;
         if has_words(&translation) {
             let speaker = self.draft_speaker(&pcm[draft_from.min(pcm.len())..]);
-            emit(Caption { id: self.next_id, stage: Stage::Partial, lang: t.lang, source: text, translation, speaker });
+            let color = speaker.and_then(|s| self.speakers.color(s));
+            emit(Caption { id: self.next_id, stage: Stage::Partial, lang: t.lang, source: text, translation, speaker, color });
         }
         Ok(())
     }
@@ -654,7 +659,8 @@ impl Session {
             let from = start_ms + span * done as u64 / total as u64;
             done += source.chars().count();
             let to = start_ms + span * done as u64 / total as u64;
-            let mut cap = Caption { id: self.next_id, stage: Stage::Streaming, lang: lang.clone(), source, translation: String::new(), speaker };
+            let color = speaker.and_then(|s| self.speakers.color(s));
+            let mut cap = Caption { id: self.next_id, stage: Stage::Streaming, lang: lang.clone(), source, translation: String::new(), speaker, color };
             let mut acc = String::new();
             cap.translation = self.translate(&cap.source, &cap.lang, mt, &mut |piece| {
                 acc.push_str(piece);
