@@ -129,10 +129,10 @@
       "id": "3dspeaker-campplus-zh-en-advanced",
       "kind": "speaker",
       "label": "3D-Speaker CAM++ (speaker embedding)",
-      "url": "https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/a8055d6daef723a6a4ecf4de233708575bf4994f/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
+      "url": "https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
       "file": "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
-      "size": 28281165,
-      "sha256": "53cab20ba8f2eb2f6e2d89ecc18e88ef3222169b61b4419cbc13666744a4574b",
+      "size": 28281164,
+      "sha256": "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2",
       "default_for": []
     },
     {

@@ -243,7 +243,7 @@ this document.
 | plamo-3-translate-2b-Q4_K_M.gguf | `pfnet/plamo-3-translate-2b-GGUF` | `232fbd7916519edecddfdae0beae7e76fe70453f` | PLaMo Community License, revised 2026-11-09 (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>) |
 | plamo-3-translate-0.8b-Q4_K_M.gguf | `pfnet/plamo-3-translate-0.8b-GGUF` | `dbeb0856cb0b004b484f190bb71dd65876297013` | PLaMo Community License, revised 2026-11-09 (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>) |
 | ggml-silero-v6.2.0.bin | `ggml-org/whisper-vad` | `9ffd54a1e1ee413ddf265af9913beaf518d1639b` | MIT (Silero VAD) |
-| 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx | `csukuangfj/speaker-embedding-models` | `a8055d6daef723a6a4ecf4de233708575bf4994f` | Apache-2.0 (3D-Speaker CAM++, ONNX conversion by sherpa-onnx) |
+| 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx | `csukuangfj/speaker-embedding-models` | `0743f301363dec56491a490f6d6cbc9d67f9a3bf` | Apache-2.0 (3D-Speaker CAM++, ONNX conversion by sherpa-onnx) |
 | model.onnx | `csukuangfj/sherpa-onnx-pyannote-segmentation-3-0` | `9403a6902bb58e3d5ae8c7e77c3422de279db2e0` | MIT (pyannote segmentation-3.0, ONNX conversion) |
 
 Attribution for the MIT-licensed model weights and the VAD model:
