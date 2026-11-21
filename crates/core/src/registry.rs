@@ -7,6 +7,10 @@ pub enum Kind {
     Asr,
     Translator,
     Vad,
+    /// Speaker embeddings, for telling speakers apart (optional, `diarize` builds).
+    Speaker,
+    /// Speaker segmentation: where the speaker changes (optional, `diarize` builds).
+    Segmentation,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,5 +76,8 @@ mod tests {
         assert!(r.models.iter().all(|m| m.sha256.len() == 64 && m.url.starts_with("https://")));
         // A moving ref like `main` lets upstream re-uploads break the pinned sha256.
         assert!(r.models.iter().all(|m| !m.url.contains("/resolve/main/")));
+        for k in [Kind::Speaker, Kind::Segmentation] {
+            assert_eq!(r.models.iter().filter(|m| m.kind == k).count(), 1, "one {k:?} model");
+        }
     }
 }

@@ -80,8 +80,11 @@ function apply(settings) {
   restoreAnchor(anchor);
 }
 
+/** Speaker colors: the caption gets spk-N from its color slot (see overlay.html); the session hands out free slots. */
+const speakerClass = (c) => (c.color == null ? "" : ` spk-${c.color % 6}`);
+
 const captionHtml = (c) =>
-  `<div class="cap ${c.stage}"${c.id == null ? "" : ` data-id="${c.id}"`}>${cfg.showSource ? `<span class="src">${esc(c.source)}</span>` : ""}<span class="tr">${esc(c.translation)}</span></div>`;
+  `<div class="cap ${c.stage}${speakerClass(c)}"${c.id == null ? "" : ` data-id="${c.id}"`}>${cfg.showSource ? `<span class="src">${esc(c.source)}</span>` : ""}<span class="tr">${esc(c.translation)}</span></div>`;
 
 /** Two sample captions so the "lines" setting is previewed too (real captions take priority). */
 function previewHtml() {

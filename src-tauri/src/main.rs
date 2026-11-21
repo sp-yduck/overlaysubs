@@ -61,6 +61,9 @@ struct Settings {
     browser_source_port: u16,
     /// Download the installer of a newer release in the background. It is only run when the user asks.
     auto_update: bool,
+    /// Tell speakers apart and color their captions (builds with the `diarize` feature, speaker model in the
+    /// models folder). Read when translation starts.
+    diarize: bool,
 }
 
 impl Default for Settings {
@@ -81,6 +84,7 @@ impl Default for Settings {
             browser_source: false,
             browser_source_port: 17777,
             auto_update: true,
+            diarize: false,
         }
     }
 }
@@ -237,6 +241,8 @@ struct Snapshot {
     hardware: Option<HardwareCache>,
     /// False in a build without a GPU backend; the settings UI then offers Auto / CPU only.
     gpu_build: bool,
+    /// Whether this build can tell speakers apart (its models are in `registry`, kinds speaker and segmentation).
+    diarize_build: bool,
 }
 
 #[tauri::command]
@@ -252,11 +258,12 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
         settings,
         registry,
         downloaded,
-        models_dir: dir,
         platform: std::env::consts::OS,
         devices: capture::devices(),
         hardware: hw::cached(&config_dir(&app)),
         gpu_build: GPU_BUILD,
+        diarize_build: cfg!(feature = "diarize"),
+        models_dir: dir,
     })
 }
 
@@ -537,7 +544,11 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     let source_hub = st.source_hub.clone();
     let session_id = st.session_seq.fetch_add(1, Ordering::SeqCst) + 1;
     let session_thread = std::thread::spawn(move || {
-        let mut session = Session::new(s.session);
+        let mut session = Session::new(s.session.clone());
+        #[cfg(feature = "diarize")]
+        if s.diarize {
+            load_speaker_models(&emit_app, &s, &mut session);
+        }
         let mut seen = 0;
         let mut emit = |c: Caption| {
             let _ = emit_app.emit("caption", &c);
@@ -581,6 +592,32 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
     st.overlay_hide_pending.store(false, Ordering::SeqCst);
     set_overlay_visible(&app, true);
     app.emit("running", true).map_err(|e| e.to_string())
+}
+
+/// Speaker colors (`diarize` builds, the setting on): the speaker embedding model labels each sentence's
+/// speaker, and the segmentation model finds where the speaker changes inside a draft so the caption is cut
+/// there. Both are downloaded from the settings page; with either missing or failing to load, captions have no
+/// speaker, as with the setting off.
+#[cfg(feature = "diarize")]
+fn load_speaker_models(app: &AppHandle, s: &Settings, session: &mut Session) {
+    use overlaysubs_core::registry::Kind;
+    let (reg, dir) = match registry(app) {
+        Ok(r) => (r, models_dir(app, s)),
+        Err(e) => return log::error!("speaker labels off: {e}"),
+    };
+    let path = |k: Kind| reg.models.iter().find(|m| m.kind == k).map(|m| dir.join(&m.file)).filter(|p| p.exists());
+    let (Some(voice), Some(seg)) = (path(Kind::Speaker), path(Kind::Segmentation)) else {
+        return log::info!("speaker labels off: the speaker models are not downloaded");
+    };
+    match (engine::Voice::load(&voice, 2), engine::Segmentation::load(&seg, 2)) {
+        (Ok(v), Ok(g)) => {
+            session.embedder = Some(Box::new(v));
+            session.segmenter = Some(Box::new(g));
+            session.speaker_commit = true;
+            log::info!("speaker labels on");
+        }
+        (Err(e), _) | (_, Err(e)) => log::error!("speaker labels off: {e}"),
+    }
 }
 
 #[tauri::command]

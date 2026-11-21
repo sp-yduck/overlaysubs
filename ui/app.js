@@ -246,10 +246,30 @@ function homePage() {
   <details class="card"><summary>${t("tuning")}</summary>
     ${select(t("form"), "session.form", opts([["", t("form_default")], ["plain", t("plain")], ["polite", t("polite")]], s.session.form), "nullable")}
     ${field(t("context"), "session.use_context", "check")}
+    ${diarizeField()}
     ${field(t("topic"), "session.topic", "text", `placeholder="${esc(t("topic_ph"))}"`)}
     <label class="f top"><span>${t("glossary")}</span><textarea data-k="session.glossary" data-t="glossary" placeholder="source=target">${esc(glossary)}</textarea></label>
   </details>
   ${card(t("recent"), `<div class="hist" data-hist="6"></div>`)}`;
+}
+
+/** The models speaker colors need (registry kinds "speaker" and "segmentation"), and those not downloaded. */
+const speakerModels = () => snap.registry.models.filter((m) => m.kind === "speaker" || m.kind === "segmentation");
+const speakerMissing = () => speakerModels().filter((m) => !snap.downloaded.includes(m.id));
+
+/** Speaker colors, in builds that can tell speakers apart. Turning it on downloads the models it still needs. */
+function diarizeField() {
+  if (!snap.diarize_build) return "";
+  const models = speakerModels();
+  const missing = speakerMissing();
+  const loading = busy.has("diarize-download") || missing.some((m) => progress[m.id]);
+  const status = !missing.length
+    ? `<span class="ok">✓ ${t("downloaded")}</span> <span class="muted">· ${gb(models.reduce((a, m) => a + m.size, 0))}</span> ${btn("diarize-delete", t("delete"), { cls: "small" })}`
+    : loading
+      ? missing.map((m) => `<span data-mstatus="${esc(m.id)}">${progress[m.id] ? progressView(progress[m.id]) : `<span class="muted">${t("downloading")}</span>`}</span>`).join(" ")
+      : `<span class="muted">${t("missing")} · ${gb(missing.reduce((a, m) => a + m.size, 0))}</span> ${btn("diarize-download", t("download"), { cls: "small" })}`;
+  return `<label class="chk"><input type="checkbox" data-k="diarize" data-t="check" ${snap.settings.diarize ? "checked" : ""}> ${esc(t("diarize"))}</label>
+    <div class="mstatus small"><span class="muted">${t("diarize_models")}:</span> ${status}</div>`;
 }
 
 const sourceUrl = () => `http://127.0.0.1:${snap.settings.browser_source_port}/`;
@@ -364,6 +384,8 @@ function render() {
   page ??= ready ? "home" : "models";
   const prev = $("#page");
   const keep = prev?.dataset.page === page ? prev.scrollTop : 0;
+  // A settings change re-renders the page; sections the user opened (<details>) stay open, matched by position.
+  const opened = prev?.dataset.page === page ? [...prev.querySelectorAll("details")].map((d) => d.open) : [];
   $("#app").className = "";
   $("#app").innerHTML = `
   <aside>
@@ -376,6 +398,7 @@ function render() {
     <select data-k="ui_lang" data-t="str" aria-label="${t("ui_lang")}">${opts([["en", "English"], ["ja", "日本語"], ["zh-hant", "繁體中文"], ["zh-hans", "简体中文"]], s.ui_lang)}</select>
   </aside>
   <section id="page" data-page="${page}">${updateBanner()}${PAGES[page]()}</section>`;
+  $("#page").querySelectorAll("details").forEach((d, i) => { if (opened[i]) d.open = true; });
   $("#page").scrollTop = keep;
   drawHistory();
   if (page === "about") { loadTerms(); loadLog(); }
@@ -487,7 +510,8 @@ document.addEventListener("change", (ev) => {
   // Number inputs accept typed values outside their min/max; normalize before saving so the file
   // holds the same values the overlay clamps to.
   if (k.startsWith("overlay.")) snap.settings.overlay = overlayConfig(snap.settings.overlay);
-  persist();
+  const fetchSpeakers = k === "diarize" && v && speakerMissing().length > 0;
+  persist().then(() => fetchSpeakers && runAct("diarize-download"));
 });
 
 async function act(name, id, el) {
@@ -510,6 +534,15 @@ async function act(name, id, el) {
     await invoke("download", { ids: [s.vad, s.asr, s.translator].filter((id) => !snap.downloaded.includes(id)) });
     progress = {};
     toast(t("download_done"));
+  }
+  if (name === "diarize-download") {
+    await invoke("download", { ids: speakerMissing().map((m) => m.id) });
+    progress = {};
+    toast(t("download_done"));
+  }
+  if (name === "diarize-delete") {
+    for (const m of speakerModels()) if (snap.downloaded.includes(m.id)) await invoke("delete_model", { id: m.id });
+    toast(t("deleted"));
   }
   if (name === "overlay-reset") {
     await invoke("reset_overlay_position");
@@ -584,6 +617,11 @@ document.addEventListener("click", async (ev) => {
   const el = ev.target.closest("[data-act]");
   if (!el || el.disabled) return;
   const { act: name, id } = el.dataset;
+  await runAct(name, id, el);
+});
+
+/** Runs an action with the page marked busy for it, as a button click does. */
+async function runAct(name, id, el) {
   const key = id && name !== "nav" ? `${name}:${id}` : name;
   if (busy.has(key)) return;
   busy.add(key);
@@ -591,7 +629,7 @@ document.addEventListener("click", async (ev) => {
   try { await act(name, id, el); }
   catch (e) { toast(errText(e), "error"); }
   finally { busy.delete(key); if (snap) render(); }
-});
+}
 
 listen("download", (e) => {
   const p = e.payload;
@@ -600,9 +638,10 @@ listen("download", (e) => {
   // it with a progress bar that would stay until the next render.
   if (snap?.downloaded.includes(p.id)) return;
   progress[p.id] = p;
-  // Progress is shown only on the models page. Re-rendering other pages on every chunk replaces the nav
-  // buttons between mousedown and mouseup, so clicks are lost until the download ends.
-  if (page !== "models") return;
+  // Progress is shown on the models page and, for the speaker models, under their toggle on the home page.
+  // Re-rendering on every chunk replaces the nav buttons between mousedown and mouseup, so clicks are lost
+  // until the download ends: the status cells are patched instead.
+  if (page !== "models" && page !== "home") return;
   // Patch the status cell of the row that shows this model. The cell is keyed by model id, so a selection
   // change during the download removes it and leaves nothing to update; switching back re-renders from the
   // recorded progress. Never render() here: rebuilding the page between mousedown and mouseup swallows the
