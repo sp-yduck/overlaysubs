@@ -212,7 +212,8 @@ function modelsPage() {
       ${modelRow("asr", "asr")}${modelRow("translator", "translator")}${modelRow("vad", "vad")}
       ${snap.gpu_build ? "" : `<p class="muted small">${t("gpu_build_cpu")}</p>`}
       ${snap.running ? `<p class="muted small">${t("model_restart_note")}</p>` : ""}
-      <div class="row">${btn("download", busy.has("download") ? t("downloading") : `${t("download")} (${gb(total)})`, { cls: ready ? "" : "primary", disabled: ready })}</div>`
+      <div class="row">${btn("download", busy.has("download") ? t("downloading") : `${t("download")} (${gb(total)})`, { cls: ready ? "" : "primary", disabled: ready })}</div>
+      ${speakerModelsRow()}`
     : `<p class="muted">${t("step_locked")}</p>`)}
   ${step(3, !!benchMsg, !ready, t("step_bench"), `<p class="muted">${t("step_bench_desc")}</p>
     <div class="row">${btn("bench", busy.has("bench") ? t("benchmarking") : t("benchmark"), { disabled: !ready })}${benchMsg ? `<span>${esc(benchMsg)}</span>` : ""}</div>`)}
@@ -258,18 +259,32 @@ const speakerModels = () => snap.registry.models.filter((m) => m.kind === "speak
 const speakerMissing = () => speakerModels().filter((m) => !snap.downloaded.includes(m.id));
 
 /** Speaker colors, in builds that can tell speakers apart. Turning it on downloads the models it still needs. */
-function diarizeField() {
-  if (!snap.diarize_build) return "";
+/** The speaker models' state: downloaded (with Delete), downloading (progress per model), or missing (with Download). */
+function speakerStatus() {
   const models = speakerModels();
   const missing = speakerMissing();
   const loading = busy.has("diarize-download") || missing.some((m) => progress[m.id]);
-  const status = !missing.length
+  return !missing.length
     ? `<span class="ok">✓ ${t("downloaded")}</span> <span class="muted">· ${gb(models.reduce((a, m) => a + m.size, 0))}</span> ${btn("diarize-delete", t("delete"), { cls: "small" })}`
     : loading
       ? missing.map((m) => `<span data-mstatus="${esc(m.id)}">${progress[m.id] ? progressView(progress[m.id]) : `<span class="muted">${t("downloading")}</span>`}</span>`).join(" ")
       : `<span class="muted">${t("missing")} · ${gb(missing.reduce((a, m) => a + m.size, 0))}</span> ${btn("diarize-download", t("download"), { cls: "small" })}`;
+}
+
+/** The speaker-color toggle with its models' state; turning it on downloads what is missing. */
+function diarizeField() {
+  if (!snap.diarize_build) return "";
   return `<label class="chk"><input type="checkbox" data-k="diarize" data-t="check" ${snap.settings.diarize ? "checked" : ""}> ${esc(t("diarize"))}</label>
-    <div class="mstatus small"><span class="muted">${t("diarize_models")}:</span> ${status}</div>`;
+    <div class="mstatus small"><span class="muted">${t("diarize_models")}:</span> ${speakerStatus()}</div>`;
+}
+
+/** On the models page: the optional speaker models (not part of the setup that translation needs). */
+function speakerModelsRow() {
+  if (!snap.diarize_build) return "";
+  const list = speakerModels().map((m) => `${esc(m.label)} · ${gb(m.size)}`).join("<br>");
+  return `<div class="mrow">
+    <div class="f"><span>${t("diarize_models")}</span><span class="muted small">${t("diarize_models_note")}<br>${list}</span></div>
+    <div class="mstatus">${speakerStatus()}</div></div>`;
 }
 
 const sourceUrl = () => `http://127.0.0.1:${snap.settings.browser_source_port}/`;

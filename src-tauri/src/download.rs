@@ -5,15 +5,21 @@ use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
 
+/// Whether `path` holds a downloaded model: there, with the size models.json declares.
+pub fn present(path: &Path, size: u64) -> bool {
+    fs::metadata(path).is_ok_and(|x| x.len() == size)
+}
+
 pub fn fetch(m: &ModelDef, dir: &Path, progress: &mut dyn FnMut(u64, u64)) -> Result<(), String> {
     fetch_file(&m.url, &m.file, m.size, &m.sha256, dir, progress)
 }
 
-/// Downloads `url` to `dir/file`; a no-op when that file is already there.
+/// Downloads `url` to `dir/file`; a no-op when that file is already there with the expected size. A file of another
+/// size (left from an earlier pin of the model, or cut short) is downloaded again and replaced.
 pub fn fetch_file(url: &str, file: &str, size: u64, sha256: &str, dir: &Path, progress: &mut dyn FnMut(u64, u64)) -> Result<(), String> {
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let dst = dir.join(file);
-    if dst.exists() {
+    if present(&dst, size) {
         return Ok(());
     }
     let part = dir.join(format!("{file}.part"));

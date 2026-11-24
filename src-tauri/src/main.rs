@@ -250,7 +250,7 @@ fn snapshot(app: AppHandle, st: State<App>) -> Result<Snapshot, String> {
     let settings = st.settings.lock().unwrap().clone();
     let registry = registry(&app)?;
     let dir = models_dir(&app, &settings);
-    let downloaded = registry.models.iter().filter(|m| dir.join(&m.file).exists()).map(|m| m.id.clone()).collect();
+    let downloaded = registry.models.iter().filter(|m| download::present(&dir.join(&m.file), m.size)).map(|m| m.id.clone()).collect();
     Ok(Snapshot {
         running: st.running.lock().unwrap().is_some(),
         overlay_visible: st.overlay_visible.load(Ordering::Relaxed),
@@ -434,7 +434,7 @@ fn ensure_engines(app: &AppHandle, st: &App) -> Result<(), String> {
 fn load_engines(app: &AppHandle, s: &Settings, cfg: &EngineConfig) -> Result<(engine::Whisper, engine::Plamo), String> {
     let reg = registry(app)?;
     let dir = models_dir(app, s);
-    let path = |id: &str| reg.get(id).map(|m| dir.join(&m.file)).filter(|p| p.exists()).ok_or(format!("model {id} not downloaded"));
+    let path = |id: &str| reg.get(id).filter(|m| download::present(&dir.join(&m.file), m.size)).map(|m| dir.join(&m.file)).ok_or(format!("model {id} not downloaded"));
     let (asr, vad, mt) = (path(&cfg.ids.asr)?, path(&cfg.ids.vad)?, path(&cfg.ids.translator)?);
     let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
     let load = |asr_gpu: bool, gpu_layers: u32| {
@@ -605,7 +605,7 @@ fn load_speaker_models(app: &AppHandle, s: &Settings, session: &mut Session) {
         Ok(r) => (r, models_dir(app, s)),
         Err(e) => return log::error!("speaker labels off: {e}"),
     };
-    let path = |k: Kind| reg.models.iter().find(|m| m.kind == k).map(|m| dir.join(&m.file)).filter(|p| p.exists());
+    let path = |k: Kind| reg.models.iter().find(|m| m.kind == k).filter(|m| download::present(&dir.join(&m.file), m.size)).map(|m| dir.join(&m.file));
     let (Some(voice), Some(seg)) = (path(Kind::Speaker), path(Kind::Segmentation)) else {
         return log::info!("speaker labels off: the speaker models are not downloaded");
     };
