@@ -14,4 +14,4 @@ whisper-rs-sys = { path = "vendor/whisper-rs-sys" }
 # `version.workspace = true`, and Tauri falls back to the Cargo package version because
 # src-tauri/tauri.conf.json has no "version" field. Bump it with scripts/set-version.sh.
 [workspace.package]
-version = "0.8.1"
+version = "0.9.0"
