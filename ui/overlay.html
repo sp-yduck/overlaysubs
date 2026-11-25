@@ -20,6 +20,17 @@
   .cap { align-self: var(--cap-align, center); max-width: 100%; text-align: var(--align, center); padding: 4px 14px; border-radius: 8px; background: var(--cap-bg, rgba(0,0,0,0.55)); color: var(--fg, #fff); font-size: var(--size, 28px); font-weight: var(--weight, 400); line-height: var(--line-height, 1.3); text-shadow: 0 1px 3px #000; }
   .cap .src { display: block; font-size: var(--src-size, 17px); color: var(--src-color, #cfd6e2); font-weight: 400; }
   .cap.partial .tr, .cap.streaming .tr { opacity: 0.6; }
+  /* Speaker colors (diarize builds): each caption carries spk-N, and its original and translation take the
+     speaker's color, in order of first appearance: light blue, orange, green, pink, lavender, then white.
+     No red, for color-blind viewers. */
+  .cap.spk-0 { --spk: #7fd0ff; }
+  .cap.spk-1 { --spk: #ffc86b; }
+  .cap.spk-2 { --spk: #9ee69e; }
+  .cap.spk-3 { --spk: #f0a6f0; }
+  .cap.spk-4 { --spk: #c3b1ff; }
+  .cap.spk-5 { --spk: #ffffff; }
+  .cap[class*="spk-"] .tr, .cap[class*="spk-"] .src { color: var(--spk); }
+  .cap[class*="spk-"] .src { opacity: 0.8; }
   /* Top-aligned captions start below the drag grip drawn over the top of the overlay. */
   body.top #lines { padding-top: 26px; }
   #grip { position: fixed; left: 0; top: 0; right: 0; height: 18px; font: 11px/18px system-ui, sans-serif; color: #fff; text-align: center; text-shadow: 0 1px 2px #000; }

@@ -180,6 +180,93 @@ impl Vad for Silero {
     }
 }
 
+/// Speaker embeddings from a sherpa-onnx speaker model (3D-Speaker CAM++, WeSpeaker ResNet, …), on the CPU.
+#[cfg(feature = "diarize")]
+pub struct Voice(sherpa_onnx::SpeakerEmbeddingExtractor);
+
+#[cfg(feature = "diarize")]
+impl Voice {
+    pub fn load(model: &Path, threads: usize) -> Result<Self, String> {
+        let cfg = sherpa_onnx::SpeakerEmbeddingExtractorConfig { model: Some(model.to_string_lossy().into_owned()), num_threads: threads as i32, ..Default::default() };
+        sherpa_onnx::SpeakerEmbeddingExtractor::create(&cfg).map(Self).ok_or_else(|| format!("cannot load speaker model {}", model.display()))
+    }
+}
+
+#[cfg(feature = "diarize")]
+impl overlaysubs_core::speaker::Embedder for Voice {
+    fn embed(&mut self, pcm: &[f32]) -> Result<Vec<f32>, String> {
+        let st = self.0.create_stream().ok_or("cannot create a speaker stream")?;
+        st.accept_waveform(16_000, pcm);
+        st.input_finished();
+        if !self.0.is_ready(&st) {
+            return Err("too little audio for a speaker embedding".into());
+        }
+        self.0.compute(&st).ok_or_else(|| "speaker embedding failed".into())
+    }
+}
+
+/// Speaker segmentation (pyannote segmentation-3.0 ONNX) on the CPU, run with the ONNX Runtime that sherpa-onnx
+/// ships next to the exe. The model gives, per 270-sample frame, one of 7 classes: nobody, one of 3 local
+/// voices, or a pair of them.
+#[cfg(feature = "diarize")]
+pub struct Segmentation(ort::session::Session);
+
+#[cfg(feature = "diarize")]
+impl Segmentation {
+    pub fn load(model: &Path, threads: usize) -> Result<Self, String> {
+        static ENV: std::sync::OnceLock<Result<ort::environment::Environment, String>> = std::sync::OnceLock::new();
+        // The exe's own copy (Windows would find a System32 one first by name).
+        let dll = onnxruntime_library();
+        let env = ENV
+            .get_or_init(|| ort::init_from(&dll).map_err(|e| format!("cannot load {}: {e}", dll.display()))?.build().map_err(|e| e.to_string()))
+            .as_ref()
+            .map_err(|e| e.clone())?;
+        let session = ort::session::Session::builder(env)
+            .map_err(|e| e.to_string())?
+            .with_intra_threads(threads)
+            .map_err(|e| e.to_string())?
+            .with_inter_threads(1)
+            .map_err(|e| e.to_string())?
+            .commit_from_file(model)
+            .map_err(|e| format!("cannot load segmentation model {}: {e}", model.display()))?;
+        Ok(Self(session))
+    }
+}
+
+/// The ONNX Runtime library sherpa-onnx ships with the app: next to the exe (Windows; System32 has an unrelated
+/// onnxruntime.dll that Windows would otherwise find first), or in the bundle's Frameworks (macOS), where its name
+/// carries the version.
+#[cfg(feature = "diarize")]
+fn onnxruntime_library() -> std::path::PathBuf {
+    let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)).unwrap_or_default();
+    if cfg!(windows) {
+        return exe_dir.join("onnxruntime.dll");
+    }
+    let (dirs, prefix, ext) = match cfg!(target_os = "macos") {
+        true => (vec![exe_dir.join("../Frameworks"), exe_dir.clone()], "libonnxruntime", ".dylib"),
+        false => (vec![exe_dir.clone()], "libonnxruntime", ".so"),
+    };
+    let found = dirs.iter().flat_map(|d| std::fs::read_dir(d).into_iter().flatten().flatten()).map(|e| e.path()).find(|p| {
+        let n = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        n.starts_with(prefix) && n.contains(ext) && !n.contains("providers")
+    });
+    found.unwrap_or_else(|| exe_dir.join(format!("{prefix}{ext}")))
+}
+
+#[cfg(feature = "diarize")]
+impl overlaysubs_core::speaker::Segmenter for Segmentation {
+    fn segment(&mut self, pcm: &[f32]) -> Result<(Vec<u8>, usize), String> {
+        // Powerset classes -> local voice bit masks: {}, {0}, {1}, {2}, {0,1}, {0,2}, {1,2}.
+        const MASKS: [u8; 7] = [0, 1, 2, 4, 3, 5, 6];
+        let x = ort::value::Tensor::from_array(([1usize, 1, pcm.len()], pcm.to_vec())).map_err(|e| e.to_string())?;
+        let out = self.0.run(ort::inputs!["x" => x]).map_err(|e| e.to_string())?;
+        let (shape, y) = out["y"].try_extract_tensor::<f32>().map_err(|e| e.to_string())?;
+        let classes = *shape.last().ok_or("no output shape")? as usize;
+        let frames = y.chunks(classes).map(|c| MASKS[c.iter().enumerate().max_by(|a, b| a.1.total_cmp(b.1)).map_or(0, |(i, _)| i).min(6)]).collect();
+        Ok((frames, 270))
+    }
+}
+
 pub struct Plamo {
     backend: LlamaBackend,
     model: LlamaModel,
@@ -457,12 +544,24 @@ mod tests {
         /// Against `<clip>.txt` / `<clip>.tr.txt` next to the WAV, when present.
         cer: Option<f64>,
         tr_cer: Option<f64>,
+        /// With OVERLAYSUBS_DIARIZE=1: seconds in the speaker models, speakers found, cuts at speaker changes.
+        #[serde(default)]
+        embed_s: f64,
+        #[serde(default)]
+        speakers: usize,
+        #[serde(default)]
+        early_commits: usize,
+        #[serde(default)]
+        speaker_commits: usize,
+        #[serde(default)]
+        segment_s: f64,
     }
 
     /// Speed and quality of the whole pipeline on recorded clips, replayed as live audio.
     /// Run it with scripts/bench.sh, which documents the inputs. Env: OVERLAYSUBS_WAV (a 16 kHz mono WAV or a
     /// folder of them), OVERLAYSUBS_OUT (report path), OVERLAYSUBS_BASELINE (an earlier report to compare with),
-    /// OVERLAYSUBS_ASR / OVERLAYSUBS_MT (model ids), OVERLAYSUBS_GPU=1.
+    /// OVERLAYSUBS_ASR / OVERLAYSUBS_MT (model ids), OVERLAYSUBS_GPU=1, OVERLAYSUBS_DIARIZE=1 (speaker colors as with the
+    /// setting on; needs `--features diarize`, downloads the speaker models).
     #[test]
     #[ignore]
     fn bench_report() {
@@ -505,6 +604,18 @@ mod tests {
             let vad_s = t0.elapsed().as_secs_f64();
             (asr.1, mt.1) = (Duration::ZERO, Duration::ZERO);
             let mut s = Session::new(SessionConfig::default());
+            #[cfg(feature = "diarize")]
+            if env("OVERLAYSUBS_DIARIZE", "") == "1" {
+                use overlaysubs_core::registry::Kind;
+                let file = |k: Kind| {
+                    let m = reg.models.iter().find(|m| m.kind == k).unwrap();
+                    crate::download::fetch(m, &dir, &mut |_, _| {}).unwrap();
+                    dir.join(&m.file)
+                };
+                s.embedder = Some(Box::new(Voice::load(&file(Kind::Speaker), 2).unwrap()));
+                s.segmenter = Some(Box::new(Segmentation::load(&file(Kind::Segmentation), 2).unwrap()));
+                s.speaker_commit = true;
+            }
             let mut seen = 0;
             let mut r = replay(evs, |(ev, pos)| {
                 s.tick(pos - seen);
@@ -533,6 +644,11 @@ mod tests {
                 tr_cer: reference("tr.txt", &translation),
                 source,
                 translation,
+                embed_s: s.embed_s,
+                speakers: s.speakers.speakers(),
+                early_commits: s.early_commits,
+                speaker_commits: s.speaker_commits,
+                segment_s: s.segment_s,
             });
         }
 
@@ -555,6 +671,13 @@ mod tests {
             row("asr s", c.asr_s, b.map(|b| b.asr_s));
             row("translate s", c.mt_s, b.map(|b| b.mt_s));
             row("vad s", c.vad_s, b.map(|b| b.vad_s));
+            if c.speakers > 0 {
+                row("embed s", c.embed_s, b.map(|b| b.embed_s));
+                row("speakers", c.speakers as f64, b.map(|b| b.speakers as f64));
+                row("early commits", c.early_commits as f64, b.map(|b| b.early_commits as f64));
+                row("speaker commits", c.speaker_commits as f64, b.map(|b| b.speaker_commits as f64));
+                row("segment s", c.segment_s, b.map(|b| b.segment_s));
+            }
             row("partials run", c.partials_run as f64, b.map(|b| b.partials_run as f64));
             row("partials skipped", c.partials_skipped as f64, b.map(|b| b.partials_skipped as f64));
             match b {

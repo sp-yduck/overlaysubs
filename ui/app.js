@@ -246,10 +246,17 @@ function homePage() {
   <details class="card"><summary>${t("tuning")}</summary>
     ${select(t("form"), "session.form", opts([["", t("form_default")], ["plain", t("plain")], ["polite", t("polite")]], s.session.form), "nullable")}
     ${field(t("context"), "session.use_context", "check")}
+    ${diarizeField()}
     ${field(t("topic"), "session.topic", "text", `placeholder="${esc(t("topic_ph"))}"`)}
     <label class="f top"><span>${t("glossary")}</span><textarea data-k="session.glossary" data-t="glossary" placeholder="source=target">${esc(glossary)}</textarea></label>
   </details>
   ${card(t("recent"), `<div class="hist" data-hist="6"></div>`)}`;
+}
+
+/** Speaker colors, in builds that can tell speakers apart (the models ship with the app). */
+function diarizeField() {
+  if (!snap.diarize_build) return "";
+  return `<label class="chk"><input type="checkbox" data-k="diarize" data-t="check" ${snap.settings.diarize ? "checked" : ""}> ${esc(t("diarize"))}</label>`;
 }
 
 const sourceUrl = () => `http://127.0.0.1:${snap.settings.browser_source_port}/`;
@@ -364,6 +371,8 @@ function render() {
   page ??= ready ? "home" : "models";
   const prev = $("#page");
   const keep = prev?.dataset.page === page ? prev.scrollTop : 0;
+  // A settings change re-renders the page; sections the user opened (<details>) stay open, matched by position.
+  const opened = prev?.dataset.page === page ? [...prev.querySelectorAll("details")].map((d) => d.open) : [];
   $("#app").className = "";
   $("#app").innerHTML = `
   <aside>
@@ -376,6 +385,7 @@ function render() {
     <select data-k="ui_lang" data-t="str" aria-label="${t("ui_lang")}">${opts([["en", "English"], ["ja", "日本語"], ["zh-hant", "繁體中文"], ["zh-hans", "简体中文"]], s.ui_lang)}</select>
   </aside>
   <section id="page" data-page="${page}">${updateBanner()}${PAGES[page]()}</section>`;
+  $("#page").querySelectorAll("details").forEach((d, i) => { if (opened[i]) d.open = true; });
   $("#page").scrollTop = keep;
   drawHistory();
   if (page === "about") { loadTerms(); loadLog(); }
@@ -584,6 +594,11 @@ document.addEventListener("click", async (ev) => {
   const el = ev.target.closest("[data-act]");
   if (!el || el.disabled) return;
   const { act: name, id } = el.dataset;
+  await runAct(name, id, el);
+});
+
+/** Runs an action with the page marked busy for it, as a button click does. */
+async function runAct(name, id, el) {
   const key = id && name !== "nav" ? `${name}:${id}` : name;
   if (busy.has(key)) return;
   busy.add(key);
@@ -591,7 +606,7 @@ document.addEventListener("click", async (ev) => {
   try { await act(name, id, el); }
   catch (e) { toast(errText(e), "error"); }
   finally { busy.delete(key); if (snap) render(); }
-});
+}
 
 listen("download", (e) => {
   const p = e.payload;

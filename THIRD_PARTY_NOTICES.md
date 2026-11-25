@@ -11,14 +11,20 @@ apply to the distributed builds.
   [§1](#1-bundled-native-libraries). The Windows installers additionally ship
   Khronos' **Vulkan loader** (`vulkan-1.dll`, Apache-2.0) next to
   `overlaysubs.exe`; it is covered by the Apache-2.0 text reproduced in
-  [§4](#4-license-texts).
+  [§4](#4-license-texts). For speaker colors, every installer also ships the
+  **sherpa-onnx** C API (Apache-2.0) and **ONNX Runtime** (MIT) shared
+  libraries, and the two speaker models: 3D-Speaker CAM++ (Apache-2.0) and
+  pyannote segmentation-3.0 (MIT); see [§1.4](#14-sherpa-onnx--apache-20) to
+  [§1.7](#17-pyannote-segmentation-30-speaker-model--mit).
 - **Rust dependencies.** The application statically links the third-party Rust
   crates listed in [§3](#3-rust-dependency-inventory). All of them are covered
   by the license texts reproduced in [§4](#4-license-texts).
 - **Where this notice is installed.** The installers bundle this file so that it
   is available on end-user machines: Windows places it in the installation
   directory next to `overlaysubs.exe`; macOS places it at
-  `OverlaySubs.app/Contents/Resources/THIRD_PARTY_NOTICES.md`.
+  `OverlaySubs.app/Contents/Resources/THIRD_PARTY_NOTICES.md`. ONNX Runtime's
+  own third-party notices (`onnxruntime-ThirdPartyNotices.txt`) are installed
+  next to it.
 - **Downloaded at runtime (not part of the installers).** On first run the app
   downloads model files from Hugging Face: OpenAI Whisper GGML models (MIT),
   Silero VAD (MIT) and PLaMo 3 Translate models. PLaMo is **not** open source;
@@ -55,6 +61,11 @@ Apache-2.0) next to the executable. The app is linked against `vulkan-1` at
 load time, so the loader has to be present for the process to start; on a PC
 without a Vulkan-capable GPU or driver it simply finds no device and the app
 runs on the CPU. See [§1.3](#13-khronos-vulkan-loader--apache-20-windows).
+
+For speaker colors, the installers also ship sherpa-onnx's C API and ONNX
+Runtime as shared libraries (Windows: next to the executable, macOS:
+`Contents/Frameworks/`). See [§1.4](#14-sherpa-onnx--apache-20) and
+[§1.5](#15-onnx-runtime--mit).
 
 ### 1.1 whisper.cpp — MIT
 
@@ -148,17 +159,123 @@ License text: Apache License 2.0, reproduced in
 [§4](#4-license-texts). The upstream `LICENSE.txt` notes that most of the
 project is Apache-2.0 and that a few files use more-permissive licenses.
 
+### 1.4 sherpa-onnx — Apache-2.0
+
+Version: sherpa-onnx 2.0.1 (prebuilt shared libraries downloaded by the
+sherpa-onnx-sys 2.0.1 crate)
+
+Upstream: <https://github.com/k2-fsa/sherpa-onnx>
+
+Bundled files: `sherpa-onnx-c-api.dll` and `sherpa-onnx-cxx-api.dll`
+(Windows), `libsherpa-onnx-c-api.dylib` (macOS). Used for speaker colors
+(speaker embeddings).
+
+Copyright: Xiaomi Corporation and the sherpa-onnx contributors
+
+License text: Apache License 2.0, reproduced in [§4](#4-license-texts).
+
+### 1.5 ONNX Runtime — MIT
+
+Version: the ONNX Runtime build shipped with sherpa-onnx 2.0.1
+
+Upstream: <https://onnxruntime.ai>
+
+Bundled files: `onnxruntime.dll` and `onnxruntime_providers_shared.dll`
+(Windows), `libonnxruntime*.dylib` (macOS). Used by sherpa-onnx and, for
+the speaker segmentation model, by the `ort` crate.
+
+ONNX Runtime includes third-party components; their notices are installed
+with the app as `onnxruntime-ThirdPartyNotices.txt` (next to this file) and
+kept in the repository at
+[`licenses/onnxruntime/ThirdPartyNotices.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/onnxruntime/ThirdPartyNotices.txt).
+
+Copyright: Copyright (c) Microsoft Corporation
+
+License text:
+
+```text
+MIT License
+
+Copyright (c) Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### 1.6 3D-Speaker CAM++ speaker model — Apache-2.0
+
+Bundled file: `speaker-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx` (28281165 bytes, SHA-256 `53cab20ba8f2eb2f6e2d89ecc18e88ef3222169b61b4419cbc13666744a4574b`), from <https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/a8055d6daef723a6a4ecf4de233708575bf4994f/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx>.
+
+Model: iic/speech_campplus_sv_zh_en_16k-common_advanced by the 3D-Speaker
+project (Alibaba Tongyi Lab),
+<https://modelscope.cn/models/iic/speech_campplus_sv_zh_en_16k-common_advanced>;
+upstream repository <https://github.com/modelscope/3D-Speaker>. ONNX
+conversion by sherpa-onnx.
+
+License text: Apache License 2.0, reproduced in [§4](#4-license-texts) and
+installed as `speaker-models/LICENSE-3dspeaker-campplus.txt`.
+
+### 1.7 pyannote segmentation-3.0 speaker model — MIT
+
+Bundled file: `speaker-models/pyannote-segmentation-3.0.onnx` (5992913 bytes, SHA-256 `220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079`), from <https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/9403a6902bb58e3d5ae8c7e77c3422de279db2e0/model.onnx>.
+
+Model: <https://huggingface.co/pyannote/segmentation-3.0>. ONNX conversion
+by sherpa-onnx. Installed with its license as
+`speaker-models/LICENSE-pyannote-segmentation.txt`.
+
+License text:
+
+```text
+MIT License
+
+Copyright (c) 2022 CNRS
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## 2. Runtime-downloaded model assets
 
 These files are **not** included in the installers. OverlaySubs downloads them
-from Hugging Face on first run and verifies each file against the size and
+on first run from Hugging Face, and verifies each file against the size and
 SHA-256 values declared in [`models.json`](https://github.com/sp-yduck/overlaysubs/blob/main/models.json). The MIT license text
 that covers the Whisper and Silero VAD assets is reproduced in [§4
 ("MIT")](#4-license-texts); the PLaMo assets are governed by the PLaMo
 Community License (revised November 9, 2026) linked in the header of this
-document.
+document. The speaker models are bundled instead; see [§1.6](#16-3d-speaker-campp-speaker-model--apache-20)
+and [§1.7](#17-pyannote-segmentation-30-speaker-model--mit).
 
-| Model file | Hugging Face repository | Pinned revision | License |
+| Model file | Repository | Pinned revision | License |
 |---|---|---|---|
 | ggml-large-v3-turbo.bin | `ggerganov/whisper.cpp` | `5359861c739e955e79d9a303bcbc70fb988958b1` | MIT (OpenAI Whisper weights, GGML conversion) |
 | ggml-large-v3-turbo-q5_0.bin | `ggerganov/whisper.cpp` | `5359861c739e955e79d9a303bcbc70fb988958b1` | MIT (OpenAI Whisper weights, GGML conversion) |
@@ -187,18 +304,19 @@ Attribution for the MIT-licensed model weights and the VAD model:
 ## 3. Rust dependency inventory
 
 Generated from the resolved Cargo dependency graph
-(`cargo metadata --format-version 1`, default features, all target
+(`cargo metadata --format-version 1 --features overlaysubs/diarize`, all target
 platforms). The two workspace crates `overlaysubs` and `overlaysubs-core` are
 excluded. The license column reproduces each package's `license` field
 verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 
-- Third-party crates: **509**
-- Distinct license units: **16**
+- Third-party crates: **548**
+- Distinct license units: **17**
 - Crates with no `license` field: **0** (every crate declares a license; none required a "see crate" fallback)
 
 | Crate | Version | License | Repository |
 |---|---|---|---|
 | `adler2` | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | https://github.com/oyvindln/adler2 |
+| `aes` | 0.9.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/block-ciphers |
 | `aho-corasick` | 1.1.5 | Unlicense OR MIT | https://github.com/BurntSushi/aho-corasick |
 | `alloc-no-stdlib` | 3.0.0 | BSD-3-Clause | https://github.com/dropbox/rust-alloc-no-stdlib |
 | `alloc-stdlib` | 0.3.0 | BSD-3-Clause | https://github.com/dropbox/rust-alloc-no-stdlib |
@@ -230,6 +348,9 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `bytemuck` | 1.25.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/Lokathor/bytemuck |
 | `byteorder` | 1.5.0 | Unlicense OR MIT | https://github.com/BurntSushi/byteorder |
 | `bytes` | 1.12.1 | MIT | https://github.com/tokio-rs/bytes |
+| `bzip2` | 0.4.4 | MIT/Apache-2.0 | https://github.com/alexcrichton/bzip2-rs |
+| `bzip2` | 0.6.1 | MIT OR Apache-2.0 | https://github.com/trifectatechfoundation/bzip2-rs |
+| `bzip2-sys` | 0.1.13+1.0.8 | MIT/Apache-2.0 | https://github.com/alexcrichton/bzip2-rs |
 | `cairo-rs` | 0.18.5 | MIT | https://github.com/gtk-rs/gtk-rs-core |
 | `cairo-sys-rs` | 0.18.2 | MIT | https://github.com/gtk-rs/gtk-rs-core |
 | `camino` | 1.2.6 | MIT OR Apache-2.0 | https://github.com/camino-rs/camino |
@@ -245,10 +366,13 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `cfg_aliases` | 0.2.2 | MIT | https://github.com/katharostech/cfg_aliases |
 | `chacha20` | 0.10.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/stream-ciphers |
 | `chrono` | 0.4.45 | MIT OR Apache-2.0 | https://github.com/chronotope/chrono |
+| `cipher` | 0.5.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | `clang-sys` | 1.9.1 | Apache-2.0 | https://github.com/KyleMayes/clang-sys |
 | `cmake` | 0.1.58 | MIT OR Apache-2.0 | https://github.com/rust-lang/cmake-rs |
+| `cmov` | 0.5.4 | Apache-2.0 OR MIT | https://github.com/RustCrypto/utils |
 | `combine` | 4.6.9 | MIT | https://github.com/Marwes/combine |
 | `const-oid` | 0.10.2 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
+| `constant_time_eq` | 0.6.1 | CC0-1.0 OR MIT-0 OR Apache-2.0 | https://codeberg.org/cesarb/constant_time_eq |
 | `cookie` | 0.18.2 | MIT OR Apache-2.0 | https://github.com/SergioBenitez/cookie-rs |
 | `core-foundation` | 0.10.1 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
 | `core-foundation-sys` | 0.8.7 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
@@ -256,6 +380,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `core-graphics-types` | 0.2.0 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
 | `coreaudio-rs` | 0.14.2 | MIT/Apache-2.0 | https://github.com/RustAudio/coreaudio-rs.git |
 | `cpal` | 0.18.2 | Apache-2.0 | https://github.com/RustAudio/cpal |
+| `cpubits` | 0.1.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | `cpufeatures` | 0.2.17 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | `cpufeatures` | 0.3.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | `crc32fast` | 1.5.4 | MIT OR Apache-2.0 | https://github.com/srijs/rust-crc32fast |
@@ -266,11 +391,13 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `cssparser` | 0.37.0 | MPL-2.0 | https://github.com/servo/rust-cssparser |
 | `cssparser-macros` | 0.7.1 | MPL-2.0 | https://github.com/servo/rust-cssparser |
 | `ctor` | 1.0.13 | Apache-2.0 OR MIT | https://github.com/mmastrac/linktime |
+| `ctutils` | 0.4.8 | Apache-2.0 OR MIT | https://github.com/RustCrypto/utils |
 | `darling` | 0.24.1 | MIT | https://github.com/TedDriggs/darling |
 | `darling_core` | 0.24.1 | MIT | https://github.com/TedDriggs/darling |
 | `darling_macro` | 0.24.1 | MIT | https://github.com/TedDriggs/darling |
 | `dasp_sample` | 0.11.0 | MIT OR Apache-2.0 | https://github.com/rustaudio/sample.git |
 | `dbus` | 0.9.12 | Apache-2.0/MIT | https://github.com/diwic/dbus-rs |
+| `deflate64` | 0.1.12 | MIT | https://github.com/anatawa12/deflate64-rs |
 | `defmt` | 1.2.0 | MIT OR Apache-2.0 | https://github.com/knurling-rs/defmt |
 | `defmt-macros` | 1.2.0 | MIT OR Apache-2.0 | https://github.com/knurling-rs/defmt |
 | `defmt-parser` | 1.1.0 | MIT OR Apache-2.0 | https://github.com/knurling-rs/defmt |
@@ -303,6 +430,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `fastrand` | 2.5.0 | Apache-2.0 OR MIT | https://github.com/smol-rs/fastrand |
 | `fdeflate` | 0.3.7 | MIT OR Apache-2.0 | https://github.com/image-rs/fdeflate |
 | `field-offset` | 0.3.6 | MIT OR Apache-2.0 | https://github.com/Diggsey/rust-field-offset |
+| `filetime` | 0.2.29 | MIT/Apache-2.0 | https://github.com/alexcrichton/filetime |
 | `find-msvc-tools` | 0.1.15 | MIT OR Apache-2.0 | https://github.com/rust-lang/cc-rs |
 | `find_cuda_helper` | 0.2.0 | MIT OR Apache-2.0 | https://github.com/Rust-GPU/Rust-CUDA |
 | `flate2` | 1.1.10 | MIT OR Apache-2.0 | https://github.com/rust-lang/flate2-rs |
@@ -349,6 +477,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `heck` | 0.4.1 | MIT OR Apache-2.0 | https://github.com/withoutboats/heck |
 | `heck` | 0.5.0 | MIT OR Apache-2.0 | https://github.com/withoutboats/heck |
 | `hex` | 0.4.3 | MIT OR Apache-2.0 | https://github.com/KokaKiwi/rust-hex |
+| `hmac` | 0.13.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/MACs |
 | `html5ever` | 0.39.0 | MIT OR Apache-2.0 | https://github.com/servo/html5ever |
 | `http` | 1.5.0 | MIT OR Apache-2.0 | https://github.com/hyperium/http |
 | `http-body` | 1.1.0 | MIT | https://github.com/hyperium/http-body |
@@ -374,6 +503,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `indexmap` | 1.9.3 | Apache-2.0 OR MIT | https://github.com/bluss/indexmap |
 | `indexmap` | 2.14.2 | Apache-2.0 OR MIT | https://github.com/indexmap-rs/indexmap |
 | `infer` | 0.22.0 | MIT | https://github.com/bojand/infer |
+| `inout` | 0.2.6 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | `ipnet` | 2.12.2 | MIT OR Apache-2.0 | https://github.com/krisprice/ipnet |
 | `itertools` | 0.13.0 | MIT OR Apache-2.0 | https://github.com/rust-itertools/itertools |
 | `itoa` | 1.0.18 | MIT OR Apache-2.0 | https://github.com/dtolnay/itoa |
@@ -398,10 +528,12 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `keyboard-types` | 0.8.3 | MIT OR Apache-2.0 | https://github.com/rust-windowing/keyboard-types |
 | `libappindicator` | 0.9.0 | Apache-2.0 OR MIT | - |
 | `libappindicator-sys` | 0.9.0 | Apache-2.0 OR MIT | - |
+| `libbz2-rs-sys` | 0.2.6 | bzip2-1.0.6 | https://github.com/trifectatechfoundation/libbzip2-rs |
 | `libc` | 0.2.191 | MIT OR Apache-2.0 | https://github.com/rust-lang/libc |
 | `libdbus-sys` | 0.2.7 | Apache-2.0/MIT | https://github.com/diwic/dbus-rs |
 | `libloading` | 0.7.4 | ISC | https://github.com/nagisa/rust_libloading/ |
 | `libloading` | 0.8.9 | ISC | https://github.com/nagisa/rust_libloading/ |
+| `libloading` | 0.9.1 | ISC | https://github.com/nagisa/rust_libloading/ |
 | `libredox` | 0.1.25 | MIT | https://gitlab.redox-os.org/redox-os/libredox.git |
 | `linux-raw-sys` | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/sunfishcode/linux-raw-sys |
 | `litemap` | 0.8.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
@@ -410,8 +542,10 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `lock_api` | 0.4.14 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | `log` | 0.4.35 | MIT OR Apache-2.0 | https://github.com/rust-lang/log |
 | `lru-slab` | 0.1.3 | MIT OR Apache-2.0 OR Zlib | https://github.com/Ralith/lru-slab |
+| `lzma-rust2` | 0.25.0 | Apache-2.0 | https://github.com/hasenbanck/lzma-rust2/ |
 | `mach2` | 0.6.0 | BSD-2-Clause OR MIT OR Apache-2.0 | https://github.com/JohnTitor/mach2 |
 | `markup5ever` | 0.39.0 | MIT OR Apache-2.0 | https://github.com/servo/html5ever |
+| `matrixmultiply` | 0.3.11 | MIT/Apache-2.0 | https://github.com/bluss/matrixmultiply/ |
 | `memchr` | 2.8.3 | Unlicense OR MIT | https://github.com/BurntSushi/memchr |
 | `memoffset` | 0.9.1 | MIT | https://github.com/Gilnaa/memoffset |
 | `mime` | 0.3.18 | MIT OR Apache-2.0 | https://github.com/hyperium/mime |
@@ -420,12 +554,15 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `miniz_oxide` | 0.9.1 | MIT OR Zlib OR Apache-2.0 | https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide |
 | `mio` | 1.2.4 | MIT | https://github.com/tokio-rs/mio |
 | `muda` | 0.20.0 | Apache-2.0 OR MIT | https://github.com/tauri-apps/muda |
+| `ndarray` | 0.17.2 | MIT OR Apache-2.0 | https://github.com/rust-ndarray/ndarray |
 | `ndk` | 0.9.0 | MIT OR Apache-2.0 | https://github.com/rust-mobile/ndk |
 | `ndk-context` | 0.1.1 | MIT OR Apache-2.0 | https://github.com/rust-windowing/android-ndk-rs |
 | `ndk-sys` | 0.6.0+11769913 | MIT OR Apache-2.0 | https://github.com/rust-mobile/ndk |
 | `new_debug_unreachable` | 1.0.6 | MIT | https://github.com/mbrubeck/rust-debug-unreachable |
+| `nix` | 0.32.0 | MIT | https://github.com/nix-rust/nix |
 | `nom` | 7.1.3 | MIT | https://github.com/Geal/nom |
 | `ntapi` | 0.4.3 | Apache-2.0 OR MIT | https://github.com/MSxDOS/ntapi |
+| `num-complex` | 0.4.6 | MIT OR Apache-2.0 | https://github.com/rust-num/num-complex |
 | `num-conv` | 0.2.2 | MIT OR Apache-2.0 | https://github.com/jhpratt/num-conv |
 | `num-derive` | 0.4.2 | MIT OR Apache-2.0 | https://github.com/rust-num/num-derive |
 | `num-integer` | 0.1.47 | MIT OR Apache-2.0 | https://github.com/rust-num/num-integer |
@@ -457,10 +594,13 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `objc2-web-kit` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | `once_cell` | 1.21.4 | MIT OR Apache-2.0 | https://github.com/matklad/once_cell |
 | `option-ext` | 0.2.0 | MPL-2.0 | https://github.com/soc/option-ext.git |
+| `ort` | 2.0.0-rc.15 | MIT OR Apache-2.0 | https://github.com/pykeio/ort |
+| `ort-sys` | 2.0.0-rc.15 | MIT OR Apache-2.0 | https://github.com/pykeio/ort |
 | `pango` | 0.18.3 | MIT | https://github.com/gtk-rs/gtk-rs-core |
 | `pango-sys` | 0.18.0 | MIT | https://github.com/gtk-rs/gtk-rs-core |
 | `parking_lot` | 0.12.5 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | `parking_lot_core` | 0.9.12 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
+| `pbkdf2` | 0.13.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/password-hashes |
 | `percent-encoding` | 2.3.2 | MIT OR Apache-2.0 | https://github.com/servo/rust-url/ |
 | `phf` | 0.13.1 | MIT | https://github.com/rust-phf/rust-phf |
 | `phf_codegen` | 0.13.1 | MIT | https://github.com/rust-phf/rust-phf |
@@ -475,6 +615,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `portable-atomic-util` | 0.2.8 | Apache-2.0 OR MIT | https://github.com/taiki-e/portable-atomic-util |
 | `potential_utf` | 0.1.6 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | `powerfmt` | 0.2.1 | MIT OR Apache-2.0 | https://github.com/jhpratt/powerfmt |
+| `ppmd-rust` | 1.5.2 | CC0-1.0 OR MIT-0 | https://github.com/hasenbanck/ppmd-rust |
 | `precomputed-hash` | 0.1.1 | MIT | https://github.com/emilio/precomputed-hash |
 | `prettyplease` | 0.2.37 | MIT OR Apache-2.0 | https://github.com/dtolnay/prettyplease |
 | `proc-macro-crate` | 1.3.1 | MIT OR Apache-2.0 | https://github.com/bkchr/proc-macro-crate |
@@ -494,6 +635,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `rand_core` | 0.10.1 | MIT OR Apache-2.0 | https://github.com/rust-random/rand_core |
 | `rand_pcg` | 0.10.2 | MIT OR Apache-2.0 | https://github.com/rust-random/rngs |
 | `raw-window-handle` | 0.6.2 | MIT OR Apache-2.0 OR Zlib | https://github.com/rust-windowing/raw-window-handle |
+| `rawpointer` | 0.2.1 | MIT/Apache-2.0 | https://github.com/bluss/rawpointer/ |
 | `redox_syscall` | 0.5.18 | MIT | https://gitlab.redox-os.org/redox-os/syscall |
 | `redox_users` | 0.5.3 | MIT | https://gitlab.redox-os.org/redox-os/users |
 | `ref-cast` | 1.0.27 | MIT OR Apache-2.0 | https://github.com/dtolnay/ref-cast |
@@ -537,8 +679,11 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `serialize-to-javascript` | 0.1.2 | MIT OR Apache-2.0 | https://github.com/chippers/serialize-to-javascript |
 | `serialize-to-javascript-impl` | 0.1.2 | MIT OR Apache-2.0 | https://github.com/chippers/serialize-to-javascript |
 | `servo_arc` | 0.4.3 | MIT OR Apache-2.0 | https://github.com/servo/stylo |
+| `sha1` | 0.11.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
 | `sha2` | 0.10.9 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
 | `sha2` | 0.11.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
+| `sherpa-onnx` | 2.0.1 | Apache-2.0 | https://github.com/k2-fsa/sherpa-onnx |
+| `sherpa-onnx-sys` | 2.0.1 | Apache-2.0 | https://github.com/k2-fsa/sherpa-onnx |
 | `shlex` | 1.3.0 | MIT OR Apache-2.0 | https://github.com/comex/rust-shlex |
 | `shlex` | 2.0.1 | MIT OR Apache-2.0 | https://github.com/comex/rust-shlex |
 | `simd-adler32` | 0.3.10 | MIT | https://github.com/mcountryman/simd-adler32 |
@@ -563,10 +708,11 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `syn` | 3.0.9 | MIT OR Apache-2.0 | https://github.com/dtolnay/syn |
 | `sync_wrapper` | 1.0.2 | Apache-2.0 | https://github.com/Actyx/sync_wrapper |
 | `synstructure` | 0.14.0 | MIT | https://github.com/mystor/synstructure |
-| `sysinfo` | 0.40.1 | MIT | https://github.com/GuillaumeGomez/sysinfo |
+| `sysinfo` | 0.40.3 | MIT | https://github.com/GuillaumeGomez/sysinfo |
 | `system-deps` | 6.2.2 | MIT OR Apache-2.0 | https://github.com/gdesmott/system-deps |
 | `tao` | 0.37.2 | Apache-2.0 | https://github.com/tauri-apps/tao |
 | `tao-macros` | 0.1.4 | MIT OR Apache-2.0 | https://github.com/tauri-apps/tao |
+| `tar` | 0.4.46 | MIT OR Apache-2.0 | https://github.com/composefs/tar-rs |
 | `target-lexicon` | 0.12.16 | Apache-2.0 WITH LLVM-exception | https://github.com/bytecodealliance/target-lexicon |
 | `tauri` | 2.12.5 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | `tauri-build` | 2.7.4 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
@@ -611,11 +757,13 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `tracing-core` | 0.1.36 | MIT | https://github.com/tokio-rs/tracing |
 | `tray-icon` | 0.25.1 | MIT OR Apache-2.0 | https://github.com/tauri-apps/tray-icon |
 | `try-lock` | 0.2.5 | MIT | https://github.com/seanmonstar/try-lock |
+| `typed-path` | 0.13.0 | MIT OR Apache-2.0 | https://github.com/chipsenkbeil/typed-path |
 | `typeid` | 1.0.3 | MIT OR Apache-2.0 | https://github.com/dtolnay/typeid |
 | `typenum` | 1.20.1 | MIT OR Apache-2.0 | https://github.com/paholg/typenum |
 | `unicode-ident` | 1.0.27 | (MIT OR Apache-2.0) AND Unicode-3.0 | https://github.com/dtolnay/unicode-ident |
 | `unicode-segmentation` | 1.13.3 | MIT OR Apache-2.0 | https://github.com/unicode-rs/unicode-segmentation |
 | `untrusted` | 0.9.0 | ISC | https://github.com/briansmith/untrusted |
+| `ureq` | 2.12.1 | MIT OR Apache-2.0 | https://github.com/algesten/ureq |
 | `url` | 2.5.8 | MIT OR Apache-2.0 | https://github.com/servo/rust-url |
 | `urlpattern` | 0.6.0 | MIT | https://github.com/denoland/rust-urlpattern |
 | `utf8_iter` | 1.1.0 | Apache-2.0 OR MIT | https://github.com/hsivonen/utf8_iter |
@@ -642,6 +790,7 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `web_atoms` | 0.2.6 | MIT OR Apache-2.0 | https://github.com/servo/html5ever |
 | `webkit2gtk` | 2.0.2 | MIT | https://github.com/tauri-apps/webkit2gtk-rs |
 | `webkit2gtk-sys` | 2.0.2 | MIT | https://github.com/tauri-apps/webkit2gtk-rs |
+| `webpki-roots` | 0.26.11 | CDLA-Permissive-2.0 | https://github.com/rustls/webpki-roots |
 | `webpki-roots` | 1.0.11 | CDLA-Permissive-2.0 | https://github.com/rustls/webpki-roots |
 | `webview2-com` | 0.39.1 | MIT | https://github.com/wravery/webview2-rs |
 | `webview2-com-macros` | 0.8.1 | MIT | https://github.com/wravery/webview2-rs |
@@ -696,17 +845,24 @@ verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).
 | `x11-dl` | 2.21.0 | MIT | https://github.com/AltF02/x11-rs.git |
 | `x11rb` | 0.13.2 | MIT OR Apache-2.0 | https://github.com/psychon/x11rb |
 | `x11rb-protocol` | 0.13.2 | MIT OR Apache-2.0 | https://github.com/psychon/x11rb |
+| `xattr` | 1.7.0 | MIT OR Apache-2.0 | https://github.com/Stebalien/xattr |
 | `xkeysym` | 0.2.1 | MIT OR Apache-2.0 OR Zlib | https://github.com/notgull/xkeysym |
 | `yoke` | 0.8.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | `yoke-derive` | 0.8.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | `zerofrom` | 0.1.8 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | `zerofrom-derive` | 0.1.8 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | `zeroize` | 1.9.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/utils |
+| `zeroize_derive` | 1.5.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/utils |
 | `zerotrie` | 0.2.5 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | `zerovec` | 0.11.9 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | `zerovec-derive` | 0.11.7 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| `zip` | 9.6.0 | MIT | https://github.com/zip-rs/zip2 |
 | `zlib-rs` | 0.6.8 | Zlib | https://github.com/trifectatechfoundation/zlib-rs |
 | `zmij` | 1.0.23 | MIT | https://github.com/dtolnay/zmij |
+| `zopfli` | 0.8.4 | Apache-2.0 | https://github.com/zopfli-rs/zopfli |
+| `zstd` | 0.14.4 | BSD-3-Clause | https://github.com/gyscos/zstd-rs |
+| `zstd-safe` | 8.3.0 | BSD-3-Clause | https://github.com/gyscos/zstd-rs |
+| `zstd-sys` | 2.1.3+zstd.1.5.7 | BSD-3-Clause AND BSD-2-Clause | https://github.com/gyscos/zstd-rs |
 
 ## 4. License texts
 
@@ -721,12 +877,13 @@ The text was taken from the license file of the first crate (alphabetically)
 that offers the license and ships a matching file; the source is noted under
 each section.
 
-### 4.1 MIT (464 crates)
+### 4.1 MIT (491 crates)
 
 Applies to the following crates (name version):
 
 ```text
   adler2 2.0.1
+  aes 0.9.4
   aho-corasick 1.1.5
   alsa 0.11.0
   alsa-sys 0.4.0
@@ -755,6 +912,9 @@ Applies to the following crates (name version):
   bytemuck 1.25.2
   byteorder 1.5.0
   bytes 1.12.1
+  bzip2 0.4.4
+  bzip2 0.6.1
+  bzip2-sys 0.1.13+1.0.8
   cairo-rs 0.18.5
   cairo-sys-rs 0.18.2
   camino 1.2.6
@@ -770,7 +930,9 @@ Applies to the following crates (name version):
   cfg_aliases 0.2.2
   chacha20 0.10.2
   chrono 0.4.45
+  cipher 0.5.2
   cmake 0.1.58
+  cmov 0.5.4
   combine 4.6.9
   const-oid 0.10.2
   cookie 0.18.2
@@ -779,6 +941,7 @@ Applies to the following crates (name version):
   core-graphics 0.25.0
   core-graphics-types 0.2.0
   coreaudio-rs 0.14.2
+  cpubits 0.1.1
   cpufeatures 0.2.17
   cpufeatures 0.3.1
   crc32fast 1.5.4
@@ -787,11 +950,13 @@ Applies to the following crates (name version):
   crypto-common 0.1.7
   crypto-common 0.2.2
   ctor 1.0.13
+  ctutils 0.4.8
   darling 0.24.1
   darling_core 0.24.1
   darling_macro 0.24.1
   dasp_sample 0.11.0
   dbus 0.9.12
+  deflate64 0.1.12
   defmt 1.2.0
   defmt-macros 1.2.0
   defmt-parser 1.1.0
@@ -822,6 +987,7 @@ Applies to the following crates (name version):
   fastrand 2.5.0
   fdeflate 0.3.7
   field-offset 0.3.6
+  filetime 0.2.29
   find-msvc-tools 0.1.15
   find_cuda_helper 0.2.0
   flate2 1.1.10
@@ -866,6 +1032,7 @@ Applies to the following crates (name version):
   heck 0.4.1
   heck 0.5.0
   hex 0.4.3
+  hmac 0.13.0
   html5ever 0.39.0
   http 1.5.0
   http-body 1.1.0
@@ -884,6 +1051,7 @@ Applies to the following crates (name version):
   indexmap 1.9.3
   indexmap 2.14.2
   infer 0.22.0
+  inout 0.2.6
   ipnet 2.12.2
   itertools 0.13.0
   itoa 1.0.18
@@ -919,6 +1087,7 @@ Applies to the following crates (name version):
   lru-slab 0.1.3
   mach2 0.6.0
   markup5ever 0.39.0
+  matrixmultiply 0.3.11
   memchr 2.8.3
   memoffset 0.9.1
   mime 0.3.18
@@ -927,12 +1096,15 @@ Applies to the following crates (name version):
   miniz_oxide 0.9.1
   mio 1.2.4
   muda 0.20.0
+  ndarray 0.17.2
   ndk 0.9.0
   ndk-context 0.1.1
   ndk-sys 0.6.0+11769913
   new_debug_unreachable 1.0.6
+  nix 0.32.0
   nom 7.1.3
   ntapi 0.4.3
+  num-complex 0.4.6
   num-conv 0.2.2
   num-derive 0.4.2
   num-integer 0.1.47
@@ -963,10 +1135,13 @@ Applies to the following crates (name version):
   objc2-user-notifications 0.3.2
   objc2-web-kit 0.3.2
   once_cell 1.21.4
+  ort 2.0.0-rc.15
+  ort-sys 2.0.0-rc.15
   pango 0.18.3
   pango-sys 0.18.0
   parking_lot 0.12.5
   parking_lot_core 0.9.12
+  pbkdf2 0.13.0
   percent-encoding 2.3.2
   phf 0.13.1
   phf_codegen 0.13.1
@@ -999,6 +1174,7 @@ Applies to the following crates (name version):
   rand_core 0.10.1
   rand_pcg 0.10.2
   raw-window-handle 0.6.2
+  rawpointer 0.2.1
   redox_syscall 0.5.18
   redox_users 0.5.3
   ref-cast 1.0.27
@@ -1038,6 +1214,7 @@ Applies to the following crates (name version):
   serialize-to-javascript 0.1.2
   serialize-to-javascript-impl 0.1.2
   servo_arc 0.4.3
+  sha1 0.11.0
   sha2 0.10.9
   sha2 0.11.1
   shlex 1.3.0
@@ -1062,9 +1239,10 @@ Applies to the following crates (name version):
   syn 2.0.119
   syn 3.0.9
   synstructure 0.14.0
-  sysinfo 0.40.1
+  sysinfo 0.40.3
   system-deps 6.2.2
   tao-macros 0.1.4
+  tar 0.4.46
   tauri 2.12.5
   tauri-build 2.7.4
   tauri-codegen 2.7.4
@@ -1107,10 +1285,12 @@ Applies to the following crates (name version):
   tracing-core 0.1.36
   tray-icon 0.25.1
   try-lock 0.2.5
+  typed-path 0.13.0
   typeid 1.0.3
   typenum 1.20.1
   unicode-ident 1.0.27
   unicode-segmentation 1.13.3
+  ureq 2.12.1
   url 2.5.8
   urlpattern 0.6.0
   utf8_iter 1.1.0
@@ -1187,43 +1367,52 @@ Applies to the following crates (name version):
   x11-dl 2.21.0
   x11rb 0.13.2
   x11rb-protocol 0.13.2
+  xattr 1.7.0
   xkeysym 0.2.1
   zeroize 1.9.1
+  zeroize_derive 1.5.0
+  zip 9.6.0
   zmij 1.0.23
 ```
 
-Text source: the LICENSE-MIT file in the aho-corasick 1.1.5 package.
+Text source: the LICENSE-MIT file in the aes 0.9.4 package.
 
 ```text
-The MIT License (MIT)
+Copyright (c) 2018-2024 The RustCrypto Project Developers
+Copyright (c) 2018 Artyom Pavlov
 
-Copyright (c) 2015 Andrew Gallant
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
 ```
 
-### 4.2 Apache-2.0 (352 crates)
+### 4.2 Apache-2.0 (381 crates)
 
 Applies to the following crates (name version):
 
 ```text
   adler2 2.0.1
+  aes 0.9.4
   alsa 0.11.0
   android_system_properties 0.1.6
   anyhow 1.0.104
@@ -1243,6 +1432,9 @@ Applies to the following crates (name version):
   bs58 0.5.1
   bumpalo 3.20.3
   bytemuck 1.25.2
+  bzip2 0.4.4
+  bzip2 0.6.1
+  bzip2-sys 0.1.13+1.0.8
   camino 1.2.6
   cargo-platform 0.1.9
   cargo_toml 1.0.1
@@ -1253,9 +1445,12 @@ Applies to the following crates (name version):
   cfg-if 1.0.5
   chacha20 0.10.2
   chrono 0.4.45
+  cipher 0.5.2
   clang-sys 1.9.1
   cmake 0.1.58
+  cmov 0.5.4
   const-oid 0.10.2
+  constant_time_eq 0.6.1
   cookie 0.18.2
   core-foundation 0.10.1
   core-foundation-sys 0.8.7
@@ -1263,6 +1458,7 @@ Applies to the following crates (name version):
   core-graphics-types 0.2.0
   coreaudio-rs 0.14.2
   cpal 0.18.2
+  cpubits 0.1.1
   cpufeatures 0.2.17
   cpufeatures 0.3.1
   crc32fast 1.5.4
@@ -1271,6 +1467,7 @@ Applies to the following crates (name version):
   crypto-common 0.1.7
   crypto-common 0.2.2
   ctor 1.0.13
+  ctutils 0.4.8
   dasp_sample 0.11.0
   dbus 0.9.12
   defmt 1.2.0
@@ -1298,6 +1495,7 @@ Applies to the following crates (name version):
   fastrand 2.5.0
   fdeflate 0.3.7
   field-offset 0.3.6
+  filetime 0.2.29
   find-msvc-tools 0.1.15
   find_cuda_helper 0.2.0
   flate2 1.1.10
@@ -1325,6 +1523,7 @@ Applies to the following crates (name version):
   heck 0.4.1
   heck 0.5.0
   hex 0.4.3
+  hmac 0.13.0
   html5ever 0.39.0
   http 1.5.0
   httparse 1.10.1
@@ -1337,6 +1536,7 @@ Applies to the following crates (name version):
   idna_adapter 1.2.2
   indexmap 1.9.3
   indexmap 2.14.2
+  inout 0.2.6
   ipnet 2.12.2
   itertools 0.13.0
   itoa 1.0.18
@@ -1362,17 +1562,21 @@ Applies to the following crates (name version):
   lock_api 0.4.14
   log 0.4.35
   lru-slab 0.1.3
+  lzma-rust2 0.25.0
   mach2 0.6.0
   markup5ever 0.39.0
+  matrixmultiply 0.3.11
   mime 0.3.18
   minimal-lexical 0.2.1
   miniz_oxide 0.8.9
   miniz_oxide 0.9.1
   muda 0.20.0
+  ndarray 0.17.2
   ndk 0.9.0
   ndk-context 0.1.1
   ndk-sys 0.6.0+11769913
   ntapi 0.4.3
+  num-complex 0.4.6
   num-conv 0.2.2
   num-derive 0.4.2
   num-integer 0.1.47
@@ -1400,8 +1604,11 @@ Applies to the following crates (name version):
   objc2-user-notifications 0.3.2
   objc2-web-kit 0.3.2
   once_cell 1.21.4
+  ort 2.0.0-rc.15
+  ort-sys 2.0.0-rc.15
   parking_lot 0.12.5
   parking_lot_core 0.9.12
+  pbkdf2 0.13.0
   percent-encoding 2.3.2
   pin-project-lite 0.2.17
   pkg-config 0.3.34
@@ -1426,6 +1633,7 @@ Applies to the following crates (name version):
   rand_core 0.10.1
   rand_pcg 0.10.2
   raw-window-handle 0.6.2
+  rawpointer 0.2.1
   ref-cast 1.0.27
   ref-cast-impl 1.0.27
   regex 1.13.1
@@ -1459,8 +1667,11 @@ Applies to the following crates (name version):
   serialize-to-javascript 0.1.2
   serialize-to-javascript-impl 0.1.2
   servo_arc 0.4.3
+  sha1 0.11.0
   sha2 0.10.9
   sha2 0.11.1
+  sherpa-onnx 2.0.1
+  sherpa-onnx-sys 2.0.1
   shlex 1.3.0
   shlex 2.0.1
   simd_cesu8 1.2.0
@@ -1481,6 +1692,7 @@ Applies to the following crates (name version):
   system-deps 6.2.2
   tao 0.37.2
   tao-macros 0.1.4
+  tar 0.4.46
   tauri 2.12.5
   tauri-build 2.7.4
   tauri-codegen 2.7.4
@@ -1512,10 +1724,12 @@ Applies to the following crates (name version):
   toml_parser 1.1.5+spec-1.1.0
   toml_writer 1.2.0+spec-1.1.0
   tray-icon 0.25.1
+  typed-path 0.13.0
   typeid 1.0.3
   typenum 1.20.1
   unicode-ident 1.0.27
   unicode-segmentation 1.13.3
+  ureq 2.12.1
   url 2.5.8
   utf8_iter 1.1.0
   utf_types 1.0.0
@@ -1573,8 +1787,11 @@ Applies to the following crates (name version):
   wry 0.57.1
   x11rb 0.13.2
   x11rb-protocol 0.13.2
+  xattr 1.7.0
   xkeysym 0.2.1
   zeroize 1.9.1
+  zeroize_derive 1.5.0
+  zopfli 0.8.4
 ```
 
 Text source: the LICENSE-APACHE file in the adler2 2.0.1 package.
@@ -1963,7 +2180,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 ```
 
-### 4.6 BSD-3-Clause (8 crates)
+### 4.6 BSD-3-Clause (11 crates)
 
 Applies to the following crates (name version):
 
@@ -1976,6 +2193,9 @@ Applies to the following crates (name version):
   num_enum 0.7.6
   num_enum_derive 0.7.6
   subtle 2.6.1
+  zstd 0.14.4
+  zstd-safe 8.3.0
+  zstd-sys 2.1.3+zstd.1.5.7
 ```
 
 Text source: the LICENSE file in the alloc-no-stdlib 3.0.0 package.
@@ -1995,7 +2215,7 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### 4.7 ISC (7 crates)
+### 4.7 ISC (8 crates)
 
 Applies to the following crates (name version):
 
@@ -2003,6 +2223,7 @@ Applies to the following crates (name version):
   hyper-rustls 0.27.10
   libloading 0.7.4
   libloading 0.8.9
+  libloading 0.9.1
   ring 0.17.14
   rustls 0.23.46
   rustls-webpki 0.103.16
@@ -2655,7 +2876,287 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
   defined by the Mozilla Public License, v. 2.0.
 ```
 
-### 4.10 LGPL-2.1-or-later (2 crates)
+### 4.10 CC0-1.0 (3 crates)
+
+Applies to the following crates (name version):
+
+```text
+  constant_time_eq 0.6.1
+  dunce 1.0.5
+  ppmd-rust 1.5.2
+```
+
+Text source: the LICENSE-CC0 file in the constant_time_eq 0.6.1 package.
+
+```text
+Creative Commons Legal Code
+
+CC0 1.0 Universal
+
+    CREATIVE COMMONS CORPORATION IS NOT A LAW FIRM AND DOES NOT PROVIDE
+    LEGAL SERVICES. DISTRIBUTION OF THIS DOCUMENT DOES NOT CREATE AN
+    ATTORNEY-CLIENT RELATIONSHIP. CREATIVE COMMONS PROVIDES THIS
+    INFORMATION ON AN "AS-IS" BASIS. CREATIVE COMMONS MAKES NO WARRANTIES
+    REGARDING THE USE OF THIS DOCUMENT OR THE INFORMATION OR WORKS
+    PROVIDED HEREUNDER, AND DISCLAIMS LIABILITY FOR DAMAGES RESULTING FROM
+    THE USE OF THIS DOCUMENT OR THE INFORMATION OR WORKS PROVIDED
+    HEREUNDER.
+
+Statement of Purpose
+
+The laws of most jurisdictions throughout the world automatically confer
+exclusive Copyright and Related Rights (defined below) upon the creator
+and subsequent owner(s) (each and all, an "owner") of an original work of
+authorship and/or a database (each, a "Work").
+
+Certain owners wish to permanently relinquish those rights to a Work for
+the purpose of contributing to a commons of creative, cultural and
+scientific works ("Commons") that the public can reliably and without fear
+of later claims of infringement build upon, modify, incorporate in other
+works, reuse and redistribute as freely as possible in any form whatsoever
+and for any purposes, including without limitation commercial purposes.
+These owners may contribute to the Commons to promote the ideal of a free
+culture and the further production of creative, cultural and scientific
+works, or to gain reputation or greater distribution for their Work in
+part through the use and efforts of others.
+
+For these and/or other purposes and motivations, and without any
+expectation of additional consideration or compensation, the person
+associating CC0 with a Work (the "Affirmer"), to the extent that he or she
+is an owner of Copyright and Related Rights in the Work, voluntarily
+elects to apply CC0 to the Work and publicly distribute the Work under its
+terms, with knowledge of his or her Copyright and Related Rights in the
+Work and the meaning and intended legal effect of CC0 on those rights.
+
+1. Copyright and Related Rights. A Work made available under CC0 may be
+protected by copyright and related or neighboring rights ("Copyright and
+Related Rights"). Copyright and Related Rights include, but are not
+limited to, the following:
+
+  i. the right to reproduce, adapt, distribute, perform, display,
+     communicate, and translate a Work;
+ ii. moral rights retained by the original author(s) and/or performer(s);
+iii. publicity and privacy rights pertaining to a person's image or
+     likeness depicted in a Work;
+ iv. rights protecting against unfair competition in regards to a Work,
+     subject to the limitations in paragraph 4(a), below;
+  v. rights protecting the extraction, dissemination, use and reuse of data
+     in a Work;
+ vi. database rights (such as those arising under Directive 96/9/EC of the
+     European Parliament and of the Council of 11 March 1996 on the legal
+     protection of databases, and under any national implementation
+     thereof, including any amended or successor version of such
+     directive); and
+vii. other similar, equivalent or corresponding rights throughout the
+     world based on applicable law or treaty, and any national
+     implementations thereof.
+
+2. Waiver. To the greatest extent permitted by, but not in contravention
+of, applicable law, Affirmer hereby overtly, fully, permanently,
+irrevocably and unconditionally waives, abandons, and surrenders all of
+Affirmer's Copyright and Related Rights and associated claims and causes
+of action, whether now known or unknown (including existing as well as
+future claims and causes of action), in the Work (i) in all territories
+worldwide, (ii) for the maximum duration provided by applicable law or
+treaty (including future time extensions), (iii) in any current or future
+medium and for any number of copies, and (iv) for any purpose whatsoever,
+including without limitation commercial, advertising or promotional
+purposes (the "Waiver"). Affirmer makes the Waiver for the benefit of each
+member of the public at large and to the detriment of Affirmer's heirs and
+successors, fully intending that such Waiver shall not be subject to
+revocation, rescission, cancellation, termination, or any other legal or
+equitable action to disrupt the quiet enjoyment of the Work by the public
+as contemplated by Affirmer's express Statement of Purpose.
+
+3. Public License Fallback. Should any part of the Waiver for any reason
+be judged legally invalid or ineffective under applicable law, then the
+Waiver shall be preserved to the maximum extent permitted taking into
+account Affirmer's express Statement of Purpose. In addition, to the
+extent the Waiver is so judged Affirmer hereby grants to each affected
+person a royalty-free, non transferable, non sublicensable, non exclusive,
+irrevocable and unconditional license to exercise Affirmer's Copyright and
+Related Rights in the Work (i) in all territories worldwide, (ii) for the
+maximum duration provided by applicable law or treaty (including future
+time extensions), (iii) in any current or future medium and for any number
+of copies, and (iv) for any purpose whatsoever, including without
+limitation commercial, advertising or promotional purposes (the
+"License"). The License shall be deemed effective as of the date CC0 was
+applied by Affirmer to the Work. Should any part of the License for any
+reason be judged legally invalid or ineffective under applicable law, such
+partial invalidity or ineffectiveness shall not invalidate the remainder
+of the License, and in such case Affirmer hereby affirms that he or she
+will not (i) exercise any of his or her remaining Copyright and Related
+Rights in the Work or (ii) assert any associated claims and causes of
+action with respect to the Work, in either case contrary to Affirmer's
+express Statement of Purpose.
+
+4. Limitations and Disclaimers.
+
+ a. No trademark or patent rights held by Affirmer are waived, abandoned,
+    surrendered, licensed or otherwise affected by this document.
+ b. Affirmer offers the Work as-is and makes no representations or
+    warranties of any kind concerning the Work, express, implied,
+    statutory or otherwise, including without limitation warranties of
+    title, merchantability, fitness for a particular purpose, non
+    infringement, or the absence of latent or other defects, accuracy, or
+    the present or absence of errors, whether or not discoverable, all to
+    the greatest extent permissible under applicable law.
+ c. Affirmer disclaims responsibility for clearing rights of other persons
+    that may apply to the Work or any use thereof, including without
+    limitation any person's Copyright and Related Rights in the Work.
+    Further, Affirmer disclaims responsibility for obtaining any necessary
+    consents, permissions or other rights required for any use of the
+    Work.
+ d. Affirmer understands and acknowledges that Creative Commons is not a
+    party to this document and has no duty or obligation with respect to
+    this CC0 or use of the Work.
+```
+
+### 4.11 MIT-0 (3 crates)
+
+Note: `dunce` offers MIT-0 only as one of three alternatives
+(CC0-1.0 OR MIT-0 OR Apache-2.0).
+
+Applies to the following crates (name version):
+
+```text
+  constant_time_eq 0.6.1
+  dunce 1.0.5
+  ppmd-rust 1.5.2
+```
+
+Text source: the LICENSE-MIT0 file in the constant_time_eq 0.6.1 package.
+
+```text
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### 4.12 BSD-2-Clause (2 crates)
+
+Applies to the following crates (name version):
+
+```text
+  mach2 0.6.0
+  zstd-sys 2.1.3+zstd.1.5.7
+```
+
+Text source: the LICENSE-BSD file in the mach2 0.6.0 package.
+
+```text
+Copyright (c) 2019 Nick Fitzgerald, 2021 Yuki Okushi
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+### 4.13 CDLA-Permissive-2.0 (2 crates)
+
+Applies to the following crates (name version):
+
+```text
+  webpki-roots 0.26.11
+  webpki-roots 1.0.11
+```
+
+Text source: the LICENSE file in the webpki-roots 0.26.11 package.
+
+```text
+# Community Data License Agreement - Permissive - Version 2.0
+
+This is the Community Data License Agreement - Permissive, Version
+2.0 (the "agreement"). Data Provider(s) and Data Recipient(s) agree
+as follows:
+
+## 1. Provision of the Data
+
+1.1. A Data Recipient may use, modify, and share the Data made
+available by Data Provider(s) under this agreement if that Data
+Recipient follows the terms of this agreement.
+
+1.2. This agreement does not impose any restriction on a Data
+Recipient's use, modification, or sharing of any portions of the
+Data that are in the public domain or that may be used, modified,
+or shared under any other legal exception or limitation.
+
+## 2. Conditions for Sharing Data
+
+2.1. A Data Recipient may share Data, with or without modifications, so
+long as the Data Recipient makes available the text of this agreement
+with the shared Data.
+
+## 3. No Restrictions on Results
+
+3.1. This agreement does not impose any restriction or obligations
+with respect to the use, modification, or sharing of Results.
+
+## 4. No Warranty; Limitation of Liability
+
+4.1. All Data Recipients receive the Data subject to the following
+terms:
+
+THE DATA IS PROVIDED ON AN "AS IS" BASIS, WITHOUT REPRESENTATIONS,
+WARRANTIES OR CONDITIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED
+INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR CONDITIONS OF TITLE,
+NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+
+NO DATA PROVIDER SHALL HAVE ANY LIABILITY FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING
+WITHOUT LIMITATION LOST PROFITS), HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE DATA OR RESULTS,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+## 5. Definitions
+
+5.1. "Data" means the material received by a Data Recipient under
+this agreement.
+
+5.2. "Data Provider" means any person who is the source of Data
+provided under this agreement and in reliance on a Data Recipient's
+agreement to its terms.
+
+5.3. "Data Recipient" means any person who receives Data directly
+or indirectly from a Data Provider and agrees to the terms of this
+agreement.
+
+5.4. "Results" means any outcome obtained by computational analysis
+of Data, including for example machine learning models and models'
+insights.
+```
+
+### 4.14 LGPL-2.1-or-later (2 crates)
 
 Note: `r-efi` offers LGPL-2.1-or-later only as one of three
 alternatives (MIT OR Apache-2.0 OR LGPL-2.1-or-later); the distributed
@@ -3175,7 +3676,7 @@ necessary.  Here is a sample; alter the names:
 That's all there is to it!
 ```
 
-### 4.11 0BSD (1 crate)
+### 4.15 0BSD (1 crate)
 
 Applies to the following crates (name version):
 
@@ -3200,43 +3701,7 @@ AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### 4.12 BSD-2-Clause (1 crate)
-
-Applies to the following crates (name version):
-
-```text
-  mach2 0.6.0
-```
-
-Text source: the LICENSE-BSD file in the mach2 0.6.0 package.
-
-```text
-Copyright (c) 2019 Nick Fitzgerald, 2021 Yuki Okushi
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-```
-
-### 4.13 BSL-1.0 (1 crate)
+### 4.16 BSL-1.0 (1 crate)
 
 Applies to the following crates (name version):
 
@@ -3272,244 +3737,63 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### 4.14 CC0-1.0 (1 crate)
+### 4.17 bzip2-1.0.6 (1 crate)
 
 Applies to the following crates (name version):
 
 ```text
-  dunce 1.0.5
+  libbz2-rs-sys 0.2.6
 ```
 
-Text source: the LICENSE file in the dunce 1.0.5 package.
+Text source: the LICENSE file in the libbz2-rs-sys 0.2.6 package.
 
 ```text
-Creative Commons Legal Code
+--------------------------------------------------------------------------
 
-CC0 1.0 Universal
+The original program, "bzip2", the associated library "libbzip2", and all
+documentation, are
 
-    CREATIVE COMMONS CORPORATION IS NOT A LAW FIRM AND DOES NOT PROVIDE
-    LEGAL SERVICES. DISTRIBUTION OF THIS DOCUMENT DOES NOT CREATE AN
-    ATTORNEY-CLIENT RELATIONSHIP. CREATIVE COMMONS PROVIDES THIS
-    INFORMATION ON AN "AS-IS" BASIS. CREATIVE COMMONS MAKES NO WARRANTIES
-    REGARDING THE USE OF THIS DOCUMENT OR THE INFORMATION OR WORKS
-    PROVIDED HEREUNDER, AND DISCLAIMS LIABILITY FOR DAMAGES RESULTING FROM
-    THE USE OF THIS DOCUMENT OR THE INFORMATION OR WORKS PROVIDED
-    HEREUNDER.
+Copyright (C) 1996-2021 Julian R Seward.
+Copyright (C) 2019-2020 Federico Mena Quintero
+Copyright (C) 2021 Micah Snyder
 
-Statement of Purpose
+This Rust translation, "libbzip2-rs" is a derived work based on "bzip2" and
+"libbzip2", and is Copyright (C) 2024-2025 Trifecta Tech Foundation and contributors
 
-The laws of most jurisdictions throughout the world automatically confer
-exclusive Copyright and Related Rights (defined below) upon the creator
-and subsequent owner(s) (each and all, an "owner") of an original work of
-authorship and/or a database (each, a "Work").
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
 
-Certain owners wish to permanently relinquish those rights to a Work for
-the purpose of contributing to a commons of creative, cultural and
-scientific works ("Commons") that the public can reliably and without fear
-of later claims of infringement build upon, modify, incorporate in other
-works, reuse and redistribute as freely as possible in any form whatsoever
-and for any purposes, including without limitation commercial purposes.
-These owners may contribute to the Commons to promote the ideal of a free
-culture and the further production of creative, cultural and scientific
-works, or to gain reputation or greater distribution for their Work in
-part through the use and efforts of others.
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
 
-For these and/or other purposes and motivations, and without any
-expectation of additional consideration or compensation, the person
-associating CC0 with a Work (the "Affirmer"), to the extent that he or she
-is an owner of Copyright and Related Rights in the Work, voluntarily
-elects to apply CC0 to the Work and publicly distribute the Work under its
-terms, with knowledge of his or her Copyright and Related Rights in the
-Work and the meaning and intended legal effect of CC0 on those rights.
+2. The origin of this software must not be misrepresented; you must
+   not claim that you wrote the original software.  If you use this
+   software in a product, an acknowledgment in the product
+   documentation would be appreciated but is not required.
 
-1. Copyright and Related Rights. A Work made available under CC0 may be
-protected by copyright and related or neighboring rights ("Copyright and
-Related Rights"). Copyright and Related Rights include, but are not
-limited to, the following:
+3. Altered source versions must be plainly marked as such, and must
+   not be misrepresented as being the original software.
 
-  i. the right to reproduce, adapt, distribute, perform, display,
-     communicate, and translate a Work;
- ii. moral rights retained by the original author(s) and/or performer(s);
-iii. publicity and privacy rights pertaining to a person's image or
-     likeness depicted in a Work;
- iv. rights protecting against unfair competition in regards to a Work,
-     subject to the limitations in paragraph 4(a), below;
-  v. rights protecting the extraction, dissemination, use and reuse of data
-     in a Work;
- vi. database rights (such as those arising under Directive 96/9/EC of the
-     European Parliament and of the Council of 11 March 1996 on the legal
-     protection of databases, and under any national implementation
-     thereof, including any amended or successor version of such
-     directive); and
-vii. other similar, equivalent or corresponding rights throughout the
-     world based on applicable law or treaty, and any national
-     implementations thereof.
+4. The name of the author may not be used to endorse or promote
+   products derived from this software without specific prior written
+   permission.
 
-2. Waiver. To the greatest extent permitted by, but not in contravention
-of, applicable law, Affirmer hereby overtly, fully, permanently,
-irrevocably and unconditionally waives, abandons, and surrenders all of
-Affirmer's Copyright and Related Rights and associated claims and causes
-of action, whether now known or unknown (including existing as well as
-future claims and causes of action), in the Work (i) in all territories
-worldwide, (ii) for the maximum duration provided by applicable law or
-treaty (including future time extensions), (iii) in any current or future
-medium and for any number of copies, and (iv) for any purpose whatsoever,
-including without limitation commercial, advertising or promotional
-purposes (the "Waiver"). Affirmer makes the Waiver for the benefit of each
-member of the public at large and to the detriment of Affirmer's heirs and
-successors, fully intending that such Waiver shall not be subject to
-revocation, rescission, cancellation, termination, or any other legal or
-equitable action to disrupt the quiet enjoyment of the Work by the public
-as contemplated by Affirmer's express Statement of Purpose.
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
+OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-3. Public License Fallback. Should any part of the Waiver for any reason
-be judged legally invalid or ineffective under applicable law, then the
-Waiver shall be preserved to the maximum extent permitted taking into
-account Affirmer's express Statement of Purpose. In addition, to the
-extent the Waiver is so judged Affirmer hereby grants to each affected
-person a royalty-free, non transferable, non sublicensable, non exclusive,
-irrevocable and unconditional license to exercise Affirmer's Copyright and
-Related Rights in the Work (i) in all territories worldwide, (ii) for the
-maximum duration provided by applicable law or treaty (including future
-time extensions), (iii) in any current or future medium and for any number
-of copies, and (iv) for any purpose whatsoever, including without
-limitation commercial, advertising or promotional purposes (the
-"License"). The License shall be deemed effective as of the date CC0 was
-applied by Affirmer to the Work. Should any part of the License for any
-reason be judged legally invalid or ineffective under applicable law, such
-partial invalidity or ineffectiveness shall not invalidate the remainder
-of the License, and in such case Affirmer hereby affirms that he or she
-will not (i) exercise any of his or her remaining Copyright and Related
-Rights in the Work or (ii) assert any associated claims and causes of
-action with respect to the Work, in either case contrary to Affirmer's
-express Statement of Purpose.
+Julian Seward, jseward@acm.org
+bzip2/libbzip2 version 1.1.0 of 6 September 2010
 
-4. Limitations and Disclaimers.
-
- a. No trademark or patent rights held by Affirmer are waived, abandoned,
-    surrendered, licensed or otherwise affected by this document.
- b. Affirmer offers the Work as-is and makes no representations or
-    warranties of any kind concerning the Work, express, implied,
-    statutory or otherwise, including without limitation warranties of
-    title, merchantability, fitness for a particular purpose, non
-    infringement, or the absence of latent or other defects, accuracy, or
-    the present or absence of errors, whether or not discoverable, all to
-    the greatest extent permissible under applicable law.
- c. Affirmer disclaims responsibility for clearing rights of other persons
-    that may apply to the Work or any use thereof, including without
-    limitation any person's Copyright and Related Rights in the Work.
-    Further, Affirmer disclaims responsibility for obtaining any necessary
-    consents, permissions or other rights required for any use of the
-    Work.
- d. Affirmer understands and acknowledges that Creative Commons is not a
-    party to this document and has no duty or obligation with respect to
-    this CC0 or use of the Work.
-```
-
-### 4.15 CDLA-Permissive-2.0 (1 crate)
-
-Applies to the following crates (name version):
-
-```text
-  webpki-roots 1.0.11
-```
-
-Text source: the LICENSE file in the webpki-roots 1.0.11 package.
-
-```text
-# Community Data License Agreement - Permissive - Version 2.0
-
-This is the Community Data License Agreement - Permissive, Version
-2.0 (the "agreement"). Data Provider(s) and Data Recipient(s) agree
-as follows:
-
-## 1. Provision of the Data
-
-1.1. A Data Recipient may use, modify, and share the Data made
-available by Data Provider(s) under this agreement if that Data
-Recipient follows the terms of this agreement.
-
-1.2. This agreement does not impose any restriction on a Data
-Recipient's use, modification, or sharing of any portions of the
-Data that are in the public domain or that may be used, modified,
-or shared under any other legal exception or limitation.
-
-## 2. Conditions for Sharing Data
-
-2.1. A Data Recipient may share Data, with or without modifications, so
-long as the Data Recipient makes available the text of this agreement
-with the shared Data.
-
-## 3. No Restrictions on Results
-
-3.1. This agreement does not impose any restriction or obligations
-with respect to the use, modification, or sharing of Results.
-
-## 4. No Warranty; Limitation of Liability
-
-4.1. All Data Recipients receive the Data subject to the following
-terms:
-
-THE DATA IS PROVIDED ON AN "AS IS" BASIS, WITHOUT REPRESENTATIONS,
-WARRANTIES OR CONDITIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED
-INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR CONDITIONS OF TITLE,
-NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
-
-NO DATA PROVIDER SHALL HAVE ANY LIABILITY FOR ANY DIRECT, INDIRECT,
-INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING
-WITHOUT LIMITATION LOST PROFITS), HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE DATA OR RESULTS,
-EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-
-## 5. Definitions
-
-5.1. "Data" means the material received by a Data Recipient under
-this agreement.
-
-5.2. "Data Provider" means any person who is the source of Data
-provided under this agreement and in reliance on a Data Recipient's
-agreement to its terms.
-
-5.3. "Data Recipient" means any person who receives Data directly
-or indirectly from a Data Provider and agrees to the terms of this
-agreement.
-
-5.4. "Results" means any outcome obtained by computational analysis
-of Data, including for example machine learning models and models'
-insights.
-```
-
-### 4.16 MIT-0 (1 crate)
-
-Note: `dunce` offers MIT-0 only as one of three alternatives
-(CC0-1.0 OR MIT-0 OR Apache-2.0). The canonical SPDX text keeps the
-placeholder (<YEAR> <COPYRIGHT HOLDER>) copyright line.
-
-Applies to the following crates (name version):
-
-```text
-  dunce 1.0.5
-```
-
-Text source: canonical text from https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/MIT-0.txt.
-
-```text
-MIT No Attribution
-
-Copyright <YEAR> <COPYRIGHT HOLDER>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this
-software and associated documentation files (the "Software"), to deal in the Software
-without restriction, including without limitation the rights to use, copy, modify,
-merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+--------------------------------------------------------------------------
 ```
 

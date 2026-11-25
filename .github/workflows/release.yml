@@ -259,6 +259,16 @@ jobs:
           cmake --version | Select-Object -First 1
           ninja --version
 
+      # The installers bundle the two speaker models (speaker colors): fetched at their models.json pins into
+      # src-tauri/speaker-models/ (bundle.resources); a size or SHA-256 mismatch fails the build.
+      - name: Stage the bundled speaker models
+        shell: bash
+        run: |
+          set -euo pipefail
+          py=$(command -v python || command -v python3)
+          "$py" scripts/stage-speaker-models.py
+          ls -l src-tauri/speaker-models
+
       # --- Windows: short target dir + placeholder DLLs, exactly as in the previous ci.yml bundle job ---
       - name: Build Windows binary with staged DLLs
         if: runner.os == 'Windows'
@@ -273,10 +283,17 @@ jobs:
           New-Item -ItemType Directory -Force src-tauri/libs | Out-Null
           # tauri-build checks the glob during this build too; a placeholder satisfies it until the real DLLs exist.
           New-Item -ItemType File -Force src-tauri/libs/placeholder.dll | Out-Null
-          cargo build --release -p overlaysubs --features ${{ matrix.features }}
+          cargo build --release -p overlaysubs --features "${{ matrix.features }} diarize"
           Remove-Item src-tauri/libs/placeholder.dll
           Copy-Item C:\t\release\build\llama-cpp-sys-2-*\out\bin\*.dll src-tauri/libs/
           if (!(Test-Path src-tauri/libs/llama.dll)) { throw "llama.dll was not staged" }
+          # Speaker colors (`diarize`): sherpa-onnx links its C API and ONNX Runtime as DLLs, which its build
+          # script puts in the profile directory. They must sit next to overlaysubs.exe: System32 has an
+          # unrelated onnxruntime.dll (a Windows ML stub) that Windows would otherwise load first.
+          foreach ($dll in 'sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll') {
+            Copy-Item "C:\t\release\$dll" src-tauri/libs/
+            if (!(Test-Path "src-tauri/libs/$dll")) { throw "$dll was not staged" }
+          }
           # whisper-rs-sys statically links whisper.cpp's Vulkan backend, which links `vulkan-1` on
           # MSVC, so overlaysubs.exe has a LOAD-TIME import of vulkan-1.dll; llama.cpp's ggml
           # DLLs chain to it as well. On a PC without a Vulkan runtime (no GPU driver, basic
@@ -309,7 +326,7 @@ jobs:
       # The npm package ships a prebuilt CLI; `cargo install tauri-cli` took up to 19 minutes.
       - name: Build Windows bundles
         if: runner.os == 'Windows'
-        run: npx --yes @tauri-apps/cli@2.12.4 build --features ${{ matrix.features }}
+        run: npx --yes @tauri-apps/cli@2.12.4 build --features "${{ matrix.features }} diarize"
         working-directory: src-tauri
 
       # Stage the exact final release filenames in the build job, so a workflow_dispatch dry
@@ -408,7 +425,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
           set -euo pipefail
-          args=(build --features metal)
+          args=(build --features "metal diarize")
           if [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
             echo "APPLE_SIGNING_IDENTITY is configured; letting Tauri sign with the Developer ID."
           else

@@ -4,3 +4,7 @@ src-tauri/libs/
 dist/
 .DS_Store
 *.log
+
+# Speaker models, fetched by scripts/stage-speaker-models.py (bundled with the app)
+src-tauri/speaker-models/*.onnx
+src-tauri/speaker-models/*.part

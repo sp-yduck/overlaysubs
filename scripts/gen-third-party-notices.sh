@@ -19,7 +19,7 @@
 #
 # The output is deterministic: it depends only on Cargo.lock, the license files
 # in the cargo cache (including the whisper.cpp / llama.cpp checkouts),
-# models.json, the fallback license texts, and the Vulkan SDK pin in
+# models.json, licenses/onnxruntime/, the fallback license texts, and the Vulkan SDK pin in
 # .github/workflows/release.yml (the version of the bundled Vulkan loader,
 # which has no version number of its own in the file name). No timestamps,
 # tool versions or absolute host paths are written.
@@ -84,7 +84,8 @@ wrap_crates() {
 # 1. Dependency graph
 # ---------------------------------------------------------------------------
 printf '==> cargo metadata\n' >&2
-cargo metadata --format-version 1 > "$tmp/meta.json"
+# The installers are built with speaker colors (`diarize`), whose crates are optional.
+cargo metadata --format-version 1 --features overlaysubs/diarize > "$tmp/meta.json"
 
 # name/version -> manifest dir, for every package in the graph.
 jq -r '
@@ -213,6 +214,21 @@ vulkan_sdk_version=$(sed -n 's/^[[:space:]]*\$v = "\([0-9][0-9.]*\)"[[:space:]]*
   "$root/.github/workflows/release.yml" 2>/dev/null | head -n 1 || true)
 vulkan_sdk_version=${vulkan_sdk_version:-1.4.313.2}
 
+# Speaker colors (`diarize`): sherpa-onnx ships its C API and ONNX Runtime as
+# shared libraries, staged next to the executable (Windows) or into
+# Contents/Frameworks (macOS). The prebuilt archive the sherpa-onnx-sys build
+# script downloads carries no license files, so ONNX Runtime's LICENSE and
+# ThirdPartyNotices.txt are kept in licenses/onnxruntime/ (taken from the
+# onnxruntime 1.28.0 wheel; the bundled library is 1.28.2) and the latter is
+# installed next to this file.
+sherpa_sys_version=$(jq -r --arg n sherpa-onnx-sys '
+  [.packages[] | select(.name == $n)] | sort_by(.version) | .[-1].version // ""' "$tmp/meta.json")
+[ -n "$sherpa_sys_version" ] || { echo 'error: sherpa-onnx-sys not in dependency graph' >&2; exit 1; }
+onnxruntime_license_src="$root/licenses/onnxruntime/LICENSE"
+[ -f "$onnxruntime_license_src" ] || { echo "error: $onnxruntime_license_src is missing" >&2; exit 1; }
+clean_text "$onnxruntime_license_src" > "$tmp/onnxruntime-license.txt"
+onnxruntime_copyright=$(copyright_line "$tmp/onnxruntime-license.txt")
+
 # ---------------------------------------------------------------------------
 # 3. License texts for the Rust dependencies
 # ---------------------------------------------------------------------------
@@ -292,6 +308,9 @@ term_matches() {
     "LGPL-2.1-or-later")
       case "$base" in *lgpl*) return 0 ;; esac
       return 1
+      ;;
+    "bzip2-1.0.6")
+      grep -qF 'The original program, "bzip2", the associated library "libbzip2"' "$file"
       ;;
     *)
       return 1
@@ -387,14 +406,20 @@ apply to the distributed builds.
   [§1](#1-bundled-native-libraries). The Windows installers additionally ship
   Khronos' **Vulkan loader** (`vulkan-1.dll`, Apache-2.0) next to
   `overlaysubs.exe`; it is covered by the Apache-2.0 text reproduced in
-  [§4](#4-license-texts).
+  [§4](#4-license-texts). For speaker colors, every installer also ships the
+  **sherpa-onnx** C API (Apache-2.0) and **ONNX Runtime** (MIT) shared
+  libraries, and the two speaker models: 3D-Speaker CAM++ (Apache-2.0) and
+  pyannote segmentation-3.0 (MIT); see [§1.4](#14-sherpa-onnx--apache-20) to
+  [§1.7](#17-pyannote-segmentation-30-speaker-model--mit).
 - **Rust dependencies.** The application statically links the third-party Rust
   crates listed in [§3](#3-rust-dependency-inventory). All of them are covered
   by the license texts reproduced in [§4](#4-license-texts).
 - **Where this notice is installed.** The installers bundle this file so that it
   is available on end-user machines: Windows places it in the installation
   directory next to `overlaysubs.exe`; macOS places it at
-  `OverlaySubs.app/Contents/Resources/THIRD_PARTY_NOTICES.md`.
+  `OverlaySubs.app/Contents/Resources/THIRD_PARTY_NOTICES.md`. ONNX Runtime's
+  own third-party notices (`onnxruntime-ThirdPartyNotices.txt`) are installed
+  next to it.
 - **Downloaded at runtime (not part of the installers).** On first run the app
   downloads model files from Hugging Face: OpenAI Whisper GGML models (MIT),
   Silero VAD (MIT) and PLaMo 3 Translate models. PLaMo is **not** open source;
@@ -436,6 +461,11 @@ load time, so the loader has to be present for the process to start; on a PC
 without a Vulkan-capable GPU or driver it simply finds no device and the app
 runs on the CPU. See [§1.3](#13-khronos-vulkan-loader--apache-20-windows).
 
+For speaker colors, the installers also ship sherpa-onnx's C API and ONNX
+Runtime as shared libraries (Windows: next to the executable, macOS:
+`Contents/Frameworks/`). See [§1.4](#14-sherpa-onnx--apache-20) and
+[§1.5](#15-onnx-runtime--mit).
+
 SECTION1
   printf '### 1.1 whisper.cpp — MIT\n\n'
   printf 'Version: whisper.cpp %s (vendored in the whisper-rs-sys %s crate)\n\n' \
@@ -474,23 +504,74 @@ SECTION1
   printf '[§4](#4-license-texts). The upstream `LICENSE.txt` notes that most of the\n'
   printf 'project is Apache-2.0 and that a few files use more-permissive licenses.\n\n'
 
+  printf '### 1.4 sherpa-onnx — Apache-2.0\n\n'
+  printf 'Version: sherpa-onnx %s (prebuilt shared libraries downloaded by the\n' "$sherpa_sys_version"
+  printf 'sherpa-onnx-sys %s crate)\n\n' "$sherpa_sys_version"
+  printf 'Upstream: <https://github.com/k2-fsa/sherpa-onnx>\n\n'
+  printf 'Bundled files: `sherpa-onnx-c-api.dll` and `sherpa-onnx-cxx-api.dll`\n'
+  printf '(Windows), `libsherpa-onnx-c-api.dylib` (macOS). Used for speaker colors\n'
+  printf '(speaker embeddings).\n\n'
+  printf 'Copyright: Xiaomi Corporation and the sherpa-onnx contributors\n\n'
+  printf 'License text: Apache License 2.0, reproduced in [§4](#4-license-texts).\n\n'
+
+  printf '### 1.5 ONNX Runtime — MIT\n\n'
+  printf 'Version: the ONNX Runtime build shipped with sherpa-onnx %s\n\n' "$sherpa_sys_version"
+  printf 'Upstream: <https://onnxruntime.ai>\n\n'
+  printf 'Bundled files: `onnxruntime.dll` and `onnxruntime_providers_shared.dll`\n'
+  printf '(Windows), `libonnxruntime*.dylib` (macOS). Used by sherpa-onnx and, for\n'
+  printf 'the speaker segmentation model, by the `ort` crate.\n\n'
+  printf 'ONNX Runtime includes third-party components; their notices are installed\n'
+  printf 'with the app as `onnxruntime-ThirdPartyNotices.txt` (next to this file) and\n'
+  printf 'kept in the repository at\n'
+  printf '[`licenses/onnxruntime/ThirdPartyNotices.txt`](https://github.com/sp-yduck/overlaysubs/blob/main/licenses/onnxruntime/ThirdPartyNotices.txt).\n\n'
+  printf 'Copyright: %s\n\n' "$onnxruntime_copyright"
+  printf 'License text:\n\n```text\n'
+  cat "$tmp/onnxruntime-license.txt"
+  printf '```\n\n'
+
+  # The speaker models are bundled (src-tauri/speaker-models/, staged from their
+  # models.json pins by scripts/stage-speaker-models.py); their license files
+  # are installed next to them.
+  printf '### 1.6 3D-Speaker CAM++ speaker model — Apache-2.0\n\n'
+  jq -r '.models[] | select(.kind == "speaker") | "Bundled file: `speaker-models/\(.file)` (\(.size) bytes, SHA-256 `\(.sha256)`), from <\(.url)>.\n"' "$models_json"
+  printf 'Model: iic/speech_campplus_sv_zh_en_16k-common_advanced by the 3D-Speaker\n'
+  printf 'project (Alibaba Tongyi Lab),\n'
+  printf '<https://modelscope.cn/models/iic/speech_campplus_sv_zh_en_16k-common_advanced>;\n'
+  printf 'upstream repository <https://github.com/modelscope/3D-Speaker>. ONNX\n'
+  printf 'conversion by sherpa-onnx.\n\n'
+  printf 'License text: Apache License 2.0, reproduced in [§4](#4-license-texts) and\n'
+  printf 'installed as `speaker-models/LICENSE-3dspeaker-campplus.txt`.\n\n'
+
+  printf '### 1.7 pyannote segmentation-3.0 speaker model — MIT\n\n'
+  jq -r '.models[] | select(.kind == "segmentation") | "Bundled file: `speaker-models/\(.file)` (\(.size) bytes, SHA-256 `\(.sha256)`), from <\(.url)>.\n"' "$models_json"
+  printf 'Model: <https://huggingface.co/pyannote/segmentation-3.0>. ONNX conversion\n'
+  printf 'by sherpa-onnx. Installed with its license as\n'
+  printf '`speaker-models/LICENSE-pyannote-segmentation.txt`.\n\n'
+  printf 'License text:\n\n```text\n'
+  sed -n '/^MIT License/,$p' "$root/src-tauri/speaker-models/LICENSE-pyannote-segmentation.txt"
+  printf '```\n\n'
+
   # --- §2 runtime model assets ---------------------------------------------
   cat <<'SECTION2'
 ## 2. Runtime-downloaded model assets
 
 These files are **not** included in the installers. OverlaySubs downloads them
-from Hugging Face on first run and verifies each file against the size and
+on first run from Hugging Face, and verifies each file against the size and
 SHA-256 values declared in [`models.json`](https://github.com/sp-yduck/overlaysubs/blob/main/models.json). The MIT license text
 that covers the Whisper and Silero VAD assets is reproduced in [§4
 ("MIT")](#4-license-texts); the PLaMo assets are governed by the PLaMo
 Community License (revised November 9, 2026) linked in the header of this
-document.
+document. The speaker models are bundled instead; see [§1.6](#16-3d-speaker-campp-speaker-model--apache-20)
+and [§1.7](#17-pyannote-segmentation-30-speaker-model--mit).
 
-| Model file | Hugging Face repository | Pinned revision | License |
+| Model file | Repository | Pinned revision | License |
 |---|---|---|---|
 SECTION2
   jq -r '.models[]
-    | (.url | capture("^https://huggingface\\.co/(?<repo>[^/]+/[^/]+)/resolve/(?<rev>[0-9a-f]{40})/(?<file>[^/]+)$"))
+    | select(.kind != "speaker" and .kind != "segmentation")
+    | (.url | (capture("^https://huggingface\\.co/(?<repo>[^/]+/[^/]+)/resolve/(?<rev>[0-9a-f]{40})/(?<file>[^/]+)$")
+               // (capture("^https://github\\.com/(?<repo>[^/]+/[^/]+)/releases/download/(?<tag>[^/]+)/(?<file>[^/]+)$")
+                   | .rev = "release " + .tag + ", SHA-256 in models.json")))
     | [ .file, .repo, .rev ] | @tsv' "$models_json" > "$tmp/models.tsv"
   while IFS=$'\t' read -r file repo rev; do
     case "$repo" in
@@ -516,7 +597,7 @@ SECTION2
   # --- §3 Rust dependency inventory ----------------------------------------
   printf '## 3. Rust dependency inventory\n\n'
   printf 'Generated from the resolved Cargo dependency graph\n'
-  printf '(`cargo metadata --format-version 1`, default features, all target\n'
+  printf '(`cargo metadata --format-version 1 --features overlaysubs/diarize`, all target\n'
   printf 'platforms). The two workspace crates `overlaysubs` and `overlaysubs-core` are\n'
   printf 'excluded. The license column reproduces each package'"'"'s `license` field\n'
   printf 'verbatim (SPDX expression); the texts are reproduced in [§4](#4-license-texts).\n\n'
@@ -566,8 +647,7 @@ SECTION2
         ;;
       "MIT-0")
         printf 'Note: `dunce` offers MIT-0 only as one of three alternatives\n'
-        printf '(CC0-1.0 OR MIT-0 OR Apache-2.0). The canonical SPDX text keeps the\n'
-        printf 'placeholder (<YEAR> <COPYRIGHT HOLDER>) copyright line.\n\n'
+        printf '(CC0-1.0 OR MIT-0 OR Apache-2.0).\n\n'
         ;;
     esac
     printf 'Applies to the following crates (name version):\n\n```text\n'
