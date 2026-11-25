@@ -8,6 +8,7 @@ use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::sampling::LlamaSampler;
+use llama_cpp_2::token::LlamaToken;
 use std::ffi::{c_char, c_void, CStr};
 use std::num::NonZeroU32;
 use std::path::Path;
@@ -271,18 +272,48 @@ pub struct Plamo {
     backend: LlamaBackend,
     model: LlamaModel,
     threads: i32,
+    /// The model file name and the GPU layer count: a failed generation is explained in the log,
+    /// and `translate` holds no path of its own.
+    model_file: String,
+    gpu_layers: u32,
 }
 
 const N_CTX: u32 = 4096;
 const MAX_NEW: usize = 256;
+/// A real translation does not say one token 32 times in a row; a degenerate generation does.
+const REPEAT_STOP: usize = 32;
 
 impl Plamo {
     pub fn load(model: &Path, gpu_layers: u32, threads: usize) -> Result<Self, String> {
         install_log_hooks();
         let backend = LlamaBackend::init().map_err(|e| e.to_string())?;
         let params = LlamaModelParams::default().with_n_gpu_layers(gpu_layers);
-        let model = LlamaModel::load_from_file(&backend, model, &params).map_err(|e| e.to_string())?;
-        Ok(Self { backend, model, threads: threads.min(8) as i32 })
+        let loaded = LlamaModel::load_from_file(&backend, model, &params).map_err(|e| e.to_string())?;
+        let model_file = model.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let threads = threads.min(8) as i32;
+        // App-level INFO is written to the log as it happens; the native engine's lines are only held
+        // back until the next ERROR, and may have rotated out by the time a translation fails.
+        log::info!("translator: {model_file}, gpu_layers {gpu_layers}, {threads} threads, n_ctx {N_CTX}");
+        Ok(Self { backend, model: loaded, threads, model_file, gpu_layers })
+    }
+
+    /// The most frequent sampled tokens as `id '<piece>' xN`, for a failure log line. The pieces come
+    /// from the tokenizer (`special = true`), so a broken output reads as token ids and names; no
+    /// caption text is logged.
+    fn summarize(&self, ids: &[i32]) -> String {
+        let vocab = self.model.vocab();
+        let mut counts: Vec<(i32, usize)> = Vec::new();
+        for &id in ids {
+            match counts.iter_mut().find(|e| e.0 == id) {
+                Some(e) => e.1 += 1,
+                None => counts.push((id, 1)),
+            }
+        }
+        counts.sort_by(|a, b| b.1.cmp(&a.1));
+        counts.iter().take(3).map(|&(id, n)| {
+            let piece = String::from_utf8_lossy(&vocab.token_to_piece(LlamaToken::new(id), true, None)).replace('\n', "\\n");
+            format!("{id} '{piece}' x{n}")
+        }).collect::<Vec<_>>().join(", ")
     }
 }
 
@@ -299,18 +330,68 @@ impl Translator for Plamo {
         let mut batch = LlamaBatch::new(N_CTX as usize, 1);
         batch.add_sequence(&tokens, 0, false).map_err(|e| e.to_string())?;
         ctx.decode(&mut batch).map_err(|e| e.to_string())?;
+        // A backend that is broken for this model can make every logit NaN or inf. llama.cpp's greedy
+        // sampler only replaces `selected` on a strictly greater logit, so all-NaN logits select vocab
+        // entry 0 at every position, and PLaMo 3's entry 0 is `<|plamo:unk|>` (llama.cpp issue #31509
+        // reports exactly this on Vulkan). Record the numbers rather than captioning the fallout.
+        let logits = ctx.get_logits_ith(batch.n_tokens() - 1);
+        let mut finite = 0usize;
+        let (mut lo, mut hi) = (f32::INFINITY, f32::NEG_INFINITY);
+        for &l in logits {
+            if l.is_finite() {
+                finite += 1;
+                lo = lo.min(l);
+                hi = hi.max(l);
+            }
+        }
+        if finite < logits.len() {
+            let not_finite = logits.len() - finite;
+            let range = match finite {
+                0 => "no finite logits".to_string(),
+                _ => format!("finite range {lo:.2}..{hi:.2}"),
+            };
+            log::error!("translator logits are not finite: {not_finite} of {} ({range}), {} prompt tokens, {}->{}, model {}, gpu_layers {}; the backend is broken for this model",
+                logits.len(), tokens.len(), req.source_lang.unwrap_or("auto"), req.target_lang, self.model_file, self.gpu_layers);
+            return Err(format!("translator logits are not finite ({not_finite} of {}); the GPU backend is likely broken for this model, see the log (try the translator on the CPU)", logits.len()));
+        }
         let mut sampler = LlamaSampler::greedy();
         let mut out = Vec::<u8>::new();
         let mut emitted = 0;
         let mut pos = tokens.len() as i32;
+        // Why generation ended and what it sampled. A failed generation is explained in the log and
+        // never becomes a caption; `finished` means the model itself ended the sentence.
+        let mut finished = false;
+        let mut failure: Option<&'static str> = None;
+        let mut sampled = Vec::<i32>::with_capacity(MAX_NEW);
+        let mut last = None::<i32>;
+        let mut run = 0usize;
         for _ in 0..MAX_NEW {
             let tok = sampler.sample(&ctx, batch.n_tokens() - 1);
+            let id = tok.0;
+            sampled.push(id);
+            run = if last == Some(id) { run + 1 } else { 1 };
+            last = Some(id);
             if vocab.is_eog(tok) {
+                finished = true;
                 break;
             }
-            out.extend(vocab.token_to_piece(tok, true, None));
+            // `<|plamo:unk|>`: not EOG and not in `pfml::STOP`. A broken generation would loop here
+            // until `MAX_NEW` and caption the unknown tokens.
+            if id == 0 {
+                failure = Some("an <|plamo:unk|> token");
+                break;
+            }
+            // `のののの…` in llama.cpp #31889: stop before a degenerate run reaches a caption.
+            if run >= REPEAT_STOP {
+                failure = Some("one token repeated");
+                break;
+            }
+            // `special = false`: control tokens are never rendered, so a model that emits one by
+            // mistake cannot leak it into a caption.
+            out.extend(vocab.token_to_piece(tok, false, None));
             if let Some(stop) = pfml::STOP.iter().find_map(|s| find(&out, s.as_bytes())) {
                 out.truncate(stop);
+                finished = true;
                 break;
             }
             // Emit only whole UTF-8 characters.
@@ -326,6 +407,19 @@ impl Translator for Plamo {
             batch.add(tok, pos, &[0], true).map_err(|e| e.to_string())?;
             pos += 1;
             ctx.decode(&mut batch).map_err(|e| e.to_string())?;
+        }
+        if failure.is_none() && out.is_empty() && !finished {
+            failure = Some("no text before the token budget ran out");
+        }
+        if let Some(reason) = failure {
+            let summary = self.summarize(&sampled);
+            log::error!("translator failed: {reason}; {} token(s) sampled [{summary}], {} prompt tokens, {}->{}, history {}, model {}, gpu_layers {}",
+                sampled.len(), tokens.len(), req.source_lang.unwrap_or("auto"), req.target_lang, req.history.len(), self.model_file, self.gpu_layers);
+            let hint = match self.gpu_layers {
+                0 => "the model output is degenerate",
+                _ => "the GPU backend is likely broken for this model (try the translator on the CPU)",
+            };
+            return Err(format!("translator failed ({reason}; {summary}); {hint}"));
         }
         Ok(String::from_utf8_lossy(&out).trim().to_string())
     }
