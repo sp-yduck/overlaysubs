@@ -13,8 +13,9 @@ apply to the distributed builds.
   `overlaysubs.exe`; it is covered by the Apache-2.0 text reproduced in
   [§4](#4-license-texts). For speaker colors, every installer also ships the
   **sherpa-onnx** C API (Apache-2.0) and **ONNX Runtime** (MIT) shared
-  libraries; see [§1.4](#14-sherpa-onnx--apache-20) and
-  [§1.5](#15-onnx-runtime--mit).
+  libraries, and the two speaker models: 3D-Speaker CAM++ (Apache-2.0) and
+  pyannote segmentation-3.0 (MIT); see [§1.4](#14-sherpa-onnx--apache-20) to
+  [§1.7](#17-pyannote-segmentation-30-speaker-model--mit).
 - **Rust dependencies.** The application statically links the third-party Rust
   crates listed in [§3](#3-rust-dependency-inventory). All of them are covered
   by the license texts reproduced in [§4](#4-license-texts).
@@ -26,9 +27,7 @@ apply to the distributed builds.
   next to it.
 - **Downloaded at runtime (not part of the installers).** On first run the app
   downloads model files from Hugging Face: OpenAI Whisper GGML models (MIT),
-  Silero VAD (MIT) and PLaMo 3 Translate models. Turning speaker colors on
-  downloads two more: 3D-Speaker CAM++ (Apache-2.0) and pyannote
-  segmentation-3.0 (MIT). PLaMo is **not** open source;
+  Silero VAD (MIT) and PLaMo 3 Translate models. PLaMo is **not** open source;
   it is governed by the PLaMo Community License (revised November 9, 2026),
   provided by Preferred Networks, Inc. Personal and academic use are free;
   commercial use requires prior registration with PFN:
@@ -218,17 +217,63 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### 1.6 3D-Speaker CAM++ speaker model — Apache-2.0
+
+Bundled file: `speaker-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx` (28281165 bytes, SHA-256 `53cab20ba8f2eb2f6e2d89ecc18e88ef3222169b61b4419cbc13666744a4574b`), from <https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/a8055d6daef723a6a4ecf4de233708575bf4994f/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx>.
+
+Model: iic/speech_campplus_sv_zh_en_16k-common_advanced by the 3D-Speaker
+project (Alibaba Tongyi Lab),
+<https://modelscope.cn/models/iic/speech_campplus_sv_zh_en_16k-common_advanced>;
+upstream repository <https://github.com/modelscope/3D-Speaker>. ONNX
+conversion by sherpa-onnx.
+
+License text: Apache License 2.0, reproduced in [§4](#4-license-texts) and
+installed as `speaker-models/LICENSE-3dspeaker-campplus.txt`.
+
+### 1.7 pyannote segmentation-3.0 speaker model — MIT
+
+Bundled file: `speaker-models/pyannote-segmentation-3.0.onnx` (5992913 bytes, SHA-256 `220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079`), from <https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/9403a6902bb58e3d5ae8c7e77c3422de279db2e0/model.onnx>.
+
+Model: <https://huggingface.co/pyannote/segmentation-3.0>. ONNX conversion
+by sherpa-onnx. Installed with its license as
+`speaker-models/LICENSE-pyannote-segmentation.txt`.
+
+License text:
+
+```text
+MIT License
+
+Copyright (c) 2022 CNRS
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## 2. Runtime-downloaded model assets
 
 These files are **not** included in the installers. OverlaySubs downloads them
-on first run (the speaker models when speaker colors are turned on) from
-Hugging Face or a GitHub release, and verifies each file against the size and
+on first run from Hugging Face, and verifies each file against the size and
 SHA-256 values declared in [`models.json`](https://github.com/sp-yduck/overlaysubs/blob/main/models.json). The MIT license text
 that covers the Whisper and Silero VAD assets is reproduced in [§4
-("MIT")](#4-license-texts), and the Apache License 2.0 text that covers the
-CAM++ speaker model in [§4](#4-license-texts); the PLaMo assets are governed by
-the PLaMo Community License (revised November 9, 2026) linked in the header of
-this document.
+("MIT")](#4-license-texts); the PLaMo assets are governed by the PLaMo
+Community License (revised November 9, 2026) linked in the header of this
+document. The speaker models are bundled instead; see [§1.6](#16-3d-speaker-campp-speaker-model--apache-20)
+and [§1.7](#17-pyannote-segmentation-30-speaker-model--mit).
 
 | Model file | Repository | Pinned revision | License |
 |---|---|---|---|
@@ -243,8 +288,6 @@ this document.
 | plamo-3-translate-2b-Q4_K_M.gguf | `pfnet/plamo-3-translate-2b-GGUF` | `232fbd7916519edecddfdae0beae7e76fe70453f` | PLaMo Community License, revised 2026-11-09 (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>) |
 | plamo-3-translate-0.8b-Q4_K_M.gguf | `pfnet/plamo-3-translate-0.8b-GGUF` | `dbeb0856cb0b004b484f190bb71dd65876297013` | PLaMo Community License, revised 2026-11-09 (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>) |
 | ggml-silero-v6.2.0.bin | `ggml-org/whisper-vad` | `9ffd54a1e1ee413ddf265af9913beaf518d1639b` | MIT (Silero VAD) |
-| 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx | `csukuangfj/speaker-embedding-models` | `a8055d6daef723a6a4ecf4de233708575bf4994f` | Apache-2.0 (3D-Speaker CAM++, ONNX conversion by sherpa-onnx) |
-| model.onnx | `csukuangfj/sherpa-onnx-pyannote-segmentation-3-0` | `9403a6902bb58e3d5ae8c7e77c3422de279db2e0` | MIT (pyannote segmentation-3.0, ONNX conversion) |
 
 Attribution for the MIT-licensed model weights and the VAD model:
 
@@ -257,12 +300,6 @@ Attribution for the MIT-licensed model weights and the VAD model:
   academic use are free; commercial use requires prior registration with
   PFN. See
   <https://plamo.preferredai.jp/info/plamo-community-license-en>.
-- 3D-Speaker CAM++ (speech_campplus_sv_zh_en_16k-common_advanced): Apache
-  License 2.0, by the 3D-Speaker project (Alibaba Tongyi Lab). Model card:
-  <https://modelscope.cn/models/iic/speech_campplus_sv_zh_en_16k-common_advanced>;
-  upstream repository: <https://github.com/modelscope/3D-Speaker>.
-- pyannote segmentation-3.0: Copyright (c) 2022 CNRS (MIT). Model card:
-  <https://huggingface.co/pyannote/segmentation-3.0>.
 
 ## 3. Rust dependency inventory
 
