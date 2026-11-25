@@ -2,6 +2,14 @@
 resolver = "2"
 members = ["crates/core", "src-tauri"]
 
+# whisper-rs-sys 0.15.0 (the newest on crates.io) bundles whisper.cpp v1.8.3, whose DTW
+# median filter aborts the process when a 100-160 ms window produces a segment (#93).
+# whisper.cpp fixed it in v1.9.6 (ggml-org/whisper.cpp#4096); this is that fix applied to
+# the published crate, which is otherwise unmodified. Drop the patch and the directory once
+# a released whisper-rs-sys bundles whisper.cpp >= v1.9.6; see vendor/README.md.
+[patch.crates-io]
+whisper-rs-sys = { path = "vendor/whisper-rs-sys" }
+
 # Single source of truth for the app version. The member crates inherit it with
 # `version.workspace = true`, and Tauri falls back to the Cargo package version because
 # src-tauri/tauri.conf.json has no "version" field. Bump it with scripts/set-version.sh.

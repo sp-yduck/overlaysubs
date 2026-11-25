@@ -22,3 +22,6 @@
 
 # The lockfile is generated; keep it diffable but out of language statistics.
 Cargo.lock linguist-generated=true
+
+# Vendored whisper-rs-sys sources, including whisper.cpp and ggml (see vendor/README.md).
+vendor/** linguist-vendored
