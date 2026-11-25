@@ -212,8 +212,7 @@ function modelsPage() {
       ${modelRow("asr", "asr")}${modelRow("translator", "translator")}${modelRow("vad", "vad")}
       ${snap.gpu_build ? "" : `<p class="muted small">${t("gpu_build_cpu")}</p>`}
       ${snap.running ? `<p class="muted small">${t("model_restart_note")}</p>` : ""}
-      <div class="row">${btn("download", busy.has("download") ? t("downloading") : `${t("download")} (${gb(total)})`, { cls: ready ? "" : "primary", disabled: ready })}</div>
-      ${speakerModelsRow()}`
+      <div class="row">${btn("download", busy.has("download") ? t("downloading") : `${t("download")} (${gb(total)})`, { cls: ready ? "" : "primary", disabled: ready })}</div>`
     : `<p class="muted">${t("step_locked")}</p>`)}
   ${step(3, !!benchMsg, !ready, t("step_bench"), `<p class="muted">${t("step_bench_desc")}</p>
     <div class="row">${btn("bench", busy.has("bench") ? t("benchmarking") : t("benchmark"), { disabled: !ready })}${benchMsg ? `<span>${esc(benchMsg)}</span>` : ""}</div>`)}
@@ -254,37 +253,10 @@ function homePage() {
   ${card(t("recent"), `<div class="hist" data-hist="6"></div>`)}`;
 }
 
-/** The models speaker colors need (registry kinds "speaker" and "segmentation"), and those not downloaded. */
-const speakerModels = () => snap.registry.models.filter((m) => m.kind === "speaker" || m.kind === "segmentation");
-const speakerMissing = () => speakerModels().filter((m) => !snap.downloaded.includes(m.id));
-
-/** Speaker colors, in builds that can tell speakers apart. Turning it on downloads the models it still needs. */
-/** The speaker models' state: downloaded (with Delete), downloading (progress per model), or missing (with Download). */
-function speakerStatus() {
-  const models = speakerModels();
-  const missing = speakerMissing();
-  const loading = busy.has("diarize-download") || missing.some((m) => progress[m.id]);
-  return !missing.length
-    ? `<span class="ok">✓ ${t("downloaded")}</span> <span class="muted">· ${gb(models.reduce((a, m) => a + m.size, 0))}</span> ${btn("diarize-delete", t("delete"), { cls: "small" })}`
-    : loading
-      ? missing.map((m) => `<span data-mstatus="${esc(m.id)}">${progress[m.id] ? progressView(progress[m.id]) : `<span class="muted">${t("downloading")}</span>`}</span>`).join(" ")
-      : `<span class="muted">${t("missing")} · ${gb(missing.reduce((a, m) => a + m.size, 0))}</span> ${btn("diarize-download", t("download"), { cls: "small" })}`;
-}
-
-/** The speaker-color toggle with its models' state; turning it on downloads what is missing. */
+/** Speaker colors, in builds that can tell speakers apart (the models ship with the app). */
 function diarizeField() {
   if (!snap.diarize_build) return "";
-  return `<label class="chk"><input type="checkbox" data-k="diarize" data-t="check" ${snap.settings.diarize ? "checked" : ""}> ${esc(t("diarize"))}</label>
-    <div class="mstatus small"><span class="muted">${t("diarize_models")}:</span> ${speakerStatus()}</div>`;
-}
-
-/** On the models page: the optional speaker models (not part of the setup that translation needs). */
-function speakerModelsRow() {
-  if (!snap.diarize_build) return "";
-  const list = speakerModels().map((m) => `${esc(m.label)} · ${gb(m.size)}`).join("<br>");
-  return `<div class="mrow">
-    <div class="f"><span>${t("diarize_models")}</span><span class="muted small">${t("diarize_models_note")}<br>${list}</span></div>
-    <div class="mstatus">${speakerStatus()}</div></div>`;
+  return `<label class="chk"><input type="checkbox" data-k="diarize" data-t="check" ${snap.settings.diarize ? "checked" : ""}> ${esc(t("diarize"))}</label>`;
 }
 
 const sourceUrl = () => `http://127.0.0.1:${snap.settings.browser_source_port}/`;
@@ -525,8 +497,7 @@ document.addEventListener("change", (ev) => {
   // Number inputs accept typed values outside their min/max; normalize before saving so the file
   // holds the same values the overlay clamps to.
   if (k.startsWith("overlay.")) snap.settings.overlay = overlayConfig(snap.settings.overlay);
-  const fetchSpeakers = k === "diarize" && v && speakerMissing().length > 0;
-  persist().then(() => fetchSpeakers && runAct("diarize-download"));
+  persist();
 });
 
 async function act(name, id, el) {
@@ -549,15 +520,6 @@ async function act(name, id, el) {
     await invoke("download", { ids: [s.vad, s.asr, s.translator].filter((id) => !snap.downloaded.includes(id)) });
     progress = {};
     toast(t("download_done"));
-  }
-  if (name === "diarize-download") {
-    await invoke("download", { ids: speakerMissing().map((m) => m.id) });
-    progress = {};
-    toast(t("download_done"));
-  }
-  if (name === "diarize-delete") {
-    for (const m of speakerModels()) if (snap.downloaded.includes(m.id)) await invoke("delete_model", { id: m.id });
-    toast(t("deleted"));
   }
   if (name === "overlay-reset") {
     await invoke("reset_overlay_position");
@@ -653,10 +615,9 @@ listen("download", (e) => {
   // it with a progress bar that would stay until the next render.
   if (snap?.downloaded.includes(p.id)) return;
   progress[p.id] = p;
-  // Progress is shown on the models page and, for the speaker models, under their toggle on the home page.
-  // Re-rendering on every chunk replaces the nav buttons between mousedown and mouseup, so clicks are lost
-  // until the download ends: the status cells are patched instead.
-  if (page !== "models" && page !== "home") return;
+  // Progress is shown only on the models page. Re-rendering other pages on every chunk replaces the nav
+  // buttons between mousedown and mouseup, so clicks are lost until the download ends.
+  if (page !== "models") return;
   // Patch the status cell of the row that shows this model. The cell is keyed by model id, so a selection
   // change during the download removes it and leaves nothing to update; switching back re-renders from the
   // recorded progress. Never render() here: rebuilding the page between mousedown and mouseup swallows the

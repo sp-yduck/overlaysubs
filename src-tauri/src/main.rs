@@ -596,8 +596,9 @@ fn start(app: AppHandle, st: State<App>) -> Result<(), String> {
 
 /// Speaker colors (`diarize` builds, the setting on): the speaker embedding model labels each sentence's
 /// speaker, and the segmentation model finds where the speaker changes inside a draft so the caption is cut
-/// there. Both are downloaded from the settings page; with either missing or failing to load, captions have no
-/// speaker, as with the setting off.
+/// there. Both ship with the app (resources, `speaker-models/`); a copy in the models folder is used when the
+/// resources lack one (a development build without `scripts/stage-speaker-models.py`). With either missing or
+/// failing to load, captions have no speaker, as with the setting off.
 #[cfg(feature = "diarize")]
 fn load_speaker_models(app: &AppHandle, s: &Settings, session: &mut Session) {
     use overlaysubs_core::registry::Kind;
@@ -605,9 +606,13 @@ fn load_speaker_models(app: &AppHandle, s: &Settings, session: &mut Session) {
         Ok(r) => (r, models_dir(app, s)),
         Err(e) => return log::error!("speaker labels off: {e}"),
     };
-    let path = |k: Kind| reg.models.iter().find(|m| m.kind == k).filter(|m| download::present(&dir.join(&m.file), m.size)).map(|m| dir.join(&m.file));
+    let bundled = app.path().resource_dir().map(|d| d.join("speaker-models")).ok();
+    let path = |k: Kind| {
+        let m = reg.models.iter().find(|m| m.kind == k)?;
+        bundled.iter().chain([&dir]).map(|d| d.join(&m.file)).find(|p| download::present(p, m.size))
+    };
     let (Some(voice), Some(seg)) = (path(Kind::Speaker), path(Kind::Segmentation)) else {
-        return log::info!("speaker labels off: the speaker models are not downloaded");
+        return log::error!("speaker labels off: the speaker models are missing");
     };
     match (engine::Voice::load(&voice, 2), engine::Segmentation::load(&seg, 2)) {
         (Ok(v), Ok(g)) => {

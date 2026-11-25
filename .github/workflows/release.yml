@@ -259,6 +259,16 @@ jobs:
           cmake --version | Select-Object -First 1
           ninja --version
 
+      # The installers bundle the two speaker models (speaker colors): fetched at their models.json pins into
+      # src-tauri/speaker-models/ (bundle.resources); a size or SHA-256 mismatch fails the build.
+      - name: Stage the bundled speaker models
+        shell: bash
+        run: |
+          set -euo pipefail
+          py=$(command -v python || command -v python3)
+          "$py" scripts/stage-speaker-models.py
+          ls -l src-tauri/speaker-models
+
       # --- Windows: short target dir + placeholder DLLs, exactly as in the previous ci.yml bundle job ---
       - name: Build Windows binary with staged DLLs
         if: runner.os == 'Windows'

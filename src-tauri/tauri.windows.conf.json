@@ -1,1 +1,1 @@
-{ "bundle": { "resources": { "libs/*.dll": "./", "../THIRD_PARTY_NOTICES.md": "./", "../licenses/onnxruntime/ThirdPartyNotices.txt": "./onnxruntime-ThirdPartyNotices.txt" } } }
+{ "bundle": { "resources": { "libs/*.dll": "./", "../THIRD_PARTY_NOTICES.md": "./", "../licenses/onnxruntime/ThirdPartyNotices.txt": "./onnxruntime-ThirdPartyNotices.txt", "speaker-models/*": "speaker-models/" } } }

@@ -5,7 +5,8 @@
   "bundle": {
     "resources": {
       "../THIRD_PARTY_NOTICES.md": "./",
-      "../licenses/onnxruntime/ThirdPartyNotices.txt": "./onnxruntime-ThirdPartyNotices.txt"
+      "../licenses/onnxruntime/ThirdPartyNotices.txt": "./onnxruntime-ThirdPartyNotices.txt",
+      "speaker-models/*": "speaker-models/"
     },
     "macOS": {
       "files": {

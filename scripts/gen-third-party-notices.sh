@@ -408,8 +408,9 @@ apply to the distributed builds.
   `overlaysubs.exe`; it is covered by the Apache-2.0 text reproduced in
   [§4](#4-license-texts). For speaker colors, every installer also ships the
   **sherpa-onnx** C API (Apache-2.0) and **ONNX Runtime** (MIT) shared
-  libraries; see [§1.4](#14-sherpa-onnx--apache-20) and
-  [§1.5](#15-onnx-runtime--mit).
+  libraries, and the two speaker models: 3D-Speaker CAM++ (Apache-2.0) and
+  pyannote segmentation-3.0 (MIT); see [§1.4](#14-sherpa-onnx--apache-20) to
+  [§1.7](#17-pyannote-segmentation-30-speaker-model--mit).
 - **Rust dependencies.** The application statically links the third-party Rust
   crates listed in [§3](#3-rust-dependency-inventory). All of them are covered
   by the license texts reproduced in [§4](#4-license-texts).
@@ -421,9 +422,7 @@ apply to the distributed builds.
   next to it.
 - **Downloaded at runtime (not part of the installers).** On first run the app
   downloads model files from Hugging Face: OpenAI Whisper GGML models (MIT),
-  Silero VAD (MIT) and PLaMo 3 Translate models. Turning speaker colors on
-  downloads two more: 3D-Speaker CAM++ (Apache-2.0) and pyannote
-  segmentation-3.0 (MIT). PLaMo is **not** open source;
+  Silero VAD (MIT) and PLaMo 3 Translate models. PLaMo is **not** open source;
   it is governed by the PLaMo Community License (revised November 9, 2026),
   provided by Preferred Networks, Inc. Personal and academic use are free;
   commercial use requires prior registration with PFN:
@@ -530,24 +529,46 @@ SECTION1
   cat "$tmp/onnxruntime-license.txt"
   printf '```\n\n'
 
+  # The speaker models are bundled (src-tauri/speaker-models/, staged from their
+  # models.json pins by scripts/stage-speaker-models.py); their license files
+  # are installed next to them.
+  printf '### 1.6 3D-Speaker CAM++ speaker model — Apache-2.0\n\n'
+  jq -r '.models[] | select(.kind == "speaker") | "Bundled file: `speaker-models/\(.file)` (\(.size) bytes, SHA-256 `\(.sha256)`), from <\(.url)>.\n"' "$models_json"
+  printf 'Model: iic/speech_campplus_sv_zh_en_16k-common_advanced by the 3D-Speaker\n'
+  printf 'project (Alibaba Tongyi Lab),\n'
+  printf '<https://modelscope.cn/models/iic/speech_campplus_sv_zh_en_16k-common_advanced>;\n'
+  printf 'upstream repository <https://github.com/modelscope/3D-Speaker>. ONNX\n'
+  printf 'conversion by sherpa-onnx.\n\n'
+  printf 'License text: Apache License 2.0, reproduced in [§4](#4-license-texts) and\n'
+  printf 'installed as `speaker-models/LICENSE-3dspeaker-campplus.txt`.\n\n'
+
+  printf '### 1.7 pyannote segmentation-3.0 speaker model — MIT\n\n'
+  jq -r '.models[] | select(.kind == "segmentation") | "Bundled file: `speaker-models/\(.file)` (\(.size) bytes, SHA-256 `\(.sha256)`), from <\(.url)>.\n"' "$models_json"
+  printf 'Model: <https://huggingface.co/pyannote/segmentation-3.0>. ONNX conversion\n'
+  printf 'by sherpa-onnx. Installed with its license as\n'
+  printf '`speaker-models/LICENSE-pyannote-segmentation.txt`.\n\n'
+  printf 'License text:\n\n```text\n'
+  sed -n '/^MIT License/,$p' "$root/src-tauri/speaker-models/LICENSE-pyannote-segmentation.txt"
+  printf '```\n\n'
+
   # --- §2 runtime model assets ---------------------------------------------
   cat <<'SECTION2'
 ## 2. Runtime-downloaded model assets
 
 These files are **not** included in the installers. OverlaySubs downloads them
-on first run (the speaker models when speaker colors are turned on) from
-Hugging Face or a GitHub release, and verifies each file against the size and
+on first run from Hugging Face, and verifies each file against the size and
 SHA-256 values declared in [`models.json`](https://github.com/sp-yduck/overlaysubs/blob/main/models.json). The MIT license text
 that covers the Whisper and Silero VAD assets is reproduced in [§4
-("MIT")](#4-license-texts), and the Apache License 2.0 text that covers the
-CAM++ speaker model in [§4](#4-license-texts); the PLaMo assets are governed by
-the PLaMo Community License (revised November 9, 2026) linked in the header of
-this document.
+("MIT")](#4-license-texts); the PLaMo assets are governed by the PLaMo
+Community License (revised November 9, 2026) linked in the header of this
+document. The speaker models are bundled instead; see [§1.6](#16-3d-speaker-campp-speaker-model--apache-20)
+and [§1.7](#17-pyannote-segmentation-30-speaker-model--mit).
 
 | Model file | Repository | Pinned revision | License |
 |---|---|---|---|
 SECTION2
   jq -r '.models[]
+    | select(.kind != "speaker" and .kind != "segmentation")
     | (.url | (capture("^https://huggingface\\.co/(?<repo>[^/]+/[^/]+)/resolve/(?<rev>[0-9a-f]{40})/(?<file>[^/]+)$")
                // (capture("^https://github\\.com/(?<repo>[^/]+/[^/]+)/releases/download/(?<tag>[^/]+)/(?<file>[^/]+)$")
                    | .rev = "release " + .tag + ", SHA-256 in models.json")))
@@ -557,8 +578,6 @@ SECTION2
       ggerganov/whisper.cpp) license='MIT (OpenAI Whisper weights, GGML conversion)' ;;
       ggml-org/whisper-vad) license='MIT (Silero VAD)' ;;
       pfnet/plamo-3-translate-*) license='PLaMo Community License, revised 2026-11-09 (not open source; see <https://plamo.preferredai.jp/info/plamo-community-license-en>)' ;;
-      csukuangfj/speaker-embedding-models) license='Apache-2.0 (3D-Speaker CAM++, ONNX conversion by sherpa-onnx)' ;;
-      csukuangfj/sherpa-onnx-pyannote-segmentation-3-0) license='MIT (pyannote segmentation-3.0, ONNX conversion)' ;;
       *) license='see model card' ;;
     esac
     printf '| %s | `%s` | `%s` | %s |\n' "$file" "$repo" "$rev" "$license"
@@ -573,13 +592,7 @@ SECTION2
   printf '  November 9, 2026), provided by Preferred Networks, Inc. Personal and\n'
   printf '  academic use are free; commercial use requires prior registration with\n'
   printf '  PFN. See\n'
-  printf '  <https://plamo.preferredai.jp/info/plamo-community-license-en>.\n'
-  printf -- '- 3D-Speaker CAM++ (speech_campplus_sv_zh_en_16k-common_advanced): Apache\n'
-  printf '  License 2.0, by the 3D-Speaker project (Alibaba Tongyi Lab). Model card:\n'
-  printf '  <https://modelscope.cn/models/iic/speech_campplus_sv_zh_en_16k-common_advanced>;\n'
-  printf '  upstream repository: <https://github.com/modelscope/3D-Speaker>.\n'
-  printf -- '- pyannote segmentation-3.0: Copyright (c) 2022 CNRS (MIT). Model card:\n'
-  printf '  <https://huggingface.co/pyannote/segmentation-3.0>.\n\n'
+  printf '  <https://plamo.preferredai.jp/info/plamo-community-license-en>.\n\n'
 
   # --- §3 Rust dependency inventory ----------------------------------------
   printf '## 3. Rust dependency inventory\n\n'
