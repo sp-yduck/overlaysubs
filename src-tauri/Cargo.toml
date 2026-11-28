@@ -40,7 +40,7 @@ ort = { version = "=2.0.0-rc.15", optional = true, default-features = false, fea
 # macOS system audio comes from ScreenCaptureKit: cpal only sees input devices there, and a
 # loopback/virtual audio driver would have to be installed by the user.
 [target.'cfg(target_os = "macos")'.dependencies]
-screencapturekit = { version = "11.1.2", features = ["macos_13_0"] }
+screencapturekit = { version = "12.0.0", features = ["macos_13_0"] }
 
 # Per-app capture needs WASAPI process loopback, which cpal does not expose.
 [target.'cfg(windows)'.dependencies]
