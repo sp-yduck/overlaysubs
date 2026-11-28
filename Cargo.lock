@@ -3854,9 +3854,9 @@ dependencies = [
 
 [[package]]
 name = "sherpa-onnx"
-version = "2.0.1"
+version = "2.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6956e34735af6efe416f5879181eee8e1b51be57dc6ce0a053691ae747114089"
+checksum = "fc2e2d06c5cdeb6ac49cf859a2d1588aa7c27795ef2b16232ae9c60ab3754251"
 dependencies = [
  "serde",
  "serde_json",
@@ -3865,9 +3865,9 @@ dependencies = [
 
 [[package]]
 name = "sherpa-onnx-sys"
-version = "2.0.1"
+version = "2.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bc46e5fb3aab39141d48ad8763d0891e0b9e0fbc8e3bdefaa63704d1bf00054"
+checksum = "10f04396502e412187635ed9f0eb1b6ee9f9680d9bd04cdfdd4c8b709019c1f1"
 dependencies = [
  "bzip2 0.4.4",
  "tar",
@@ -4194,9 +4194,9 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 
 [[package]]
 name = "tauri"
-version = "2.12.6"
+version = "2.12.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c2a5cad3827d1fa46c206a6bcaee8ca14203e9b0aaabe447dd4acef33ecd065"
+checksum = "30fbfbb9dc9a2697b0e96d909ddc295fb18d2d82a58ed542ab8d9eba2edbe6da"
 dependencies = [
  "anyhow",
  "bytes",
